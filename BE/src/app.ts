@@ -1,6 +1,8 @@
 import express, { Application, Request, Response } from 'express';
 import cors from 'cors';
 import { errorHandler } from './middlewares/errorHandler';
+import authRoutes from './routes/auth.routes';
+import userRoutes from './routes/user.routes';
 
 const app: Application = express();
 
@@ -17,8 +19,9 @@ app.get('/api/health', (req: Request, res: Response) => {
   res.json({ status: 'OK', message: 'Server is running' });
 });
 
-// Import routes here
-// app.use('/api/users', userRoutes);
+// API Routes
+app.use('/api/auth', authRoutes);
+app.use('/api/users', userRoutes);
 // app.use('/api/products', productRoutes);
 
 // Error handler

@@ -8,6 +8,56 @@ export class UserController {
     this.userService = new UserService();
   }
 
+  // Authentication
+  register = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const { email, password, name, role } = req.body;
+      
+      if (!email || !password || !name) {
+        res.status(400).json({
+          success: false,
+          message: 'Please provide email, password and name'
+        });
+        return;
+      }
+
+      const result = await this.userService.register({ email, password, name, role });
+      
+      res.status(201).json({
+        success: true,
+        message: 'User registered successfully',
+        data: result
+      });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  login = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const { email, password } = req.body;
+      
+      if (!email || !password) {
+        res.status(400).json({
+          success: false,
+          message: 'Please provide email and password'
+        });
+        return;
+      }
+
+      const result = await this.userService.login(email, password);
+      
+      res.status(200).json({
+        success: true,
+        message: 'Login successful',
+        data: result
+      });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  // User CRUD
   getAllUsers = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const users = await this.userService.getAllUsers();
