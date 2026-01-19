@@ -1,19 +1,35 @@
-import { Routes, Route } from 'react-router-dom';
-import Layout from './components/Layout/Layout';
-import HomePage from './pages/HomePage';
-import ProductsPage from './pages/ProductsPage';
-import AboutPage from './pages/AboutPage';
+import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { CartProvider } from './context/CartContext';
+import HomePage from './pages/HomePage/Home';
+import CartPage from './pages/HomePage/CartPage';
+import CheckoutPage from './pages/HomePage/CheckoutPage';
+import OrderSuccessPage from './pages/HomePage/OrderSuccessPage';
+import LoginPage from './pages/HomePage/LoginPage';
+import SignUpPage from './pages/HomePage/SignUpPage';
+import ForgotPasswordPage from './pages/HomePage/ForgotPasswordPage';
+import RecipesCooking from './pages/HomePage/RecipesCooking';
+import FarmStories from './pages/HomePage/FarmStories';
+import MarketNewsTips from './pages/HomePage/MarketNewsTips';
+import AboutUs from './pages/HomePage/AboutUs';
 
-function App() {
+export default function App() {
   return (
-    <Layout>
-      <Routes>
-        <Route path="/" element={<HomePage />} />
-        <Route path="/products" element={<ProductsPage />} />
-        <Route path="/about" element={<AboutPage />} />
-      </Routes>
-    </Layout>
+    <CartProvider>
+      <BrowserRouter>
+        <Routes>
+          <Route path="/" element={<HomePage />} />
+          <Route path="/cart" element={<CartPage />} />
+          <Route path="/checkout" element={<CheckoutPage />} />
+          <Route path="/order-success" element={<OrderSuccessPage />} />
+          <Route path="/login" element={<LoginPage />} />
+          <Route path="/signup" element={<SignUpPage />} />
+          <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+          <Route path="/blogs/cooking-tips" element={<RecipesCooking />} />
+          <Route path="/blogs/green-living" element={<FarmStories />} />
+          <Route path="/blogs/news-offers" element={<MarketNewsTips />} />
+          <Route path="/about" element={<AboutUs />} />
+        </Routes>
+      </BrowserRouter>
+    </CartProvider>
   );
 }
-
-export default App;
