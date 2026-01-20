@@ -13,6 +13,7 @@ import RecipesCooking from './pages/HomePage/RecipesCooking';
 import FarmStories from './pages/HomePage/FarmStories';
 import MarketNewsTips from './pages/HomePage/MarketNewsTips';
 import AboutUs from './pages/HomePage/AboutUs';
+import Profile from './pages/Customer/Profile';
 
 export default function App() {
   return (
@@ -32,6 +33,7 @@ export default function App() {
             <Route path="/blogs/green-living" element={<FarmStories />} />
             <Route path="/blogs/news-offers" element={<MarketNewsTips />} />
             <Route path="/about" element={<AboutUs />} />
+            <Route path="/profile" element={<Profile />} />
           </Routes>
         </BrowserRouter>
       </CartProvider>
