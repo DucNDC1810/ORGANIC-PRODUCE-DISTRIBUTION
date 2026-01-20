@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { ArrowLeft, Minus, Plus, X, ShoppingCart, Leaf, Truck, Shield } from 'lucide-react';
+import { Minus, Plus, X, ShoppingCart, Truck, Shield } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useCart } from '../../context/CartContext';
 import { ImageWithFallback } from '../../components/figma/ImageWithFallback';

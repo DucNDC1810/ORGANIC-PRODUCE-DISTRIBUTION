@@ -1,6 +1,5 @@
-import { Search, ShoppingCart, Leaf, TrendingUp, Truck, Shield, Clock } from 'lucide-react';
+import { Leaf, TrendingUp, Truck, Shield, Clock } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { useCart } from '../../context/CartContext';
 import ProductCard from '../../components/ProductCard';
 import MiniCart from '../../components/MiniCart';
 import Header from '../../components/Header';
@@ -73,8 +72,6 @@ const products = [
 ];
 
 export default function HomePage() {
-  const { getTotalItems } = useCart();
-
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}

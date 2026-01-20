@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { CheckCircle, Package, Home, Leaf } from 'lucide-react';
+import { CheckCircle, Package, Home } from 'lucide-react';
 import { motion } from 'framer-motion';
 import Header from '../../components/Header';
 

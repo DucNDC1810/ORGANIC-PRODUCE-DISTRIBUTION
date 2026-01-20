@@ -120,7 +120,7 @@ export default function MarketNewsTips() {
           {/* Main Column - Blog Posts (70%) */}
           <main className="flex-1 max-w-3xl">
             <div className="space-y-8">
-              {blogPosts.map((post, index) => (
+              {blogPosts.map((post) => (
                 <article 
                   key={post.id}
                   className="flex gap-6 pb-8 border-b border-border last:border-b-0 group cursor-pointer"

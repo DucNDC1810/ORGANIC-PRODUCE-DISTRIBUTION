@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { User, ShoppingBag, MapPin, LogOut, Phone, Mail, Home } from 'lucide-react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import Header from '../../components/Header';
 

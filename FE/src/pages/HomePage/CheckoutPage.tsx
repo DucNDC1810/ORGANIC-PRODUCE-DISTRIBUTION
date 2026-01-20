@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Check, CreditCard, Leaf, MapPin, User, Lock } from 'lucide-react';
+import { Check, CreditCard, MapPin, User, Lock } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useCart } from '../../context/CartContext';
 import Header from '../../components/Header';
