@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { Toaster } from 'sonner';
 import { CartProvider } from './context/CartContext';
 import { AuthProvider } from './context/AuthContext';
+import { ProtectedRoute, CustomerRoute } from './components/ProtectedRoute';
 import HomePage from './pages/HomePage/Home';
 import CartPage from './pages/HomePage/CartPage';
 import CheckoutPage from './pages/HomePage/CheckoutPage';
@@ -22,10 +23,8 @@ export default function App() {
         <BrowserRouter>
           <Toaster position="top-right" richColors />
           <Routes>
+            {/* Public routes */}
             <Route path="/" element={<HomePage />} />
-            <Route path="/cart" element={<CartPage />} />
-            <Route path="/checkout" element={<CheckoutPage />} />
-            <Route path="/order-success" element={<OrderSuccessPage />} />
             <Route path="/login" element={<LoginPage />} />
             <Route path="/signup" element={<SignUpPage />} />
             <Route path="/forgot-password" element={<ForgotPasswordPage />} />
@@ -33,7 +32,42 @@ export default function App() {
             <Route path="/blogs/green-living" element={<FarmStories />} />
             <Route path="/blogs/news-offers" element={<MarketNewsTips />} />
             <Route path="/about" element={<AboutUs />} />
-            <Route path="/profile" element={<Profile />} />
+
+            {/* Protected routes - require authentication */}
+            <Route 
+              path="/cart" 
+              element={
+                <ProtectedRoute>
+                  <CartPage />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/checkout" 
+              element={
+                <ProtectedRoute>
+                  <CheckoutPage />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/order-success" 
+              element={
+                <ProtectedRoute>
+                  <OrderSuccessPage />
+                </ProtectedRoute>
+              } 
+            />
+
+            {/* Customer-only routes */}
+            <Route 
+              path="/profile" 
+              element={
+                <CustomerRoute>
+                  <Profile />
+                </CustomerRoute>
+              } 
+            />
           </Routes>
         </BrowserRouter>
       </CartProvider>

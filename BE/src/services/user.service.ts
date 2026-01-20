@@ -114,7 +114,7 @@ export class UserService {
     const token = jwt.sign(
       { id: userId }, 
       jwtSecret,
-      { expiresIn: '7d' }
+      { expiresIn: '15m' } // 15 minutes expiration
     );
     
     return token;

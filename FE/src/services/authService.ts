@@ -26,6 +26,12 @@ export interface AuthResponse {
   };
 }
 
+interface JWTPayload {
+  id: string;
+  exp?: number;
+  iat?: number;
+}
+
 class AuthService {
   async login(credentials: LoginCredentials): Promise<AuthResponse> {
     const response: any = await api.post('/auth/login', credentials);
@@ -59,8 +65,47 @@ class AuthService {
     return localStorage.getItem('token');
   }
 
+  // Decode JWT token without verification (client-side check only)
+  private decodeToken(token: string): JWTPayload | null {
+    try {
+      const base64Url = token.split('.')[1];
+      const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+      const jsonPayload = decodeURIComponent(
+        atob(base64)
+          .split('')
+          .map((c) => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
+          .join('')
+      );
+      return JSON.parse(jsonPayload);
+    } catch (error) {
+      return null;
+    }
+  }
+
+  // Check if token is expired
+  isTokenExpired(token?: string): boolean {
+    const tokenToCheck = token || this.getToken();
+    if (!tokenToCheck) return true;
+
+    const decoded = this.decodeToken(tokenToCheck);
+    if (!decoded || !decoded.exp) return true;
+
+    // Check if token is expired (exp is in seconds)
+    const currentTime = Math.floor(Date.now() / 1000);
+    return decoded.exp < currentTime;
+  }
+
   isAuthenticated() {
-    return !!this.getToken();
+    const token = this.getToken();
+    if (!token) return false;
+    
+    // Check if token is expired
+    if (this.isTokenExpired(token)) {
+      this.logout();
+      return false;
+    }
+    
+    return true;
   }
 }
 

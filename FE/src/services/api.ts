@@ -7,6 +7,13 @@ const api = axios.create({
   },
 });
 
+// Callback for handling logout on token expiration
+let onTokenExpiredCallback: (() => void) | null = null;
+
+export const setTokenExpiredCallback = (callback: () => void) => {
+  onTokenExpiredCallback = callback;
+};
+
 // Request interceptor
 api.interceptors.request.use(
   (config) => {
@@ -26,8 +33,17 @@ api.interceptors.response.use(
   (response) => response.data,
   (error) => {
     if (error.response?.status === 401) {
+      // Token expired or invalid
       localStorage.removeItem('token');
-      window.location.href = '/login';
+      localStorage.removeItem('user');
+      
+      // Call the callback if set (for updating AuthContext)
+      if (onTokenExpiredCallback) {
+        onTokenExpiredCallback();
+      } else {
+        // Fallback to page redirect
+        window.location.href = '/login';
+      }
     }
     return Promise.reject(error);
   }
