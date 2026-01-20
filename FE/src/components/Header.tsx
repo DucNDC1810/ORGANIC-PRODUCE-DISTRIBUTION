@@ -1,7 +1,17 @@
 import { useState } from 'react';
-import { Search, ShoppingCart, Leaf, Apple, Carrot, Beef, Nut, BookOpen, Lightbulb, Gift } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Search, ShoppingCart, Leaf, Apple, Carrot, Beef, Nut, BookOpen, Lightbulb, Gift, User, LogOut, Settings } from 'lucide-react';
+import { Link, useNavigate } from 'react-router-dom';
 import { useCart } from '../context/CartContext';
+import { useAuth } from '../context/AuthContext';
+import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
+import {
+  DropdownMenu as DropdownMenuUI,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from './ui/dropdown-menu';
 
 interface DropdownItem {
   icon: React.ReactNode;
@@ -54,8 +64,24 @@ function DropdownMenu({ items, isOpen }: DropdownMenuProps) {
 
 export default function Header() {
   const { getTotalItems } = useCart();
+  const { user, isAuthenticated, logout } = useAuth();
+  const navigate = useNavigate();
   const [productsOpen, setProductsOpen] = useState(false);
   const [blogsOpen, setBlogsOpen] = useState(false);
+
+  const handleLogout = () => {
+    logout();
+    navigate('/');
+  };
+
+  const getInitials = (name: string) => {
+    return name
+      .split(' ')
+      .map(n => n[0])
+      .join('')
+      .toUpperCase()
+      .slice(0, 2);
+  };
 
   return (
     <header className="sticky top-0 z-50 bg-white/80 backdrop-blur-md border-b border-border shadow-sm">
@@ -106,12 +132,49 @@ export default function Header() {
 
           {/* Actions */}
           <div className="flex items-center gap-4">
-            <Link 
-              to="/login"
-              className="px-5 py-2 bg-primary text-white rounded-lg font-medium hover:bg-primary-dark transition-colors shadow-sm hover:shadow-md"
-            >
-              Login
-            </Link>
+            {!isAuthenticated ? (
+              <Link 
+                to="/login"
+                className="px-5 py-2 bg-primary text-white rounded-lg font-medium hover:bg-primary-dark transition-colors shadow-sm hover:shadow-md"
+              >
+                Login
+              </Link>
+            ) : (
+              <DropdownMenuUI>
+                <DropdownMenuTrigger asChild>
+                  <button className="flex items-center gap-2 hover:opacity-80 transition-opacity">
+                    <Avatar className="w-9 h-9 border-2 border-primary shadow-sm">
+                      <AvatarImage src={user?.avatar} alt={user?.name} />
+                      <AvatarFallback className="bg-primary text-white text-sm font-semibold">
+                        {user?.name ? getInitials(user.name) : 'U'}
+                      </AvatarFallback>
+                    </Avatar>
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-56">
+                  <DropdownMenuLabel>
+                    <div className="flex flex-col space-y-1">
+                      <p className="text-sm font-medium leading-none">{user?.name}</p>
+                      <p className="text-xs leading-none text-muted-foreground">{user?.email}</p>
+                    </div>
+                  </DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={() => navigate('/profile')}>
+                    <User className="mr-2 h-4 w-4" />
+                    <span>Profile</span>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => navigate('/settings')}>
+                    <Settings className="mr-2 h-4 w-4" />
+                    <span>Settings</span>
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={handleLogout} className="text-red-600">
+                    <LogOut className="mr-2 h-4 w-4" />
+                    <span>Logout</span>
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenuUI>
+            )}
             <button className="p-2 hover:bg-muted rounded-lg transition-colors">
               <Search className="w-5 h-5 text-muted-foreground" />
             </button>
