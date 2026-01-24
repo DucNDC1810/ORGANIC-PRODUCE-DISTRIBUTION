@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { UserService } from '../services/user.service';
+import { AuthRequest } from '../middlewares/auth.middleware';
 
 export class UserController {
   private userService: UserService;
@@ -7,6 +8,28 @@ export class UserController {
   constructor() {
     this.userService = new UserService();
   }
+
+  // Get current authenticated user
+  getCurrentUser = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      if (!req.user?.id) {
+        res.status(401).json({
+          success: false,
+          message: 'User not authenticated'
+        });
+        return;
+      }
+
+      const user = await this.userService.getUserById(req.user.id);
+      
+      res.status(200).json({
+        success: true,
+        data: user
+      });
+    } catch (error) {
+      next(error);
+    }
+  };
 
   // Authentication
   register = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
@@ -52,6 +75,45 @@ export class UserController {
         message: 'Login successful',
         data: result
       });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  verifyEmail = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const { token } = req.query;
+      
+      if (!token || typeof token !== 'string') {
+        res.status(400).json({
+          success: false,
+          message: 'Verification token is required'
+        });
+        return;
+      }
+
+      const result = await this.userService.verifyEmail(token);
+      
+      res.status(200).json({
+        success: true,
+        message: result.message
+      });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  googleCallback = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const authResult = req.user as any;
+      
+      if (!authResult) {
+        res.redirect(`${process.env.FRONTEND_URL}/login?error=authentication_failed`);
+        return;
+      }
+
+      // Redirect to frontend with token
+      res.redirect(`${process.env.FRONTEND_URL}/auth/callback?token=${authResult.token}`);
     } catch (error) {
       next(error);
     }

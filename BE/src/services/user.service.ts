@@ -1,6 +1,8 @@
 import { User, IUser } from '../models/User.model';
 import { AppError } from '../utils/AppError';
 import jwt from 'jsonwebtoken';
+import crypto from 'crypto';
+import { EmailService } from './email.service';
 
 interface AuthResponse {
   user: Partial<IUser>;
@@ -8,6 +10,11 @@ interface AuthResponse {
 }
 
 export class UserService {
+  private emailService: EmailService;
+
+  constructor() {
+    this.emailService = new EmailService();
+  }
   async getAllUsers(): Promise<IUser[]> {
     return await User.find().select('-password');
   }
@@ -59,8 +66,25 @@ export class UserService {
       throw new AppError('Email already exists', 400);
     }
 
+    // Generate email verification token
+    const verificationToken = crypto.randomBytes(32).toString('hex');
+    const verificationExpires = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+
     // Create user
-    const user = await User.create(userData);
+    const user = await User.create({
+      ...userData,
+      emailVerificationToken: verificationToken,
+      emailVerificationExpires: verificationExpires,
+      isEmailVerified: false
+    });
+
+    // Send verification email
+    try {
+      await this.emailService.sendVerificationEmail(user.email, verificationToken, user.name);
+    } catch (error) {
+      console.error('Failed to send verification email:', error);
+      // Don't throw error, user is still created
+    }
 
     // Generate token
     const token = this.generateToken(user._id.toString());
@@ -70,7 +94,8 @@ export class UserService {
         _id: user._id,
         email: user.email,
         name: user.name,
-        role: user.role
+        role: user.role,
+        isEmailVerified: user.isEmailVerified
       },
       token
     };
@@ -82,6 +107,11 @@ export class UserService {
     
     if (!user) {
       throw new AppError('Invalid email or password', 401);
+    }
+
+    // Check if user has password (not Google OAuth user)
+    if (!user.password) {
+      throw new AppError('Please login with Google', 401);
     }
 
     // Check password
@@ -98,7 +128,71 @@ export class UserService {
         _id: user._id,
         email: user.email,
         name: user.name,
-        role: user.role
+        role: user.role,
+        isEmailVerified: user.isEmailVerified
+      },
+      token
+    };
+  }
+
+  async verifyEmail(token: string): Promise<{ message: string }> {
+    const user = await User.findOne({
+      emailVerificationToken: token,
+      emailVerificationExpires: { $gt: Date.now() }
+    });
+
+    if (!user) {
+      throw new AppError('Invalid or expired verification token', 400);
+    }
+
+    user.isEmailVerified = true;
+    user.emailVerificationToken = undefined;
+    user.emailVerificationExpires = undefined;
+    await user.save();
+
+    // Send welcome email
+    try {
+      await this.emailService.sendWelcomeEmail(user.email, user.name);
+    } catch (error) {
+      console.error('Failed to send welcome email:', error);
+    }
+
+    return { message: 'Email verified successfully' };
+  }
+
+  async googleLogin(profile: any): Promise<AuthResponse> {
+    const { id, emails, displayName } = profile;
+    const email = emails[0].value;
+
+    // Find or create user
+    let user = await User.findOne({ $or: [{ googleId: id }, { email }] });
+
+    if (!user) {
+      // Create new user with Google
+      user = await User.create({
+        googleId: id,
+        email,
+        name: displayName,
+        isEmailVerified: true, // Google emails are already verified
+        role: 'customer'
+      });
+    } else if (!user.googleId) {
+      // Link existing account with Google
+      user.googleId = id;
+      user.isEmailVerified = true;
+      await user.save();
+    }
+
+    // Generate token
+    const token = this.generateToken(user._id.toString());
+
+    return {
+      user: {
+        _id: user._id,
+        email: user.email,
+        name: user.name,
+        role: user.role,
+        isEmailVerified: user.isEmailVerified
       },
       token
     };

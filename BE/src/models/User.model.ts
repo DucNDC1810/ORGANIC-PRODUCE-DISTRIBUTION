@@ -3,11 +3,15 @@ import bcrypt from 'bcryptjs';
 
 export interface IUser extends Document {
   email: string;
-  password: string;
+  password?: string;
   name: string;
   role: 'admin' | 'customer' | 'farmer';
   phone?: string;
   address?: string;
+  googleId?: string;
+  isEmailVerified: boolean;
+  emailVerificationToken?: string;
+  emailVerificationExpires?: Date;
   createdAt: Date;
   updatedAt: Date;
   comparePassword(candidatePassword: string): Promise<boolean>;
@@ -24,7 +28,7 @@ const userSchema = new Schema<IUser>(
     },
     password: {
       type: String,
-      required: true,
+      required: false,
       minlength: 6,
       select: false
     },
@@ -38,7 +42,18 @@ const userSchema = new Schema<IUser>(
       default: 'customer'
     },
     phone: String,
-    address: String
+    address: String,
+    googleId: {
+      type: String,
+      unique: true,
+      sparse: true
+    },
+    isEmailVerified: {
+      type: Boolean,
+      default: false
+    },
+    emailVerificationToken: String,
+    emailVerificationExpires: Date
   },
   {
     timestamps: true
@@ -47,7 +62,8 @@ const userSchema = new Schema<IUser>(
 
 // Hash password before saving
 userSchema.pre('save', async function(next) {
-  if (!this.isModified('password')) return next();
+  // Skip if password is not modified or doesn't exist (Google OAuth users)
+  if (!this.isModified('password') || !this.password) return next();
   
   try {
     const salt = await bcrypt.genSalt(10);
@@ -60,6 +76,7 @@ userSchema.pre('save', async function(next) {
 
 // Compare password method
 userSchema.methods.comparePassword = async function(candidatePassword: string): Promise<boolean> {
+  if (!this.password) return false;
   return await bcrypt.compare(candidatePassword, this.password);
 };
 

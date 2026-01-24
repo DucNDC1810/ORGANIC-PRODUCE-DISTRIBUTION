@@ -10,6 +10,8 @@ import OrderSuccessPage from './pages/HomePage/OrderSuccessPage';
 import LoginPage from './pages/HomePage/LoginPage';
 import SignUpPage from './pages/HomePage/SignUpPage';
 import ForgotPasswordPage from './pages/HomePage/ForgotPasswordPage';
+import AuthCallbackPage from './pages/HomePage/AuthCallbackPage';
+import VerifyEmailPage from './pages/HomePage/VerifyEmailPage';
 import RecipesCooking from './pages/HomePage/RecipesCooking';
 import FarmStories from './pages/HomePage/FarmStories';
 import MarketNewsTips from './pages/HomePage/MarketNewsTips';
@@ -28,6 +30,8 @@ export default function App() {
             <Route path="/login" element={<LoginPage />} />
             <Route path="/signup" element={<SignUpPage />} />
             <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+            <Route path="/auth/callback" element={<AuthCallbackPage />} />
+            <Route path="/verify-email" element={<VerifyEmailPage />} />
             <Route path="/blogs/cooking-tips" element={<RecipesCooking />} />
             <Route path="/blogs/green-living" element={<FarmStories />} />
             <Route path="/blogs/news-offers" element={<MarketNewsTips />} />
