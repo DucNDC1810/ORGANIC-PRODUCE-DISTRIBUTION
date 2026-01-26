@@ -10,6 +10,7 @@ import OrderSuccessPage from './pages/HomePage/OrderSuccessPage';
 import LoginPage from './pages/HomePage/LoginPage';
 import SignUpPage from './pages/HomePage/SignUpPage';
 import ForgotPasswordPage from './pages/HomePage/ForgotPasswordPage';
+import ResetPasswordPage from './pages/HomePage/ResetPasswordPage';
 import AuthCallbackPage from './pages/HomePage/AuthCallbackPage';
 import VerifyEmailPage from './pages/HomePage/VerifyEmailPage';
 import RecipesCooking from './pages/HomePage/RecipesCooking';
@@ -30,6 +31,7 @@ export default function App() {
             <Route path="/login" element={<LoginPage />} />
             <Route path="/signup" element={<SignUpPage />} />
             <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+            <Route path="/reset-password" element={<ResetPasswordPage />} />
             <Route path="/auth/callback" element={<AuthCallbackPage />} />
             <Route path="/verify-email" element={<VerifyEmailPage />} />
             <Route path="/blogs/cooking-tips" element={<RecipesCooking />} />

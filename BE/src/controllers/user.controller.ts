@@ -184,4 +184,68 @@ export class UserController {
       next(error);
     }
   };
+
+  // Password Reset
+  forgotPassword = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const { email } = req.body;
+      
+      if (!email) {
+        res.status(400).json({
+          success: false,
+          message: 'Please provide an email address'
+        });
+        return;
+      }
+
+      const result = await this.userService.forgotPassword(email);
+      
+      res.status(200).json({
+        success: true,
+        message: result.message
+      });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  resetPassword = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const { token } = req.query;
+      const { password } = req.body;
+      
+      if (!token || typeof token !== 'string') {
+        res.status(400).json({
+          success: false,
+          message: 'Password reset token is required'
+        });
+        return;
+      }
+
+      if (!password) {
+        res.status(400).json({
+          success: false,
+          message: 'New password is required'
+        });
+        return;
+      }
+
+      if (password.length < 6) {
+        res.status(400).json({
+          success: false,
+          message: 'Password must be at least 6 characters long'
+        });
+        return;
+      }
+
+      const result = await this.userService.resetPassword(token, password);
+      
+      res.status(200).json({
+        success: true,
+        message: result.message
+      });
+    } catch (error) {
+      next(error);
+    }
+  };
 }

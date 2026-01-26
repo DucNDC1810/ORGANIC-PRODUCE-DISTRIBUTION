@@ -5,13 +5,16 @@ export interface IUser extends Document {
   email: string;
   password?: string;
   name: string;
-  role: 'admin' | 'customer' | 'farmer';
+  role: 'admin' | 'manager' | 'customer' | 'user' | 'shipper' | 'farmer';
   phone?: string;
   address?: string;
   googleId?: string;
   isEmailVerified: boolean;
+  isActive: boolean;
   emailVerificationToken?: string;
   emailVerificationExpires?: Date;
+  passwordResetToken?: string;
+  passwordResetExpires?: Date;
   createdAt: Date;
   updatedAt: Date;
   comparePassword(candidatePassword: string): Promise<boolean>;
@@ -38,7 +41,7 @@ const userSchema = new Schema<IUser>(
     },
     role: {
       type: String,
-      enum: ['admin', 'customer', 'farmer'],
+      enum: ['admin', 'manager', 'customer', 'user', 'shipper', 'farmer'],
       default: 'customer'
     },
     phone: String,
@@ -52,8 +55,14 @@ const userSchema = new Schema<IUser>(
       type: Boolean,
       default: false
     },
+    isActive: {
+      type: Boolean,
+      default: true
+    },
     emailVerificationToken: String,
-    emailVerificationExpires: Date
+    emailVerificationExpires: Date,
+    passwordResetToken: String,
+    passwordResetExpires: Date
   },
   {
     timestamps: true

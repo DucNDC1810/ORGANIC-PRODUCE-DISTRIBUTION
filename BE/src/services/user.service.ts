@@ -3,6 +3,7 @@ import { AppError } from '../utils/AppError';
 import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
 import { EmailService } from './email.service';
+import { UserRole } from '../constants/roles';
 
 interface AuthResponse {
   user: Partial<IUser>;
@@ -196,6 +197,60 @@ export class UserService {
       },
       token
     };
+  }
+
+  async forgotPassword(email: string): Promise<{ message: string }> {
+    const user = await User.findOne({ email });
+
+    if (!user) {
+      // Don't reveal that the user doesn't exist for security reasons
+      return { message: 'If the email exists, a password reset link has been sent' };
+    }
+
+    // Check if user has password (not Google OAuth user)
+    if (!user.password) {
+      throw new AppError('This account uses Google login. Please login with Google.', 400);
+    }
+
+    // Generate password reset token
+    const resetToken = crypto.randomBytes(32).toString('hex');
+    const resetExpires = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+
+    user.passwordResetToken = resetToken;
+    user.passwordResetExpires = resetExpires;
+    await user.save();
+
+    // Send password reset email
+    try {
+      await this.emailService.sendPasswordResetEmail(user.email, resetToken, user.name);
+    } catch (error) {
+      // Rollback token if email fails
+      user.passwordResetToken = undefined;
+      user.passwordResetExpires = undefined;
+      await user.save();
+      throw new AppError('Failed to send password reset email. Please try again.', 500);
+    }
+
+    return { message: 'If the email exists, a password reset link has been sent' };
+  }
+
+  async resetPassword(token: string, newPassword: string): Promise<{ message: string }> {
+    const user = await User.findOne({
+      passwordResetToken: token,
+      passwordResetExpires: { $gt: Date.now() }
+    });
+
+    if (!user) {
+      throw new AppError('Invalid or expired password reset token', 400);
+    }
+
+    // Update password
+    user.password = newPassword;
+    user.passwordResetToken = undefined;
+    user.passwordResetExpires = undefined;
+    await user.save();
+
+    return { message: 'Password has been reset successfully' };
   }
 
   private generateToken(userId: string): string {

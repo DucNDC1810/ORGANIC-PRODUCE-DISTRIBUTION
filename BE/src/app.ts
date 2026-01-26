@@ -6,9 +6,10 @@ dotenv.config();
 import express, { Application, Request, Response } from 'express';
 import cors from 'cors';
 import passport from 'passport';
-import { errorHandler } from './middlewares/errorHandler';
+import { errorHandler, notFoundHandler } from './middlewares/errorHandler';
 import authRoutes from './routes/auth.routes';
 import userRoutes from './routes/user.routes';
+// import exampleRoutes from './routes/example.routes'; // Uncomment để test
 import { configurePassport } from './config/passport';
 
 const app: Application = express();
@@ -33,9 +34,13 @@ app.get('/api/health', (req: Request, res: Response) => {
 // API Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
+// app.use('/api/example', exampleRoutes); // Uncomment để test authentication
 // app.use('/api/products', productRoutes);
 
-// Error handler
+// 404 Handler - Must be after all routes
+app.use(notFoundHandler);
+
+// Error handler - Must be last
 app.use(errorHandler);
 
 export default app;

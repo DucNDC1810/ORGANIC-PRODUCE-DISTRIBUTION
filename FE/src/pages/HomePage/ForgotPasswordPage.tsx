@@ -1,16 +1,27 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Leaf, Mail, ArrowLeft, CheckCircle2 } from 'lucide-react';
+import { Leaf, Mail, ArrowLeft, CheckCircle2, AlertCircle } from 'lucide-react';
+import authService from '../../services/authService';
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState('');
   const [isSubmitted, setIsSubmitted] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState('');
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // Handle form submission
-    console.log('Password reset requested for:', email);
-    setIsSubmitted(true);
+    setError('');
+    setIsLoading(true);
+
+    try {
+      await authService.forgotPassword(email);
+      setIsSubmitted(true);
+    } catch (err: any) {
+      setError(err.response?.data?.message || 'Failed to send reset email. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -84,6 +95,14 @@ export default function ForgotPasswordPage() {
 
               {/* Forgot Password Form */}
               <form onSubmit={handleSubmit} className="space-y-6">
+                {/* Error Message */}
+                {error && (
+                  <div className="p-4 bg-red-50 border border-red-200 rounded-xl flex items-start gap-3">
+                    <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
+                    <p className="text-sm text-red-700">{error}</p>
+                  </div>
+                )}
+
                 {/* Email Field */}
                 <div>
                   <label htmlFor="email" className="block text-sm font-medium text-foreground mb-2">
@@ -109,9 +128,10 @@ export default function ForgotPasswordPage() {
                 {/* Reset Password Button */}
                 <button
                   type="submit"
-                  className="w-full py-4 bg-gradient-to-r from-[#6ee7b7] via-primary to-primary-dark text-white rounded-xl font-semibold text-lg shadow-lg hover:shadow-xl hover:-translate-y-0.5 transition-all duration-200"
+                  disabled={isLoading}
+                  className="w-full py-4 bg-gradient-to-r from-[#6ee7b7] via-primary to-primary-dark text-white rounded-xl font-semibold text-lg shadow-lg hover:shadow-xl hover:-translate-y-0.5 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0"
                 >
-                  Send Reset Instructions
+                  {isLoading ? 'Sending...' : 'Send Reset Instructions'}
                 </button>
 
                 {/* Back to Login */}

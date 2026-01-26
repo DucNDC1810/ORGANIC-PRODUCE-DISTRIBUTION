@@ -107,6 +107,16 @@ class AuthService {
     
     return true;
   }
+
+  async forgotPassword(email: string): Promise<{ success: boolean; message: string }> {
+    const response: any = await api.post('/auth/forgot-password', { email });
+    return response;
+  }
+
+  async resetPassword(token: string, password: string): Promise<{ success: boolean; message: string }> {
+    const response: any = await api.post(`/auth/reset-password?token=${token}`, { password });
+    return response;
+  }
 }
 
 export default new AuthService();
