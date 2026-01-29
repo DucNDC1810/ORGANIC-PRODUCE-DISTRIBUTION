@@ -18,6 +18,7 @@ import FarmStories from './pages/HomePage/FarmStories';
 import MarketNewsTips from './pages/HomePage/MarketNewsTips';
 import AboutUs from './pages/HomePage/AboutUs';
 import Profile from './pages/Customer/Profile';
+import AdminDashboard from './pages/Admin/AdminDashboard';
 
 export default function App() {
   return (
@@ -38,6 +39,7 @@ export default function App() {
             <Route path="/blogs/green-living" element={<FarmStories />} />
             <Route path="/blogs/news-offers" element={<MarketNewsTips />} />
             <Route path="/about" element={<AboutUs />} />
+            <Route path="/admin" element={<AdminDashboard />} />
 
             {/* Protected routes - require authentication */}
             <Route 
