@@ -107,6 +107,9 @@ const products = [
 
 export default function HomePage() {
   const [currentSlide, setCurrentSlide] = useState(0);
+  const [productScrollIndex, setProductScrollIndex] = useState(0);
+  const productsPerView = 5;
+  const maxIndex = Math.max(0, products.length - productsPerView);
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -122,6 +125,14 @@ export default function HomePage() {
 
   const prevSlide = () => {
     setCurrentSlide((prev) => (prev - 1 + banners.length) % banners.length);
+  };
+
+  const nextProducts = () => {
+    setProductScrollIndex((prev) => Math.min(prev + 1, maxIndex));
+  };
+
+  const prevProducts = () => {
+    setProductScrollIndex((prev) => Math.max(prev - 1, 0));
   };
 
   return (
@@ -180,17 +191,63 @@ export default function HomePage() {
       </section>
 
       {/* Featured Products */}
-      <section className="py-20 bg-white">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <section className="py-20 bg-gradient-to-b from-white via-emerald-50/30 to-white relative overflow-hidden">
+        {/* Decorative Elements */}
+        <div className="absolute top-0 right-0 w-96 h-96 bg-gradient-to-br from-emerald-100/40 to-transparent rounded-full blur-3xl"></div>
+        <div className="absolute bottom-0 left-0 w-96 h-96 bg-gradient-to-tr from-green-100/40 to-transparent rounded-full blur-3xl"></div>
+        
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
           <div className="text-center mb-12">
-            <h2 className="text-4xl font-bold text-foreground mb-4">Popular Products</h2>
-            <p className="text-xl text-muted-foreground">Handpicked fresh produce from local farms</p>
+            <div className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-100 rounded-full mb-4">
+              <Leaf className="w-4 h-4 text-emerald-600" />
+              <span className="text-sm font-medium text-emerald-700">Featured Products</span>
+            </div>
+            <h2 className="text-3xl md:text-4xl font-bold text-foreground mb-4">
+              Popular Products
+            </h2>
+            <div className="w-24 h-1 bg-gradient-to-r from-green-500 to-emerald-500 mx-auto rounded-full"></div>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-            {products.map((product) => (
-              <ProductCard key={product.id} product={product} />
-            ))}
+          {/* Horizontal Scrollable Products */}
+          <div className="relative px-12">
+            {/* Previous Button */}
+            <button
+              onClick={prevProducts}
+              disabled={productScrollIndex === 0}
+              className="absolute left-0 top-1/2 -translate-y-1/2 z-10 w-10 h-10 bg-white rounded-full flex items-center justify-center shadow-lg hover:bg-emerald-50 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <ChevronLeft className="w-6 h-6 text-gray-800" />
+            </button>
+
+            {/* Products Container */}
+            <div className="overflow-hidden">
+              <div 
+                className="flex gap-4 transition-transform duration-500 ease-out"
+                style={{ transform: `translateX(-${productScrollIndex * (208 + 16)}px)` }}
+              >
+                {products.map((product) => (
+                  <div key={product.id} className="w-52 flex-shrink-0">
+                    <ProductCard product={product} />
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Next Button */}
+            <button
+              onClick={nextProducts}
+              disabled={productScrollIndex >= maxIndex}
+              className="absolute right-0 top-1/2 -translate-y-1/2 z-10 w-10 h-10 bg-white rounded-full flex items-center justify-center shadow-lg hover:bg-emerald-50 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <ChevronRight className="w-6 h-6 text-gray-800" />
+            </button>
+          </div>
+          
+          <div className="text-center mt-8">
+            <div className="w-full h-px bg-gradient-to-r from-transparent via-gray-300 to-transparent mb-8"></div>
+            <button className="px-8 py-3 bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-lg font-medium hover:from-green-600 hover:to-emerald-700 hover:shadow-lg transition-all duration-300">
+              View All Products →
+            </button>
           </div>
         </div>
       </section>
