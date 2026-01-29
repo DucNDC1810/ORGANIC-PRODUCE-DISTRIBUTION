@@ -21,8 +21,24 @@ export default function LoginPage() {
     
     try {
       await login(formData.email, formData.password);
-      toast.success('Login successful! Welcome back!');
-      navigate('/');
+      
+      // Get user data from localStorage after successful login
+      const userStr = localStorage.getItem('user');
+      if (userStr) {
+        const user = JSON.parse(userStr);
+        
+        // Redirect based on user role
+        toast.success('Login successful! Welcome back!');
+        if (user.role === 'admin') {
+          navigate('/admin');
+        } else if (user.role === 'farmer') {
+          navigate('/farmer/dashboard');
+        } else {
+          navigate('/');
+        }
+      } else {
+        navigate('/');
+      }
     } catch (error: any) {
       console.error('Login error:', error);
       toast.error(error.response?.data?.message || 'Login failed. Please check your credentials.');

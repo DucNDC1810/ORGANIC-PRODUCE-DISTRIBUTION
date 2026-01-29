@@ -41,16 +41,16 @@ function DropdownMenu({ items, isOpen }: DropdownMenuProps) {
   if (!isOpen) return null;
 
   return (
-    <div className="absolute top-full left-0 pt-2">
-      <div className="bg-white rounded-lg shadow-[0_4px_12px_rgba(0,0,0,0.1)] p-4 min-w-[240px] animate-in fade-in slide-in-from-top-2 duration-200">
+    <div className="absolute top-full left-0 pt-2 z-50">
+      <div className="bg-white rounded-lg shadow-[0_8px_24px_rgba(0,0,0,0.12)] border border-gray-100 p-4 min-w-[240px] animate-in fade-in slide-in-from-top-2 duration-200">
         <div className="flex flex-col gap-1">
           {items.map((item, index) => (
             <Link
               key={index}
               to={item.href}
-              className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-[#333333] hover:bg-[#F0F9F4] hover:text-primary transition-colors group"
+              className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-[#333333] hover:bg-emerald-50 hover:text-emerald-600 transition-colors group"
             >
-              <span className="text-muted-foreground group-hover:text-primary transition-colors">
+              <span className="text-muted-foreground group-hover:text-emerald-600 transition-colors">
                 {item.icon}
               </span>
               <span className="text-sm font-medium">{item.label}</span>
@@ -89,7 +89,7 @@ export default function Header() {
         <div className="flex justify-between items-center h-16">
           {/* Logo */}
           <Link to="/" className="flex items-center gap-2 group">
-            <div className="w-10 h-10 bg-gradient-to-br from-primary to-primary-dark rounded-xl flex items-center justify-center shadow-md group-hover:shadow-lg transition-shadow">
+            <div className="w-10 h-10 bg-gradient-to-br from-green-500 to-emerald-600 rounded-xl flex items-center justify-center shadow-md group-hover:shadow-lg transition-shadow">
               <Leaf className="w-6 h-6 text-white" />
             </div>
             <span className="text-xl font-semibold text-foreground">FreshMarket</span>
@@ -97,7 +97,7 @@ export default function Header() {
 
           {/* Navigation */}
           <nav className="hidden md:flex items-center gap-8">
-            <Link to="/" className="text-foreground hover:text-primary transition-colors font-medium">
+            <Link to="/" className="text-foreground hover:text-emerald-600 transition-colors font-medium">
               Home
             </Link>
             
@@ -107,7 +107,7 @@ export default function Header() {
               onMouseEnter={() => setProductsOpen(true)}
               onMouseLeave={() => setProductsOpen(false)}
             >
-              <button className="text-foreground hover:text-primary transition-colors font-medium">
+              <button className="text-foreground hover:text-emerald-600 transition-colors font-medium">
                 Products
               </button>
               <DropdownMenu items={productsDropdown} isOpen={productsOpen} />
@@ -119,13 +119,13 @@ export default function Header() {
               onMouseEnter={() => setBlogsOpen(true)}
               onMouseLeave={() => setBlogsOpen(false)}
             >
-              <button className="text-foreground hover:text-primary transition-colors font-medium">
+              <button className="text-foreground hover:text-emerald-600 transition-colors font-medium">
                 Blogs
               </button>
               <DropdownMenu items={blogsDropdown} isOpen={blogsOpen} />
             </div>
 
-            <Link to="/about" className="text-foreground hover:text-primary transition-colors font-medium">
+            <Link to="/about" className="text-foreground hover:text-emerald-600 transition-colors font-medium">
               About
             </Link>
           </nav>
@@ -135,7 +135,7 @@ export default function Header() {
             {!isAuthenticated ? (
               <Link 
                 to="/login"
-                className="px-5 py-2 bg-primary text-white rounded-lg font-medium hover:bg-primary-dark transition-colors shadow-sm hover:shadow-md"
+                className="px-5 py-2 bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-lg font-medium hover:from-green-600 hover:to-emerald-700 transition-all shadow-sm hover:shadow-md"
               >
                 Login
               </Link>
@@ -143,9 +143,9 @@ export default function Header() {
               <DropdownMenuUI>
                 <DropdownMenuTrigger asChild>
                   <button className="flex items-center gap-2 hover:opacity-80 transition-opacity">
-                    <Avatar className="w-9 h-9 border-2 border-primary shadow-sm">
+                    <Avatar className="w-9 h-9 border-2 border-green-500 shadow-sm">
                       <AvatarImage src={user?.avatar} alt={user?.name} />
-                      <AvatarFallback className="bg-primary text-white text-sm font-semibold">
+                      <AvatarFallback className="bg-gradient-to-br from-green-500 to-emerald-600 text-white text-sm font-semibold">
                         {user?.name ? getInitials(user.name) : 'U'}
                       </AvatarFallback>
                     </Avatar>
@@ -182,9 +182,9 @@ export default function Header() {
               to="/cart" 
               className="relative p-2 hover:bg-muted rounded-lg transition-colors group"
             >
-              <ShoppingCart className="w-5 h-5 text-muted-foreground group-hover:text-primary transition-colors" />
+              <ShoppingCart className="w-5 h-5 text-muted-foreground group-hover:text-emerald-600 transition-colors" />
               {getTotalItems() > 0 && (
-                <span className="absolute -top-1 -right-1 w-5 h-5 bg-primary text-primary-foreground text-xs font-semibold rounded-full flex items-center justify-center shadow-md">
+                <span className="absolute -top-1 -right-1 w-5 h-5 bg-gradient-to-br from-green-500 to-emerald-600 text-white text-xs font-semibold rounded-full flex items-center justify-center shadow-md">
                   {getTotalItems()}
                 </span>
               )}

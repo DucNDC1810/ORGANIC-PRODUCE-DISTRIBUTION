@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { useState, useRef, useEffect } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { 
   Package, 
   ShoppingCart, 
@@ -10,7 +10,13 @@ import {
   Menu,
   X,
   BarChart3,
+  User,
+  Settings,
+  LogOut,
+  ChevronDown,
 } from 'lucide-react';
+import { useAuth } from '../../context/AuthContext';
+import { toast } from 'sonner';
 import Overview from './Overview';
 import ProductManagement from './ProductManagement';
 import OrderManagement from './OrderManagement';
@@ -21,6 +27,28 @@ import ReportsAnalytics from './ReportsAnalytics';
 export default function AdminDashboard() {
   const [activeTab, setActiveTab] = useState('overview');
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+  const { user, logout } = useAuth();
+  const navigate = useNavigate();
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setDropdownOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const handleLogout = () => {
+    logout();
+    toast.success('Đăng xuất thành công!');
+    navigate('/login');
+  };
 
   const menuItems = [
     { id: 'overview', label: 'Overview', icon: LayoutDashboard },
@@ -77,8 +105,64 @@ export default function AdminDashboard() {
               <ShoppingCart className="w-4 h-4" />
               Back to Store
             </Link>
-            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-green-500 to-emerald-600 flex items-center justify-center text-white font-semibold">
-              AD
+            
+            {/* User Dropdown */}
+            <div className="relative" ref={dropdownRef}>
+              <button
+                onClick={() => setDropdownOpen(!dropdownOpen)}
+                className="flex items-center gap-2 hover:bg-secondary px-3 py-2 rounded-lg transition-colors"
+              >
+                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-green-500 to-emerald-600 flex items-center justify-center text-white font-semibold">
+                  {user?.name?.charAt(0).toUpperCase() || 'AD'}
+                </div>
+                <ChevronDown className={`w-4 h-4 text-muted-foreground transition-transform ${dropdownOpen ? 'rotate-180' : ''}`} />
+              </button>
+
+              {/* Dropdown Menu */}
+              {dropdownOpen && (
+                <div className="absolute right-0 mt-2 w-56 bg-white border border-gray-200 rounded-lg shadow-[0_8px_30px_rgba(0,0,0,0.12)] py-2 z-[100] backdrop-blur-sm">
+                  {/* User Info */}
+                  <div className="px-4 py-3 border-b border-gray-200 bg-white">
+                    <p className="text-sm font-semibold text-foreground">{user?.name || 'Admin User'}</p>
+                    <p className="text-xs text-muted-foreground truncate">{user?.email || 'admin@example.com'}</p>
+                  </div>
+
+                  {/* Menu Items */}
+                  <div className="py-1">
+                    <button
+                      onClick={() => {
+                        setDropdownOpen(false);
+                        navigate('/profile');
+                      }}
+                      className="w-full flex items-center gap-3 px-4 py-2 text-sm text-foreground hover:bg-secondary transition-colors"
+                    >
+                      <User className="w-4 h-4" />
+                      <span>Profile</span>
+                    </button>
+                    <button
+                      onClick={() => {
+                        setDropdownOpen(false);
+                        // Add settings navigation if needed
+                      }}
+                      className="w-full flex items-center gap-3 px-4 py-2 text-sm text-foreground hover:bg-secondary transition-colors"
+                    >
+                      <Settings className="w-4 h-4" />
+                      <span>Settings</span>
+                    </button>
+                  </div>
+
+                  {/* Logout */}
+                  <div className="border-t border-border pt-1">
+                    <button
+                      onClick={handleLogout}
+                      className="w-full flex items-center gap-3 px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors"
+                    >
+                      <LogOut className="w-4 h-4" />
+                      <span>Logout</span>
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>

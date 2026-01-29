@@ -78,18 +78,18 @@ export default function HomePage() {
       <Header />
       
       {/* Hero Section */}
-      <section className="relative bg-gradient-to-br from-primary/5 via-white to-secondary/20 overflow-hidden">
+      <section className="relative bg-gradient-to-br from-emerald-50 via-white to-green-50 overflow-hidden">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20 md:py-32">
           <div className="grid md:grid-cols-2 gap-12 items-center">
             <div className="space-y-8">
-              <div className="inline-flex items-center gap-2 px-4 py-2 bg-primary/10 rounded-full">
-                <TrendingUp className="w-4 h-4 text-primary" />
-                <span className="text-sm font-medium text-primary">Trending Now</span>
+              <div className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-100 rounded-full">
+                <TrendingUp className="w-4 h-4 text-emerald-600" />
+                <span className="text-sm font-medium text-emerald-700">Trending Now</span>
               </div>
               
               <h1 className="text-5xl md:text-6xl font-bold text-foreground leading-tight">
                 Fresh. Clean. <br />
-                <span className="bg-gradient-to-r from-primary to-primary-dark bg-clip-text text-transparent">
+                <span className="bg-gradient-to-r from-green-500 to-emerald-600 bg-clip-text text-transparent">
                   Delivered.
                 </span>
               </h1>
@@ -99,10 +99,10 @@ export default function HomePage() {
               </p>
               
               <div className="flex flex-wrap gap-4">
-                <button className="px-8 py-4 bg-primary text-white rounded-xl font-semibold hover:bg-primary-dark hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200">
+                <button className="px-8 py-4 bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-xl font-semibold hover:from-green-600 hover:to-emerald-700 hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200">
                   Shop Now
                 </button>
-                <button className="px-8 py-4 bg-white border-2 border-border text-foreground rounded-xl font-semibold hover:border-primary hover:text-primary hover:shadow-md transition-all duration-200">
+                <button className="px-8 py-4 bg-white border-2 border-border text-foreground rounded-xl font-semibold hover:border-emerald-500 hover:text-emerald-600 hover:shadow-md transition-all duration-200">
                   View Products
                 </button>
               </div>
@@ -121,14 +121,14 @@ export default function HomePage() {
             </div>
 
             <div className="relative">
-              <div className="aspect-square bg-gradient-to-br from-primary/20 to-secondary/40 rounded-3xl overflow-hidden shadow-2xl">
+              <div className="aspect-square bg-gradient-to-br from-emerald-100 to-green-100 rounded-3xl overflow-hidden shadow-2xl">
                 <img
                   src="https://images.unsplash.com/photo-1610832958506-aa56368176cf?w=800"
                   alt="Fresh organic produce"
                   className="w-full h-full object-cover"
                 />
               </div>
-              <div className="absolute -bottom-6 -right-6 w-32 h-32 bg-gradient-to-br from-primary to-primary-dark rounded-2xl flex items-center justify-center shadow-xl">
+              <div className="absolute -bottom-6 -right-6 w-32 h-32 bg-gradient-to-br from-green-500 to-emerald-600 rounded-2xl flex items-center justify-center shadow-xl">
                 <div className="text-center">
                   <div className="text-2xl font-bold text-white">100%</div>
                   <div className="text-xs text-white/90">Organic</div>
@@ -160,8 +160,8 @@ export default function HomePage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid md:grid-cols-3 gap-8">
             <div className="bg-white p-8 rounded-2xl shadow-sm hover:shadow-md transition-shadow">
-              <div className="w-14 h-14 bg-primary/10 rounded-xl flex items-center justify-center mb-6">
-                <Leaf className="w-7 h-7 text-primary" />
+              <div className="w-14 h-14 bg-emerald-100 rounded-xl flex items-center justify-center mb-6">
+                <Leaf className="w-7 h-7 text-emerald-600" />
               </div>
               <h3 className="text-xl font-semibold text-foreground mb-3">Fresh Ingredients</h3>
               <p className="text-muted-foreground leading-relaxed">
@@ -170,8 +170,8 @@ export default function HomePage() {
             </div>
 
             <div className="bg-white p-8 rounded-2xl shadow-sm hover:shadow-md transition-shadow">
-              <div className="w-14 h-14 bg-primary/10 rounded-xl flex items-center justify-center mb-6">
-                <Truck className="w-7 h-7 text-primary" />
+              <div className="w-14 h-14 bg-emerald-100 rounded-xl flex items-center justify-center mb-6">
+                <Truck className="w-7 h-7 text-emerald-600" />
               </div>
               <h3 className="text-xl font-semibold text-foreground mb-3">Fast Delivery</h3>
               <p className="text-muted-foreground leading-relaxed">
@@ -180,8 +180,8 @@ export default function HomePage() {
             </div>
 
             <div className="bg-white p-8 rounded-2xl shadow-sm hover:shadow-md transition-shadow">
-              <div className="w-14 h-14 bg-primary/10 rounded-xl flex items-center justify-center mb-6">
-                <Shield className="w-7 h-7 text-primary" />
+              <div className="w-14 h-14 bg-emerald-100 rounded-xl flex items-center justify-center mb-6">
+                <Shield className="w-7 h-7 text-emerald-600" />
               </div>
               <h3 className="text-xl font-semibold text-foreground mb-3">Trusted Quality</h3>
               <p className="text-muted-foreground leading-relaxed">
@@ -193,7 +193,7 @@ export default function HomePage() {
       </section>
 
       {/* Promotion Banner */}
-      <section className="py-20 bg-gradient-to-r from-primary via-primary-dark to-primary">
+      <section className="py-20 bg-gradient-to-r from-green-500 via-emerald-600 to-green-500">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex flex-col md:flex-row items-center justify-between gap-8">
             <div className="text-white space-y-4">
@@ -208,7 +208,7 @@ export default function HomePage() {
                 Use code FRESH20 at checkout. Valid for new customers only.
               </p>
             </div>
-            <button className="px-8 py-4 bg-white text-primary rounded-xl font-semibold hover:bg-white/90 hover:shadow-xl hover:-translate-y-0.5 transition-all duration-200 whitespace-nowrap">
+            <button className="px-8 py-4 bg-white text-emerald-600 rounded-xl font-semibold hover:bg-white/90 hover:shadow-xl hover:-translate-y-0.5 transition-all duration-200 whitespace-nowrap">
               Shop Now →
             </button>
           </div>
@@ -221,7 +221,7 @@ export default function HomePage() {
           <div className="grid md:grid-cols-4 gap-8 mb-12">
             <div className="space-y-4">
               <div className="flex items-center gap-2">
-                <div className="w-10 h-10 bg-primary rounded-xl flex items-center justify-center">
+                <div className="w-10 h-10 bg-gradient-to-br from-green-500 to-emerald-600 rounded-xl flex items-center justify-center">
                   <Leaf className="w-6 h-6 text-white" />
                 </div>
                 <span className="text-xl font-semibold">FreshMarket</span>

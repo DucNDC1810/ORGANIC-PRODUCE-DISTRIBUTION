@@ -2,7 +2,7 @@ import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { Toaster } from 'sonner';
 import { CartProvider } from './context/CartContext';
 import { AuthProvider } from './context/AuthContext';
-import { ProtectedRoute, CustomerRoute } from './components/ProtectedRoute';
+import { ProtectedRoute, CustomerRoute, AdminRoute } from './components/ProtectedRoute';
 import HomePage from './pages/HomePage/Home';
 import CartPage from './pages/HomePage/CartPage';
 import CheckoutPage from './pages/HomePage/CheckoutPage';
@@ -39,7 +39,6 @@ export default function App() {
             <Route path="/blogs/green-living" element={<FarmStories />} />
             <Route path="/blogs/news-offers" element={<MarketNewsTips />} />
             <Route path="/about" element={<AboutUs />} />
-            <Route path="/admin" element={<AdminDashboard />} />
 
             {/* Protected routes - require authentication */}
             <Route 
@@ -74,6 +73,16 @@ export default function App() {
                 <CustomerRoute>
                   <Profile />
                 </CustomerRoute>
+              } 
+            />
+
+            {/* Admin-only routes */}
+            <Route 
+              path="/admin" 
+              element={
+                <AdminRoute>
+                  <AdminDashboard />
+                </AdminRoute>
               } 
             />
           </Routes>

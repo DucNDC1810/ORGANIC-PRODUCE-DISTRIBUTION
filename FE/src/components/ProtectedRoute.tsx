@@ -39,7 +39,7 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
       const roleRedirects: { [key: string]: string } = {
         customer: '/',
         farmer: '/farmer/dashboard',
-        admin: '/admin/dashboard',
+        admin: '/admin',
       };
       return <Navigate to={roleRedirects[user.role] || '/'} replace />;
     }
