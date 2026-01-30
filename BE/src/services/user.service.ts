@@ -1,6 +1,6 @@
 import { User, IUser } from '../models/User.model';
 import { AppError } from '../utils/AppError';
-import jwt from 'jsonwebtoken';
+import jwt, { SignOptions } from 'jsonwebtoken';
 import crypto from 'crypto';
 import { EmailService } from './email.service';
 import { UserRole } from '../constants/roles';
@@ -652,10 +652,13 @@ export class UserService {
       throw new Error('JWT_SECRET is not defined');
     }
     
+    const expiresIn = (process.env.JWT_EXPIRES_IN || '7d') as string;
+    const options: SignOptions = { expiresIn: expiresIn as any };
+    
     const token = jwt.sign(
       { id: userId }, 
       jwtSecret,
-      { expiresIn: '15m' } // 15 minutes expiration
+      options // Use environment variable or default to 7 days
     );
     
     return token;

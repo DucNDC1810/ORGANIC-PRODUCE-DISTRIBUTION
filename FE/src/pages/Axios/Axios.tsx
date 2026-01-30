@@ -30,13 +30,40 @@ api.interceptors.request.use(
 api.interceptors.response.use(
   (response) => response.data,
   (error) => {
+    // Handle token expiration or authentication errors
     if (error.response?.status === 401) {
-      localStorage.removeItem('token');
-      localStorage.removeItem('user');
-      if (window.location.pathname !== '/login') {
+      const errorMessage = error.response?.data?.message || 'Authentication failed';
+      
+      // Check if it's a token expiration error
+      if (errorMessage.includes('expired') || errorMessage.includes('Invalid token')) {
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        
+        // Show toast notification before redirect
+        if (typeof window !== 'undefined' && window.location.pathname !== '/login') {
+          // Import toast dynamically to avoid circular dependency
+          import('sonner').then(({ toast }) => {
+            toast.error('Your session has expired. Please login again.');
+          });
+          
+          // Delay redirect to show toast
+          setTimeout(() => {
+            window.location.href = '/login';
+          }, 1000);
+        }
+      } else if (window.location.pathname !== '/login') {
+        // For other 401 errors (wrong credentials, etc.)
         window.location.href = '/login';
       }
     }
+    
+    // Handle forbidden errors (403)
+    if (error.response?.status === 403) {
+      import('sonner').then(({ toast }) => {
+        toast.error(error.response?.data?.message || 'Access denied');
+      });
+    }
+    
     return Promise.reject(error);
   }
 );

@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Users, TrendingUp, Eye, Search, Edit, Trash2, UserCheck, UserX, RefreshCw, ChevronLeft, ChevronRight, Shield, AlertTriangle } from 'lucide-react';
+import { Users, TrendingUp, Eye, Search, Edit, Trash2, UserCheck, UserX, RefreshCw, ChevronLeft, ChevronRight, Shield, AlertTriangle, Lock } from 'lucide-react';
 import { Button } from '../../components/ui/button';
 import { Badge } from '../../components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '../../components/ui/dialog';
 import { Label } from '../../components/ui/label';
 import { userAPI, User, UserStats, PaginationInfo } from '../Axios/Axios';
+import { toast } from 'sonner';
 
 // Role badge colors
 const roleBadgeColors: Record<string, string> = {
@@ -38,10 +39,20 @@ export default function CustomerManagement() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [roleDialogOpen, setRoleDialogOpen] = useState(false);
   const [statusDialogOpen, setStatusDialogOpen] = useState(false);
+  const [passwordDialogOpen, setPasswordDialogOpen] = useState(false);
   
   // Edit form state
-  const [editForm, setEditForm] = useState({ name: '', email: '', phone: '', address: '' });
+  const [editForm, setEditForm] = useState({ 
+    name: '', 
+    email: '', 
+    username: '',
+    phone: '', 
+    address: '' 
+  });
   const [newRole, setNewRole] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [passwordError, setPasswordError] = useState('');
 
   // Fetch users
   const fetchUsers = useCallback(async () => {
@@ -94,12 +105,14 @@ export default function CustomerManagement() {
     if (!selectedUser) return;
     try {
       await userAPI.toggleUserStatus(selectedUser._id);
+      toast.success(`User ${selectedUser.isActive ? 'deactivated' : 'activated'} successfully!`);
       setStatusDialogOpen(false);
       setSelectedUser(null);
       fetchUsers();
       fetchStats();
     } catch (error) {
       console.error('Failed to toggle status:', error);
+      toast.error('Failed to toggle user status');
     }
   };
 
@@ -108,12 +121,14 @@ export default function CustomerManagement() {
     if (!selectedUser) return;
     try {
       await userAPI.deleteUser(selectedUser._id);
+      toast.success('User deleted successfully!');
       setDeleteDialogOpen(false);
       setSelectedUser(null);
       fetchUsers();
       fetchStats();
     } catch (error) {
       console.error('Failed to delete user:', error);
+      toast.error('Failed to delete user');
     }
   };
 
@@ -122,11 +137,13 @@ export default function CustomerManagement() {
     if (!selectedUser) return;
     try {
       await userAPI.updateUser(selectedUser._id, editForm);
+      toast.success('User information updated successfully!');
       setEditDialogOpen(false);
       setSelectedUser(null);
       fetchUsers();
     } catch (error) {
       console.error('Failed to update user:', error);
+      toast.error('Failed to update user information');
     }
   };
 
@@ -135,6 +152,7 @@ export default function CustomerManagement() {
     if (!selectedUser || !newRole) return;
     try {
       await userAPI.changeUserRole(selectedUser._id, newRole);
+      toast.success('User role updated successfully!');
       setRoleDialogOpen(false);
       setSelectedUser(null);
       setNewRole('');
@@ -142,6 +160,71 @@ export default function CustomerManagement() {
       fetchStats();
     } catch (error) {
       console.error('Failed to change role:', error);
+      toast.error('Failed to change user role');
+    }
+  };
+
+  // Validate password in real-time
+  const validatePassword = (password: string): string => {
+    if (!password) {
+      return 'Password is required';
+    }
+    if (password.length < 6) {
+      return 'Password must be at least 6 characters';
+    }
+    if (password.length > 50) {
+      return 'Password must be less than 50 characters';
+    }
+    if (!/[A-Z]/.test(password)) {
+      return 'Password must contain at least one uppercase letter';
+    }
+    if (!/[a-z]/.test(password)) {
+      return 'Password must contain at least one lowercase letter';
+    }
+    if (!/[0-9]/.test(password)) {
+      return 'Password must contain at least one number';
+    }
+    return '';
+  };
+
+  // Handle reset password
+  const handleResetPassword = async () => {
+    if (!selectedUser) return;
+    
+    // Validate new password
+    const passwordValidationError = validatePassword(newPassword);
+    if (passwordValidationError) {
+      setPasswordError(passwordValidationError);
+      toast.error(passwordValidationError);
+      return;
+    }
+    
+    // Check if passwords match
+    if (!confirmPassword) {
+      setPasswordError('Please confirm your password');
+      toast.error('Please confirm your password');
+      return;
+    }
+    
+    if (newPassword !== confirmPassword) {
+      setPasswordError('Passwords do not match');
+      toast.error('Passwords do not match');
+      return;
+    }
+    
+    try {
+      await userAPI.adminResetPassword(selectedUser._id, newPassword);
+      toast.success(`Password reset successfully for ${selectedUser.name}!`);
+      setPasswordDialogOpen(false);
+      setSelectedUser(null);
+      setNewPassword('');
+      setConfirmPassword('');
+      setPasswordError('');
+    } catch (error: any) {
+      console.error('Failed to reset password:', error);
+      const errorMessage = error?.response?.data?.message || 'Failed to reset password';
+      toast.error(errorMessage);
+      setPasswordError(errorMessage);
     }
   };
 
@@ -151,6 +234,7 @@ export default function CustomerManagement() {
     setEditForm({
       name: user.name,
       email: user.email,
+      username: user.username,
       phone: user.phone || '',
       address: user.address || ''
     });
@@ -162,6 +246,15 @@ export default function CustomerManagement() {
     setSelectedUser(user);
     setNewRole(user.role);
     setRoleDialogOpen(true);
+  };
+
+  // Open password dialog
+  const openPasswordDialog = (user: User) => {
+    setSelectedUser(user);
+    setNewPassword('');
+    setConfirmPassword('');
+    setPasswordError('');
+    setPasswordDialogOpen(true);
   };
 
   // Format date
@@ -330,19 +423,22 @@ export default function CustomerManagement() {
                       <TableCell className="text-muted-foreground">{formatDate(user.createdAt)}</TableCell>
                       <TableCell>
                         <div className="flex items-center justify-end gap-1">
-                          <Button variant="ghost" size="sm" onClick={() => { setSelectedUser(user); setViewDialogOpen(true); }}>
+                          <Button variant="ghost" size="sm" onClick={() => { setSelectedUser(user); setViewDialogOpen(true); }} title="View Details">
                             <Eye className="w-4 h-4" />
                           </Button>
-                          <Button variant="ghost" size="sm" onClick={() => openEditDialog(user)}>
+                          <Button variant="ghost" size="sm" onClick={() => openEditDialog(user)} title="Edit User">
                             <Edit className="w-4 h-4" />
                           </Button>
-                          <Button variant="ghost" size="sm" onClick={() => openRoleDialog(user)}>
+                          <Button variant="ghost" size="sm" onClick={() => openPasswordDialog(user)} title="Reset Password">
+                            <Lock className="w-4 h-4 text-orange-500" />
+                          </Button>
+                          <Button variant="ghost" size="sm" onClick={() => openRoleDialog(user)} title="Change Role">
                             <Shield className="w-4 h-4" />
                           </Button>
-                          <Button variant="ghost" size="sm" onClick={() => { setSelectedUser(user); setStatusDialogOpen(true); }}>
+                          <Button variant="ghost" size="sm" onClick={() => { setSelectedUser(user); setStatusDialogOpen(true); }} title="Toggle Status">
                             {user.isActive ? <UserX className="w-4 h-4 text-red-500" /> : <UserCheck className="w-4 h-4 text-green-500" />}
                           </Button>
-                          <Button variant="ghost" size="sm" onClick={() => { setSelectedUser(user); setDeleteDialogOpen(true); }}>
+                          <Button variant="ghost" size="sm" onClick={() => { setSelectedUser(user); setDeleteDialogOpen(true); }} title="Delete User">
                             <Trash2 className="w-4 h-4 text-red-500" />
                           </Button>
                         </div>
@@ -463,12 +559,22 @@ export default function CustomerManagement() {
               />
             </div>
             <div>
+              <Label className="text-sm font-medium">Username</Label>
+              <Input 
+                value={editForm.username} 
+                onChange={(e) => setEditForm({ ...editForm, username: e.target.value })} 
+                className="mt-1.5 bg-white"
+                placeholder="Enter username"
+              />
+            </div>
+            <div>
               <Label className="text-sm font-medium">Email</Label>
               <Input 
                 value={editForm.email} 
                 onChange={(e) => setEditForm({ ...editForm, email: e.target.value })} 
                 className="mt-1.5 bg-white"
                 placeholder="Enter email address"
+                type="email"
               />
             </div>
             <div>
@@ -623,6 +729,118 @@ export default function CustomerManagement() {
                 ? <><UserX className="w-4 h-4 mr-2" /> Deactivate</>
                 : <><UserCheck className="w-4 h-4 mr-2" /> Activate</>
               }
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Password Reset Dialog */}
+      <Dialog open={passwordDialogOpen} onOpenChange={setPasswordDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <div className="flex flex-col items-center text-center py-2">
+            <div className="w-16 h-16 rounded-full bg-orange-100 flex items-center justify-center mb-4">
+              <Lock className="w-8 h-8 text-orange-600" />
+            </div>
+            <DialogHeader className="space-y-1">
+              <DialogTitle className="text-xl font-semibold text-center">Reset Password</DialogTitle>
+              <DialogDescription className="text-center">
+                Set a new password for <span className="font-semibold text-gray-900">{selectedUser?.name}</span>
+              </DialogDescription>
+            </DialogHeader>
+          </div>
+          <div className="space-y-4 bg-gray-50 rounded-lg p-4">
+            {/* Password Requirements Info */}
+            <div className="bg-blue-50 border border-blue-200 rounded-md p-3">
+              <p className="text-xs font-semibold text-blue-800 mb-2">Password Requirements:</p>
+              <ul className="text-xs text-blue-700 space-y-1">
+                <li className="flex items-center gap-1">
+                  <span className={newPassword.length >= 6 && newPassword.length <= 50 ? 'text-green-600' : ''}>
+                    • 6-50 characters
+                  </span>
+                </li>
+                <li className="flex items-center gap-1">
+                  <span className={/[A-Z]/.test(newPassword) ? 'text-green-600' : ''}>
+                    • At least one uppercase letter
+                  </span>
+                </li>
+                <li className="flex items-center gap-1">
+                  <span className={/[a-z]/.test(newPassword) ? 'text-green-600' : ''}>
+                    • At least one lowercase letter
+                  </span>
+                </li>
+                <li className="flex items-center gap-1">
+                  <span className={/[0-9]/.test(newPassword) ? 'text-green-600' : ''}>
+                    • At least one number
+                  </span>
+                </li>
+              </ul>
+            </div>
+
+            <div>
+              <Label className="text-sm font-medium">New Password *</Label>
+              <Input 
+                type="password"
+                value={newPassword} 
+                onChange={(e) => {
+                  setNewPassword(e.target.value);
+                  setPasswordError('');
+                }} 
+                className={`mt-1.5 bg-white ${passwordError && !confirmPassword ? 'border-red-300' : ''}`}
+                placeholder="Enter new password"
+              />
+            </div>
+            <div>
+              <Label className="text-sm font-medium">Confirm Password *</Label>
+              <Input 
+                type="password"
+                value={confirmPassword} 
+                onChange={(e) => {
+                  setConfirmPassword(e.target.value);
+                  setPasswordError('');
+                }} 
+                className={`mt-1.5 bg-white ${passwordError && confirmPassword ? 'border-red-300' : ''}`}
+                placeholder="Confirm new password"
+                onPaste={(e) => {
+                  e.preventDefault();
+                  toast.error('Pasting is not allowed for password confirmation');
+                }}
+              />
+              {/* Show match indicator */}
+              {newPassword && confirmPassword && (
+                <p className={`text-xs mt-1.5 ${newPassword === confirmPassword ? 'text-green-600' : 'text-red-600'}`}>
+                  {newPassword === confirmPassword ? '✓ Passwords match' : '✗ Passwords do not match'}
+                </p>
+              )}
+            </div>
+            {passwordError && (
+              <div className="bg-red-50 border border-red-200 rounded-md p-3">
+                <p className="text-sm text-red-600 flex items-center gap-2">
+                  <AlertTriangle className="w-4 h-4" />
+                  {passwordError}
+                </p>
+              </div>
+            )}
+          </div>
+          <DialogFooter className="flex gap-3 sm:gap-3">
+            <Button 
+              variant="outline" 
+              onClick={() => {
+                setPasswordDialogOpen(false);
+                setNewPassword('');
+                setConfirmPassword('');
+                setPasswordError('');
+              }} 
+              className="flex-1"
+            >
+              Cancel
+            </Button>
+            <Button 
+              onClick={handleResetPassword} 
+              className="flex-1 bg-orange-600 hover:bg-orange-700"
+              disabled={!newPassword || !confirmPassword}
+            >
+              <Lock className="w-4 h-4 mr-2" />
+              Reset Password
             </Button>
           </DialogFooter>
         </DialogContent>
