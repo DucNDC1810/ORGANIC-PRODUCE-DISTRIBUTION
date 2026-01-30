@@ -19,17 +19,23 @@ export default function VerifyEmailPage() {
       return;
     }
 
-    // Verify the email
+    // Verify the email using direct axios (not the interceptor that modifies response)
     axios
-      .get(`http://localhost:5000/api/auth/verify-email?token=${token}`)
+      .get(`${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/auth/verify-email?token=${token}`)
       .then((response) => {
-        setStatus('success');
-        setMessage(response.data.message || 'Email verified successfully!');
-        
-        // Redirect to login after 3 seconds
-        setTimeout(() => {
-          navigate('/login');
-        }, 3000);
+        // Check if verification was successful
+        if (response.data && response.data.success) {
+          setStatus('success');
+          setMessage(response.data.message || 'Email verified successfully!');
+          
+          // Redirect to login after 3 seconds
+          setTimeout(() => {
+            navigate('/login');
+          }, 3000);
+        } else {
+          setStatus('error');
+          setMessage(response.data?.message || 'Email verification failed.');
+        }
       })
       .catch((error) => {
         setStatus('error');

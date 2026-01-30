@@ -14,6 +14,7 @@ export default function SignUpPage() {
   const [formData, setFormData] = useState({
     name: '',
     email: '',
+    username: '',
     password: '',
     confirmPassword: '',
   });
@@ -41,12 +42,14 @@ export default function SignUpPage() {
     setLoading(true);
     
     try {
-      await register(formData.name, formData.email, formData.password);
-      toast.success('Registration successful! Please check your email to verify your account.');
-      // Don't auto-navigate, let user check email
+      await register(formData.name, formData.email, formData.username, formData.password);
+      toast.success('Registration successful! Please check your email to verify your account before logging in.', {
+        duration: 5000,
+      });
+      // Navigate to login after showing message
       setTimeout(() => {
         navigate('/login');
-      }, 2000);
+      }, 3000);
     } catch (error: any) {
       console.error('Registration error:', error);
       toast.error(error.response?.data?.message || 'Registration failed. Please try again.');
@@ -169,6 +172,29 @@ export default function SignUpPage() {
                   onChange={handleInputChange}
                   className="block w-full pl-11 pr-4 py-3.5 bg-white border-2 border-primary/30 rounded-xl text-foreground placeholder:text-muted-foreground focus:border-primary focus:ring-0 transition-all outline-none hover:border-primary/50"
                   placeholder="you@example.com"
+                />
+              </div>
+            </div>
+
+            {/* Username Field */}
+            <div>
+              <label htmlFor="username" className="block text-sm font-medium text-foreground mb-2">
+                Username
+              </label>
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                  <User className="h-5 w-5 text-muted-foreground" />
+                </div>
+                <input
+                  id="username"
+                  name="username"
+                  type="text"
+                  required
+                  value={formData.username}
+                  onChange={handleInputChange}
+                  className="block w-full pl-11 pr-4 py-3.5 bg-white border-2 border-primary/30 rounded-xl text-foreground placeholder:text-muted-foreground focus:border-primary focus:ring-0 transition-all outline-none hover:border-primary/50"
+                  placeholder="johndoe"
+                  minLength={3}
                 />
               </div>
             </div>

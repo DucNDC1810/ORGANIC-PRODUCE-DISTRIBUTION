@@ -49,6 +49,7 @@ export interface User {
   _id: string;
   email: string;
   name: string;
+  username: string;
   role: string;
   phone?: string;
   address?: string;
@@ -63,6 +64,7 @@ export interface LoginCredentials {
 export interface RegisterData {
   name: string;
   email: string;
+  username: string;
   password: string;
   role?: 'customer' | 'farmer' | 'admin';
 }
@@ -97,13 +99,11 @@ export const authAPI = {
   /**
    * Register new user
    * POST /api/auth/register
+   * Note: Token is not stored - user must verify email before logging in
    */
   register: async (userData: RegisterData): Promise<AuthResponse> => {
     const response: any = await api.post('/auth/register', userData);
-    if (response.data?.token) {
-      localStorage.setItem('token', response.data.token);
-      localStorage.setItem('user', JSON.stringify(response.data.user));
-    }
+    // Don't store token or user - they need to verify email first
     return response;
   },
 

@@ -9,6 +9,7 @@ const userController = new UserController();
 router.post('/register', userController.register);
 router.post('/login', userController.login);
 router.get('/verify-email', userController.verifyEmail);
+router.post('/resend-verification-email', userController.resendVerificationEmail);
 
 // Password Reset routes
 router.post('/forgot-password', userController.forgotPassword);

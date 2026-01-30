@@ -9,7 +9,7 @@ interface AuthContextType {
   isAuthenticated: boolean;
   loading: boolean;
   login: (email: string, password: string) => Promise<void>;
-  register: (name: string, email: string, password: string) => Promise<void>;
+  register: (name: string, email: string, username: string, password: string) => Promise<void>;
   logout: () => void;
 }
 
@@ -110,10 +110,11 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
   };
 
-  const register = async (name: string, email: string, password: string) => {
+  const register = async (name: string, email: string, username: string, password: string) => {
     try {
-      const response = await authAPI.register({ name, email, password, role: 'customer' });
-      setUser(response.data.user);
+      await authAPI.register({ name, email, username, password, role: 'customer' });
+      // Don't set user or store token - user must verify email first
+      // Just return success, the user will need to verify email before logging in
     } catch (error) {
       throw error;
     }

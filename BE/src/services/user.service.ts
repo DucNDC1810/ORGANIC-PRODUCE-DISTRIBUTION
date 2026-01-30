@@ -60,11 +60,18 @@ export class UserService {
   }
 
   // Authentication methods
-  async register(userData: { email: string; password: string; name: string; role?: string }): Promise<AuthResponse> {
+  async register(userData: { email: string; password: string; name: string; username: string; role?: string }): Promise<AuthResponse> {
     // Check if user exists
-    const existingUser = await User.findOne({ email: userData.email });
+    const existingUser = await User.findOne({ 
+      $or: [{ email: userData.email }, { username: userData.username }] 
+    });
     if (existingUser) {
-      throw new AppError('Email already exists', 400);
+      if (existingUser.email === userData.email) {
+        throw new AppError('Email already exists', 400);
+      }
+      if (existingUser.username === userData.username) {
+        throw new AppError('Username already exists', 400);
+      }
     }
 
     // Generate email verification token
@@ -95,6 +102,7 @@ export class UserService {
         _id: user._id,
         email: user.email,
         name: user.name,
+        username: user.username,
         role: user.role,
         isEmailVerified: user.isEmailVerified
       },
@@ -102,12 +110,14 @@ export class UserService {
     };
   }
 
-  async login(email: string, password: string): Promise<AuthResponse> {
-    // Find user with password
-    const user = await User.findOne({ email }).select('+password');
+  async login(emailOrUsername: string, password: string): Promise<AuthResponse> {
+    // Find user with password by email or username
+    const user = await User.findOne({ 
+      $or: [{ email: emailOrUsername.toLowerCase() }, { username: emailOrUsername.toLowerCase() }] 
+    }).select('+password');
     
     if (!user) {
-      throw new AppError('Invalid email or password', 401);
+      throw new AppError('Invalid email/username or password', 401);
     }
 
     // Check if user has password (not Google OAuth user)
@@ -121,6 +131,16 @@ export class UserService {
       throw new AppError('Invalid email or password', 401);
     }
 
+    // Check if email is verified
+    if (!user.isEmailVerified) {
+      throw new AppError('Please verify your email before logging in. Check your inbox for the verification link.', 403);
+    }
+
+    // Check if account is active
+    if (!user.isActive) {
+      throw new AppError('Your account has been deactivated. Please contact support.', 403);
+    }
+
     // Generate token
     const token = this.generateToken(user._id.toString());
 
@@ -129,6 +149,7 @@ export class UserService {
         _id: user._id,
         email: user.email,
         name: user.name,
+        username: user.username,
         role: user.role,
         isEmailVerified: user.isEmailVerified
       },
@@ -137,28 +158,81 @@ export class UserService {
   }
 
   async verifyEmail(token: string): Promise<{ message: string }> {
-    const user = await User.findOne({
-      emailVerificationToken: token,
-      emailVerificationExpires: { $gt: Date.now() }
+    // First, check if user exists with this token (regardless of expiration)
+    const userWithToken = await User.findOne({
+      emailVerificationToken: token
     });
 
-    if (!user) {
-      throw new AppError('Invalid or expired verification token', 400);
+    if (!userWithToken) {
+      // Check if user already verified
+      const verifiedUser = await User.findOne({
+        isEmailVerified: true,
+        emailVerificationToken: { $exists: false }
+      });
+      
+      if (verifiedUser) {
+        // User might have already verified
+        throw new AppError('This email has already been verified. Please login.', 400);
+      }
+      
+      throw new AppError('Invalid verification token. Please request a new verification email.', 400);
     }
 
-    user.isEmailVerified = true;
-    user.emailVerificationToken = undefined;
-    user.emailVerificationExpires = undefined;
-    await user.save();
+    // Check if token is expired
+    if (userWithToken.emailVerificationExpires && userWithToken.emailVerificationExpires < new Date()) {
+      throw new AppError('Verification link has expired. Please request a new verification email.', 400);
+    }
+
+    // Check if already verified
+    if (userWithToken.isEmailVerified) {
+      throw new AppError('This email has already been verified. Please login.', 400);
+    }
+
+    // Verify the email
+    userWithToken.isEmailVerified = true;
+    userWithToken.emailVerificationToken = undefined;
+    userWithToken.emailVerificationExpires = undefined;
+    await userWithToken.save();
 
     // Send welcome email
     try {
-      await this.emailService.sendWelcomeEmail(user.email, user.name);
+      await this.emailService.sendWelcomeEmail(userWithToken.email, userWithToken.name);
     } catch (error) {
       console.error('Failed to send welcome email:', error);
     }
 
-    return { message: 'Email verified successfully' };
+    return { message: 'Email verified successfully! You can now login.' };
+  }
+
+  async resendVerificationEmail(email: string): Promise<{ message: string }> {
+    const user = await User.findOne({ email: email.toLowerCase() });
+
+    if (!user) {
+      // Don't reveal that the user doesn't exist for security reasons
+      return { message: 'If the email exists and is not verified, a verification link has been sent' };
+    }
+
+    if (user.isEmailVerified) {
+      throw new AppError('Email is already verified. Please login.', 400);
+    }
+
+    // Generate new email verification token
+    const verificationToken = crypto.randomBytes(32).toString('hex');
+    const verificationExpires = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+
+    user.emailVerificationToken = verificationToken;
+    user.emailVerificationExpires = verificationExpires;
+    await user.save();
+
+    // Send verification email
+    try {
+      await this.emailService.sendVerificationEmail(user.email, verificationToken, user.name);
+    } catch (error) {
+      console.error('Failed to send verification email:', error);
+      throw new AppError('Failed to send verification email. Please try again.', 500);
+    }
+
+    return { message: 'If the email exists and is not verified, a verification link has been sent' };
   }
 
   async googleLogin(profile: any): Promise<AuthResponse> {
@@ -169,11 +243,20 @@ export class UserService {
     let user = await User.findOne({ $or: [{ googleId: id }, { email }] });
 
     if (!user) {
+      // Generate username from email or displayName
+      let username = email.split('@')[0].toLowerCase();
+      // Check if username exists and add random suffix if needed
+      let usernameExists = await User.findOne({ username });
+      if (usernameExists) {
+        username = `${username}${Math.floor(Math.random() * 10000)}`;
+      }
+      
       // Create new user with Google
       user = await User.create({
         googleId: id,
         email,
         name: displayName,
+        username,
         isEmailVerified: true, // Google emails are already verified
         role: 'customer'
       });
@@ -192,6 +275,7 @@ export class UserService {
         _id: user._id,
         email: user.email,
         name: user.name,
+        username: user.username,
         role: user.role,
         isEmailVerified: user.isEmailVerified
       },
@@ -200,16 +284,23 @@ export class UserService {
   }
 
   async forgotPassword(email: string): Promise<{ message: string }> {
-    const user = await User.findOne({ email });
+    const user = await User.findOne({ email }).select('+password');
 
     if (!user) {
       // Don't reveal that the user doesn't exist for security reasons
       return { message: 'If the email exists, a password reset link has been sent' };
     }
 
-    // Check if user has password (not Google OAuth user)
-    if (!user.password) {
+    // Check if user registered with Google OAuth only (has googleId but no password)
+    // Users who registered normally will have a password
+    // Users who linked their account with Google after registering will have both googleId and password
+    if (user.googleId && !user.password) {
       throw new AppError('This account uses Google login. Please login with Google.', 400);
+    }
+
+    // If user doesn't have password (edge case), they need to register properly
+    if (!user.password) {
+      throw new AppError('This account does not have a password set. Please contact support.', 400);
     }
 
     // Generate password reset token

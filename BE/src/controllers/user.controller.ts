@@ -34,17 +34,17 @@ export class UserController {
   // Authentication
   register = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
-      const { email, password, name, role } = req.body;
+      const { email, password, name, username, role } = req.body;
       
-      if (!email || !password || !name) {
+      if (!email || !password || !name || !username) {
         res.status(400).json({
           success: false,
-          message: 'Please provide email, password and name'
+          message: 'Please provide email, password, name and username'
         });
         return;
       }
 
-      const result = await this.userService.register({ email, password, name, role });
+      const result = await this.userService.register({ email, password, name, username, role });
       
       res.status(201).json({
         success: true,
@@ -63,7 +63,7 @@ export class UserController {
       if (!email || !password) {
         res.status(400).json({
           success: false,
-          message: 'Please provide email and password'
+          message: 'Please provide email/username and password'
         });
         return;
       }
@@ -93,6 +93,29 @@ export class UserController {
       }
 
       const result = await this.userService.verifyEmail(token);
+      
+      res.status(200).json({
+        success: true,
+        message: result.message
+      });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  resendVerificationEmail = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const { email } = req.body;
+      
+      if (!email) {
+        res.status(400).json({
+          success: false,
+          message: 'Email is required'
+        });
+        return;
+      }
+
+      const result = await this.userService.resendVerificationEmail(email);
       
       res.status(200).json({
         success: true,

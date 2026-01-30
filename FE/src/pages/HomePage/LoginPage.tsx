@@ -41,7 +41,17 @@ export default function LoginPage() {
       }
     } catch (error: any) {
       console.error('Login error:', error);
-      toast.error(error.response?.data?.message || 'Login failed. Please check your credentials.');
+      const status = error.response?.status;
+      const message = error.response?.data?.message;
+      
+      if (status === 403) {
+        // Email not verified or account deactivated
+        toast.error(message || 'Please verify your email before logging in.', {
+          duration: 5000,
+        });
+      } else {
+        toast.error(message || 'Login failed. Please check your credentials.');
+      }
     } finally {
       setLoading(false);
     }
@@ -121,20 +131,20 @@ export default function LoginPage() {
 
           {/* Login Form */}
           <form onSubmit={handleSubmit} className="space-y-6">
-            {/* Email Field */}
+            {/* Email or Username Field */}
             <div>
               <label htmlFor="email" className="block text-sm font-medium text-foreground mb-2">
-                Email Address
+                Email or Username
               </label>
               <input
                 id="email"
                 name="email"
-                type="email"
+                type="text"
                 required
                 value={formData.email}
                 onChange={handleInputChange}
                 className="block w-full px-4 py-3.5 bg-white border-2 border-primary/30 rounded-xl text-foreground placeholder:text-muted-foreground focus:border-primary focus:ring-0 transition-all outline-none hover:border-primary/50"
-                placeholder="you@example.com"
+                placeholder="you@example.com or username"
               />
             </div>
 
