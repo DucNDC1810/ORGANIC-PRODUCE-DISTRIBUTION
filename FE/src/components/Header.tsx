@@ -63,7 +63,7 @@ function DropdownMenu({ items, isOpen }: DropdownMenuProps) {
 }
 
 export default function Header() {
-  const { getTotalItems } = useCart();
+  const { getTotalItems, openCart } = useCart();
   const { user, isAuthenticated, logout } = useAuth();
   const navigate = useNavigate();
   const [productsOpen, setProductsOpen] = useState(false);
@@ -178,8 +178,8 @@ export default function Header() {
             <button className="p-2 hover:bg-muted rounded-lg transition-colors">
               <Search className="w-5 h-5 text-muted-foreground" />
             </button>
-            <Link 
-              to="/cart" 
+            <button 
+              onClick={openCart}
               className="relative p-2 hover:bg-muted rounded-lg transition-colors group"
             >
               <ShoppingCart className="w-5 h-5 text-muted-foreground group-hover:text-emerald-600 transition-colors" />
@@ -188,7 +188,7 @@ export default function Header() {
                   {getTotalItems()}
                 </span>
               )}
-            </Link>
+            </button>
           </div>
         </div>
       </div>
