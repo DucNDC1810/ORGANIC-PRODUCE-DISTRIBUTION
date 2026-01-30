@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Plus, Minus, Trash2, Calendar, Truck, Store } from 'lucide-react';
+import { Plus, Minus, Trash2, Calendar, Truck, Store, Users } from 'lucide-react';
 import { useCart } from '../../context/CartContext';
 import Header from '../../components/Header';
 
@@ -9,6 +9,8 @@ export default function CheckoutPage() {
   const navigate = useNavigate();
 
   const [deliveryType, setDeliveryType] = useState<'delivery' | 'pickup'>('pickup');
+  const [isGroupOrder, setIsGroupOrder] = useState(false);
+  const [isRecurringOrder, setIsRecurringOrder] = useState(false);
   
   const [formData, setFormData] = useState({
     fullName: '',
@@ -17,12 +19,21 @@ export default function CheckoutPage() {
     paymentMethod: 'Chuyển khoản',
     notes: '',
     promoCode: '',
+    groupName: '',
+    groupMembers: '',
+    groupAddress: '',
+    groupNotes: '',
+    recurringFrequency: 'weekly',
+    recurringDay: 'monday',
+    recurringStartDate: '',
+    recurringDuration: '3',
   });
 
   const subtotal = getTotalPrice();
-  const shipping = 0;
+  const shipping = isGroupOrder ? 0 : 0; // Miễn phí ship khi đặt nhóm
+  const recurringDiscount = isRecurringOrder ? subtotal * 0.05 : 0; // Giảm 5% cho đơn định kỳ
   const vat = subtotal * 0.0476; // 4.76% VAT
-  const total = subtotal + shipping;
+  const total = subtotal + shipping - recurringDiscount;
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     setFormData({
@@ -141,6 +152,210 @@ export default function CheckoutPage() {
                   </button>
                 )}
               </div>
+            </div>
+
+            {/* Đặt theo nhóm */}
+            <div className="bg-white rounded-lg p-6 shadow-sm">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-2">
+                  <h2 className="text-base font-semibold text-gray-800">Đặt theo nhóm</h2>
+                  {isGroupOrder && (
+                    <span className="px-2 py-0.5 bg-green-100 text-green-700 text-xs font-medium rounded">
+                      🎉 Ưu đãi nhóm
+                    </span>
+                  )}
+                </div>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={isGroupOrder}
+                    onChange={(e) => setIsGroupOrder(e.target.checked)}
+                    className="w-4 h-4 text-primary rounded focus:ring-primary"
+                  />
+                  <span className="text-sm text-gray-600">Bật đặt nhóm</span>
+                </label>
+              </div>
+
+              {isGroupOrder && (
+                <div className="space-y-3">
+                  <div className="p-3 bg-green-50 border border-green-200 rounded-lg">
+                    <p className="text-sm text-green-700 flex items-center gap-2">
+                      <Users className="w-4 h-4" />
+                      Đặt theo nhóm để được miễn phí ship và nhiều ưu đãi khác!
+                    </p>
+                  </div>
+
+                  <input
+                    type="text"
+                    name="groupName"
+                    value={formData.groupName}
+                    onChange={handleInputChange}
+                    placeholder="Tên nhóm/cộng đồng (VD: Chung cư Vinhomes, Công ty ABC)"
+                    className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary text-sm"
+                  />
+
+                  <input
+                    type="number"
+                    name="groupMembers"
+                    value={formData.groupMembers}
+                    onChange={handleInputChange}
+                    placeholder="Số thành viên trong nhóm"
+                    min="2"
+                    className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary text-sm"
+                  />
+
+                  <input
+                    type="text"
+                    name="groupAddress"
+                    value={formData.groupAddress}
+                    onChange={handleInputChange}
+                    placeholder="Địa chỉ giao hàng chung"
+                    className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary text-sm"
+                  />
+
+                  <textarea
+                    name="groupNotes"
+                    value={formData.groupNotes}
+                    onChange={handleInputChange}
+                    placeholder="Ghi chú cho đơn hàng nhóm (VD: Phân phối cho từng người, liên hệ trưởng nhóm...)"
+                    rows={2}
+                    className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary text-sm resize-none"
+                  />
+                </div>
+              )}
+            </div>
+
+            {/* Đặt hẹn giao định kỳ */}
+            <div className="bg-white rounded-lg p-6 shadow-sm">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-2">
+                  <h2 className="text-base font-semibold text-gray-800">Đặt hẹn giao định kỳ</h2>
+                  {isRecurringOrder && (
+                    <span className="px-2 py-0.5 bg-blue-100 text-blue-700 text-xs font-medium rounded">
+                      ⏰ Giao tự động
+                    </span>
+                  )}
+                </div>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={isRecurringOrder}
+                    onChange={(e) => setIsRecurringOrder(e.target.checked)}
+                    className="w-4 h-4 text-primary rounded focus:ring-primary"
+                  />
+                  <span className="text-sm text-gray-600">Bật giao định kỳ</span>
+                </label>
+              </div>
+
+              {isRecurringOrder && (
+                <div className="space-y-3">
+                  <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                    <p className="text-sm text-blue-700 flex items-center gap-2">
+                      <Calendar className="w-4 h-4" />
+                      Đặt giao định kỳ để tiết kiệm thời gian và được giảm 5% cho mỗi đơn!
+                    </p>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1.5">
+                      Tần suất giao hàng
+                    </label>
+                    <select
+                      name="recurringFrequency"
+                      value={formData.recurringFrequency}
+                      onChange={handleInputChange}
+                      className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary text-sm"
+                    >
+                      <option value="weekly">Hàng tuần</option>
+                      <option value="biweekly">2 tuần/lần</option>
+                      <option value="monthly">Hàng tháng</option>
+                    </select>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 mb-1.5">
+                        Ngày giao hàng
+                      </label>
+                      <select
+                        name="recurringDay"
+                        value={formData.recurringDay}
+                        onChange={handleInputChange}
+                        className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary text-sm"
+                      >
+                        <option value="monday">Thứ 2</option>
+                        <option value="tuesday">Thứ 3</option>
+                        <option value="wednesday">Thứ 4</option>
+                        <option value="thursday">Thứ 5</option>
+                        <option value="friday">Thứ 6</option>
+                        <option value="saturday">Thứ 7</option>
+                        <option value="sunday">Chủ nhật</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 mb-1.5">
+                        Thời gian duy trì
+                      </label>
+                      <select
+                        name="recurringDuration"
+                        value={formData.recurringDuration}
+                        onChange={handleInputChange}
+                        className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary text-sm"
+                      >
+                        <option value="1">1 tháng</option>
+                        <option value="3">3 tháng</option>
+                        <option value="6">6 tháng</option>
+                        <option value="12">12 tháng</option>
+                        <option value="unlimited">Không giới hạn</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1.5">
+                      Bắt đầu từ ngày
+                    </label>
+                    <input
+                      type="date"
+                      name="recurringStartDate"
+                      value={formData.recurringStartDate}
+                      onChange={handleInputChange}
+                      min={new Date().toISOString().split('T')[0]}
+                      className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary text-sm"
+                    />
+                  </div>
+
+                  <div className="p-3 bg-gray-50 rounded-lg border border-gray-200">
+                    <p className="text-xs font-medium text-gray-700 mb-1">Tóm tắt lịch giao hàng:</p>
+                    <p className="text-xs text-gray-600">
+                      Giao hàng mỗi{' '}
+                      <span className="font-medium text-gray-800">
+                        {formData.recurringFrequency === 'weekly' 
+                          ? 'tuần' 
+                          : formData.recurringFrequency === 'biweekly' 
+                          ? '2 tuần' 
+                          : 'tháng'}
+                      </span>
+                      {' '}vào{' '}
+                      <span className="font-medium text-gray-800">
+                        {formData.recurringDay === 'monday' ? 'Thứ 2' :
+                         formData.recurringDay === 'tuesday' ? 'Thứ 3' :
+                         formData.recurringDay === 'wednesday' ? 'Thứ 4' :
+                         formData.recurringDay === 'thursday' ? 'Thứ 5' :
+                         formData.recurringDay === 'friday' ? 'Thứ 6' :
+                         formData.recurringDay === 'saturday' ? 'Thứ 7' : 'Chủ nhật'}
+                      </span>
+                      {', '}trong{' '}
+                      <span className="font-medium text-gray-800">
+                        {formData.recurringDuration === 'unlimited' 
+                          ? 'thời gian không giới hạn' 
+                          : `${formData.recurringDuration} tháng`}
+                      </span>
+                    </p>
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Phương thức thanh toán */}
@@ -296,8 +511,24 @@ export default function CheckoutPage() {
                   </div>
                   <div className="flex justify-between text-sm">
                     <span className="text-gray-600">Phí vận chuyển</span>
-                    <span className="font-medium text-gray-800">-</span>
+                    {isGroupOrder ? (
+                      <span className="font-medium text-green-600">Miễn phí</span>
+                    ) : (
+                      <span className="font-medium text-gray-800">-</span>
+                    )}
                   </div>
+                  {isGroupOrder && (
+                    <div className="flex justify-between text-sm">
+                      <span className="text-green-600">Giảm giá đặt nhóm</span>
+                      <span className="font-medium text-green-600">-0₫</span>
+                    </div>
+                  )}
+                  {isRecurringOrder && (
+                    <div className="flex justify-between text-sm">
+                      <span className="text-blue-600">Giảm giá đơn định kỳ (5%)</span>
+                      <span className="font-medium text-blue-600">-{recurringDiscount.toLocaleString('vi-VN')}₫</span>
+                    </div>
+                  )}
                   <div className="pt-2.5 border-t border-gray-200">
                     <div className="flex justify-between items-center mb-1">
                       <span className="text-base font-semibold text-gray-800">Tổng thanh toán</span>
