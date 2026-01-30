@@ -22,19 +22,33 @@ export default function LoginPage() {
     try {
       await login(formData.email, formData.password);
       
+      // Small delay to ensure localStorage is updated
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
       // Get user data from localStorage after successful login
       const userStr = localStorage.getItem('user');
       if (userStr) {
         const user = JSON.parse(userStr);
         
         // Redirect based on user role
-        toast.success('Login successful! Welcome back!');
-        if (user.role === 'admin') {
-          navigate('/admin');
-        } else if (user.role === 'farmer') {
-          navigate('/farmer/dashboard');
-        } else {
-          navigate('/');
+        toast.success('Đăng nhập thành công! Chào mừng bạn trở lại!');
+        switch (user.role) {
+          case 'admin':
+            navigate('/admin');
+            break;
+          case 'manager':
+            navigate('/manager');
+            break;
+          case 'farmer':
+            navigate('/farmer/dashboard');
+            break;
+          case 'shipper':
+            navigate('/shipper/dashboard');
+            break;
+          case 'customer':
+          default:
+            navigate('/');
+            break;
         }
       } else {
         navigate('/');

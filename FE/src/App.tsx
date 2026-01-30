@@ -2,7 +2,7 @@ import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { Toaster } from 'sonner';
 import { CartProvider } from './context/CartContext';
 import { AuthProvider } from './context/AuthContext';
-import { ProtectedRoute, CustomerRoute, AdminRoute } from './components/ProtectedRoute';
+import { ProtectedRoute, CustomerRoute, AdminRoute, ManagerRoute } from './components/ProtectedRoute';
 import HomePage from './pages/HomePage/Home';
 import CartPage from './pages/HomePage/CartPage';
 import CheckoutPage from './pages/HomePage/CheckoutPage';
@@ -19,6 +19,7 @@ import MarketNewsTips from './pages/HomePage/MarketNewsTips';
 import AboutUs from './pages/HomePage/AboutUs';
 import Profile from './pages/Customer/Profile';
 import AdminDashboard from './pages/Admin/AdminDashboard';
+import ManagerDashboard from './pages/Manager/ManagerDashboard';
 
 export default function App() {
   return (
@@ -41,50 +42,16 @@ export default function App() {
             <Route path="/about" element={<AboutUs />} />
 
             {/* Protected routes - require authentication */}
-            <Route 
-              path="/cart" 
-              element={
-                <ProtectedRoute>
-                  <CartPage />
-                </ProtectedRoute>
-              } 
-            />
-            <Route 
-              path="/checkout" 
-              element={
-                <ProtectedRoute>
-                  <CheckoutPage />
-                </ProtectedRoute>
-              } 
-            />
-            <Route 
-              path="/order-success" 
-              element={
-                <ProtectedRoute>
-                  <OrderSuccessPage />
-                </ProtectedRoute>
-              } 
-            />
-
+            <Route path="/cart" element={<ProtectedRoute><CartPage /></ProtectedRoute>} />
+            <Route path="/checkout" element={<ProtectedRoute><CheckoutPage /></ProtectedRoute>} />
+            <Route path="/order-success" element={<ProtectedRoute><OrderSuccessPage /></ProtectedRoute>} />
             {/* Customer-only routes */}
-            <Route 
-              path="/profile" 
-              element={
-                <CustomerRoute>
-                  <Profile />
-                </CustomerRoute>
-              } 
-            />
+            <Route path="/profile" element={<CustomerRoute> <Profile /></CustomerRoute>} />
 
             {/* Admin-only routes */}
-            <Route 
-              path="/admin" 
-              element={
-                <AdminRoute>
-                  <AdminDashboard />
-                </AdminRoute>
-              } 
-            />
+            <Route path="/admin" element={<AdminRoute><AdminDashboard /></AdminRoute>} />
+            {/* Manager-only routes */}
+            <Route path="/manager" element={<ManagerRoute><ManagerDashboard /></ManagerRoute>} />
           </Routes>
         </BrowserRouter>
       </CartProvider>

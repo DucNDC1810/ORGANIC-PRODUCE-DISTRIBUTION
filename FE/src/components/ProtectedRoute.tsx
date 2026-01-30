@@ -40,6 +40,7 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
         customer: '/',
         farmer: '/farmer/dashboard',
         admin: '/admin',
+        manager: '/manager',
       };
       return <Navigate to={roleRedirects[user.role] || '/'} replace />;
     }
@@ -72,6 +73,10 @@ export const FarmerRoute: React.FC<{ children: React.ReactNode }> = ({ children 
 
 export const AdminRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => (
   <ProtectedRoute allowedRoles={['admin']}>{children}</ProtectedRoute>
+);
+
+export const ManagerRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => (
+  <ProtectedRoute allowedRoles={['manager']}>{children}</ProtectedRoute>
 );
 
 // Route that allows multiple roles

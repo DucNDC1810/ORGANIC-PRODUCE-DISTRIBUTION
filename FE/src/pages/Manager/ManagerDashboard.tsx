@@ -4,28 +4,27 @@ import {
   Package, 
   ShoppingCart, 
   FolderTree, 
-  Users,
   Leaf, 
   LayoutDashboard,
   Menu,
   X,
-  BarChart3,
-  User,
+  Tag,
+  Percent,
   Settings,
+  User,
   LogOut,
   ChevronDown,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { toast } from 'sonner';
-import Overview from './Overview';
-import ProductManagement from '../Manager/ProductManagement';
-import OrderManagement from './OrderManagement';
-import CustomerManagement from './CustomerManagement';
-import ProductCategories from '../Manager/CategoryManagement';
-import ReportsAnalytics from './ReportsAnalytics';
+import ManagerOverview from './ManagerOverview';
+import ManagerProductManagement from './ProductManagement';
+import ManagerCategoryManagement from './CategoryManagement';
+import ManagerPromotions from './ManagerPromotions';
+import ManagerVouchers from './ManagerVouchers';
 
-export default function AdminDashboard() {
-  const [activeTab, setActiveTab] = useState('overview');
+export default function ManagerDashboard() {
+  const [activeTab, setActiveTab] = useState('dashboard');
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -51,30 +50,27 @@ export default function AdminDashboard() {
   };
 
   const menuItems = [
-    { id: 'overview', label: 'Overview', icon: LayoutDashboard },
+    { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { id: 'products', label: 'Products', icon: Package },
-    { id: 'orders', label: 'Orders', icon: ShoppingCart },
-    { id: 'customers', label: 'Customers', icon: Users },
     { id: 'categories', label: 'Categories', icon: FolderTree },
-    { id: 'reports', label: 'Reports', icon: BarChart3 },
+    { id: 'promotions', label: 'Promotions', icon: Tag },
+    { id: 'vouchers', label: 'Vouchers', icon: Percent },
   ];
 
   const renderContent = () => {
     switch (activeTab) {
-      case 'overview':
-        return <Overview />;
+      case 'dashboard':
+        return <ManagerOverview />;
       case 'products':
-        return <ProductManagement />;
-      case 'orders':
-        return <OrderManagement />;
-      case 'customers':
-        return <CustomerManagement />;
+        return <ManagerProductManagement />;
       case 'categories':
-        return <ProductCategories />;
-      case 'reports':
-        return <ReportsAnalytics />;
+        return <ManagerCategoryManagement />;
+      case 'promotions':
+        return <ManagerPromotions />;
+      case 'vouchers':
+        return <ManagerVouchers />;
       default:
-        return <Overview />;
+        return <ManagerOverview />;
     }
   };
 
@@ -94,7 +90,7 @@ export default function AdminDashboard() {
               <div className="w-8 h-8 bg-gradient-to-br from-green-500 to-emerald-600 rounded-lg flex items-center justify-center">
                 <Leaf className="w-5 h-5 text-white" />
               </div>
-              <h1 className="text-lg font-semibold text-foreground">Organic Produce Admin</h1>
+              <h1 className="text-lg font-semibold text-foreground">Organic Produce Manager</h1>
             </div>
           </div>
           <div className="flex items-center gap-4">
@@ -113,7 +109,7 @@ export default function AdminDashboard() {
                 className="flex items-center gap-2 hover:bg-secondary px-3 py-2 rounded-lg transition-colors"
               >
                 <div className="w-10 h-10 rounded-full bg-gradient-to-br from-green-500 to-emerald-600 flex items-center justify-center text-white font-semibold">
-                  {user?.name?.charAt(0).toUpperCase() || 'AD'}
+                  {user?.name?.charAt(0).toUpperCase() || 'MG'}
                 </div>
                 <ChevronDown className={`w-4 h-4 text-muted-foreground transition-transform ${dropdownOpen ? 'rotate-180' : ''}`} />
               </button>
@@ -123,8 +119,8 @@ export default function AdminDashboard() {
                 <div className="absolute right-0 mt-2 w-56 bg-white border border-gray-200 rounded-lg shadow-[0_8px_30px_rgba(0,0,0,0.12)] py-2 z-[100] backdrop-blur-sm">
                   {/* User Info */}
                   <div className="px-4 py-3 border-b border-gray-200 bg-white">
-                    <p className="text-sm font-semibold text-foreground">{user?.name || 'Admin User'}</p>
-                    <p className="text-xs text-muted-foreground truncate">{user?.email || 'admin@example.com'}</p>
+                    <p className="text-sm font-semibold text-foreground">{user?.name || 'Manager User'}</p>
+                    <p className="text-xs text-muted-foreground truncate">{user?.email || 'manager@example.com'}</p>
                   </div>
 
                   {/* Menu Items */}
@@ -142,7 +138,6 @@ export default function AdminDashboard() {
                     <button
                       onClick={() => {
                         setDropdownOpen(false);
-                        // Add settings navigation if needed
                       }}
                       className="w-full flex items-center gap-3 px-4 py-2 text-sm text-foreground hover:bg-secondary transition-colors"
                     >
