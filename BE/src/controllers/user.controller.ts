@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { UserService } from '../services/user.service';
 import { AuthRequest } from '../middlewares/auth.middleware';
+import { UserRole } from '../constants/roles';
 
 export class UserController {
   private userService: UserService;
@@ -145,10 +146,34 @@ export class UserController {
   // User CRUD
   getAllUsers = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
-      const users = await this.userService.getAllUsers();
+      // Parse query parameters
+      const {
+        page,
+        limit,
+        search,
+        role,
+        isActive,
+        isEmailVerified,
+        sortBy,
+        sortOrder
+      } = req.query;
+
+      const params = {
+        page: page ? parseInt(page as string) : undefined,
+        limit: limit ? parseInt(limit as string) : undefined,
+        search: search as string,
+        role: role as string,
+        isActive: isActive === 'true' ? true : isActive === 'false' ? false : undefined,
+        isEmailVerified: isEmailVerified === 'true' ? true : isEmailVerified === 'false' ? false : undefined,
+        sortBy: sortBy as string,
+        sortOrder: sortOrder as 'asc' | 'desc'
+      };
+
+      const result = await this.userService.getAllUsers(params);
       res.status(200).json({
         success: true,
-        data: users
+        data: result.users,
+        pagination: result.pagination
       });
     } catch (error) {
       next(error);
@@ -202,6 +227,283 @@ export class UserController {
       res.status(200).json({
         success: true,
         message: 'User deleted successfully'
+      });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  // ===== ADDITIONAL ACCOUNT MANAGEMENT METHODS =====
+
+  /**
+   * Toggle user active status
+   */
+  toggleUserStatus = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const { id } = req.params;
+      const user = await this.userService.toggleUserStatus(id);
+      res.status(200).json({
+        success: true,
+        message: `User ${user.isActive ? 'activated' : 'deactivated'} successfully`,
+        data: user
+      });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  /**
+   * Activate user account
+   */
+  activateUser = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const { id } = req.params;
+      const user = await this.userService.activateUser(id);
+      res.status(200).json({
+        success: true,
+        message: 'User activated successfully',
+        data: user
+      });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  /**
+   * Deactivate user account
+   */
+  deactivateUser = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const { id } = req.params;
+      const user = await this.userService.deactivateUser(id);
+      res.status(200).json({
+        success: true,
+        message: 'User deactivated successfully',
+        data: user
+      });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  /**
+   * Change user role
+   */
+  changeUserRole = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const { id } = req.params;
+      const { role } = req.body;
+
+      if (!role) {
+        res.status(400).json({
+          success: false,
+          message: 'Role is required'
+        });
+        return;
+      }
+
+      const user = await this.userService.changeUserRole(id, role as UserRole);
+      res.status(200).json({
+        success: true,
+        message: 'User role updated successfully',
+        data: user
+      });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  /**
+   * Bulk update users status
+   */
+  bulkUpdateStatus = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const { userIds, isActive } = req.body;
+
+      if (!userIds || !Array.isArray(userIds) || userIds.length === 0) {
+        res.status(400).json({
+          success: false,
+          message: 'userIds array is required'
+        });
+        return;
+      }
+
+      if (typeof isActive !== 'boolean') {
+        res.status(400).json({
+          success: false,
+          message: 'isActive boolean is required'
+        });
+        return;
+      }
+
+      const result = await this.userService.bulkUpdateStatus(userIds, isActive);
+      res.status(200).json({
+        success: true,
+        message: `${result.modifiedCount} users updated successfully`,
+        data: result
+      });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  /**
+   * Bulk delete users
+   */
+  bulkDeleteUsers = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const { userIds } = req.body;
+
+      if (!userIds || !Array.isArray(userIds) || userIds.length === 0) {
+        res.status(400).json({
+          success: false,
+          message: 'userIds array is required'
+        });
+        return;
+      }
+
+      const result = await this.userService.bulkDeleteUsers(userIds);
+      res.status(200).json({
+        success: true,
+        message: `${result.deletedCount} users deleted successfully`,
+        data: result
+      });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  /**
+   * Get user statistics
+   */
+  getUserStats = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const stats = await this.userService.getUserStats();
+      res.status(200).json({
+        success: true,
+        data: stats
+      });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  /**
+   * Search users
+   */
+  searchUsers = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const { keyword, limit } = req.query;
+
+      if (!keyword) {
+        res.status(400).json({
+          success: false,
+          message: 'Search keyword is required'
+        });
+        return;
+      }
+
+      const users = await this.userService.searchUsers(
+        keyword as string,
+        limit ? parseInt(limit as string) : undefined
+      );
+      res.status(200).json({
+        success: true,
+        data: users
+      });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  /**
+   * Check if email exists
+   */
+  checkEmailExists = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const { email } = req.query;
+
+      if (!email) {
+        res.status(400).json({
+          success: false,
+          message: 'Email is required'
+        });
+        return;
+      }
+
+      const exists = await this.userService.checkEmailExists(email as string);
+      res.status(200).json({
+        success: true,
+        data: { exists }
+      });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  /**
+   * Check if username exists
+   */
+  checkUsernameExists = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const { username } = req.query;
+
+      if (!username) {
+        res.status(400).json({
+          success: false,
+          message: 'Username is required'
+        });
+        return;
+      }
+
+      const exists = await this.userService.checkUsernameExists(username as string);
+      res.status(200).json({
+        success: true,
+        data: { exists }
+      });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  /**
+   * Admin reset user password
+   */
+  adminResetPassword = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const { id } = req.params;
+      const { newPassword } = req.body;
+
+      if (!newPassword || newPassword.length < 6) {
+        res.status(400).json({
+          success: false,
+          message: 'New password must be at least 6 characters long'
+        });
+        return;
+      }
+
+      const user = await this.userService.adminResetPassword(id, newPassword);
+      res.status(200).json({
+        success: true,
+        message: 'Password reset successfully',
+        data: user
+      });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  /**
+   * Admin verify user email
+   */
+  adminVerifyEmail = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const { id } = req.params;
+      const user = await this.userService.adminVerifyEmail(id);
+      res.status(200).json({
+        success: true,
+        message: 'Email verified successfully',
+        data: user
       });
     } catch (error) {
       next(error);

@@ -50,10 +50,50 @@ export interface User {
   email: string;
   name: string;
   username: string;
-  role: string;
+  role: 'admin' | 'manager' | 'customer' | 'user' | 'shipper' | 'farmer';
   phone?: string;
   address?: string;
   avatar?: string;
+  isActive: boolean;
+  isEmailVerified: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface UserQueryParams {
+  page?: number;
+  limit?: number;
+  search?: string;
+  role?: string;
+  isActive?: boolean;
+  isEmailVerified?: boolean;
+  sortBy?: string;
+  sortOrder?: 'asc' | 'desc';
+}
+
+export interface PaginationInfo {
+  currentPage: number;
+  totalPages: number;
+  totalUsers: number;
+  limit: number;
+  hasNext: boolean;
+  hasPrev: boolean;
+}
+
+export interface UsersResponse {
+  success: boolean;
+  data: User[];
+  pagination: PaginationInfo;
+}
+
+export interface UserStats {
+  totalUsers: number;
+  activeUsers: number;
+  inactiveUsers: number;
+  verifiedUsers: number;
+  unverifiedUsers: number;
+  usersByRole: Record<string, number>;
+  newUsersThisMonth: number;
 }
 
 export interface LoginCredentials {
@@ -149,12 +189,23 @@ export const authAPI = {
 
 export const userAPI = {
   /**
-   * Get all users
+   * Get all users with pagination, search and filters
    * GET /api/users
    */
-  getAllUsers: async (): Promise<User[]> => {
-    const response: any = await api.get('/users');
-    return response.data;
+  getAllUsers: async (params?: UserQueryParams): Promise<UsersResponse> => {
+    const queryParams = new URLSearchParams();
+    if (params) {
+      if (params.page) queryParams.append('page', params.page.toString());
+      if (params.limit) queryParams.append('limit', params.limit.toString());
+      if (params.search) queryParams.append('search', params.search);
+      if (params.role) queryParams.append('role', params.role);
+      if (params.isActive !== undefined) queryParams.append('isActive', params.isActive.toString());
+      if (params.isEmailVerified !== undefined) queryParams.append('isEmailVerified', params.isEmailVerified.toString());
+      if (params.sortBy) queryParams.append('sortBy', params.sortBy);
+      if (params.sortOrder) queryParams.append('sortOrder', params.sortOrder);
+    }
+    const response: any = await api.get(`/users?${queryParams.toString()}`);
+    return response;
   },
 
   /**
@@ -163,6 +214,15 @@ export const userAPI = {
    */
   getUserById: async (id: string): Promise<User> => {
     const response: any = await api.get(`/users/${id}`);
+    return response.data;
+  },
+
+  /**
+   * Create new user
+   * POST /api/users
+   */
+  createUser: async (data: Partial<User> & { password?: string }): Promise<User> => {
+    const response: any = await api.post('/users', data);
     return response.data;
   },
 
@@ -181,6 +241,116 @@ export const userAPI = {
    */
   deleteUser: async (id: string): Promise<void> => {
     await api.delete(`/users/${id}`);
+  },
+
+  /**
+   * Get user statistics
+   * GET /api/users/stats
+   */
+  getUserStats: async (): Promise<UserStats> => {
+    const response: any = await api.get('/users/stats');
+    return response.data;
+  },
+
+  /**
+   * Search users
+   * GET /api/users/search
+   */
+  searchUsers: async (keyword: string, limit?: number): Promise<User[]> => {
+    const params = new URLSearchParams({ keyword });
+    if (limit) params.append('limit', limit.toString());
+    const response: any = await api.get(`/users/search?${params.toString()}`);
+    return response.data;
+  },
+
+  /**
+   * Toggle user active status
+   * PATCH /api/users/:id/toggle-status
+   */
+  toggleUserStatus: async (id: string): Promise<User> => {
+    const response: any = await api.patch(`/users/${id}/toggle-status`);
+    return response.data;
+  },
+
+  /**
+   * Activate user
+   * PATCH /api/users/:id/activate
+   */
+  activateUser: async (id: string): Promise<User> => {
+    const response: any = await api.patch(`/users/${id}/activate`);
+    return response.data;
+  },
+
+  /**
+   * Deactivate user
+   * PATCH /api/users/:id/deactivate
+   */
+  deactivateUser: async (id: string): Promise<User> => {
+    const response: any = await api.patch(`/users/${id}/deactivate`);
+    return response.data;
+  },
+
+  /**
+   * Change user role
+   * PATCH /api/users/:id/role
+   */
+  changeUserRole: async (id: string, role: string): Promise<User> => {
+    const response: any = await api.patch(`/users/${id}/role`, { role });
+    return response.data;
+  },
+
+  /**
+   * Admin reset user password
+   * PATCH /api/users/:id/reset-password
+   */
+  adminResetPassword: async (id: string, newPassword: string): Promise<User> => {
+    const response: any = await api.patch(`/users/${id}/reset-password`, { newPassword });
+    return response.data;
+  },
+
+  /**
+   * Admin verify user email
+   * PATCH /api/users/:id/verify-email
+   */
+  adminVerifyEmail: async (id: string): Promise<User> => {
+    const response: any = await api.patch(`/users/${id}/verify-email`);
+    return response.data;
+  },
+
+  /**
+   * Bulk update users status
+   * POST /api/users/bulk-update-status
+   */
+  bulkUpdateStatus: async (userIds: string[], isActive: boolean): Promise<{ modifiedCount: number }> => {
+    const response: any = await api.post('/users/bulk-update-status', { userIds, isActive });
+    return response.data;
+  },
+
+  /**
+   * Bulk delete users
+   * POST /api/users/bulk-delete
+   */
+  bulkDeleteUsers: async (userIds: string[]): Promise<{ deletedCount: number }> => {
+    const response: any = await api.post('/users/bulk-delete', { userIds });
+    return response.data;
+  },
+
+  /**
+   * Check if email exists
+   * GET /api/users/check-email
+   */
+  checkEmailExists: async (email: string): Promise<boolean> => {
+    const response: any = await api.get(`/users/check-email?email=${encodeURIComponent(email)}`);
+    return response.data.exists;
+  },
+
+  /**
+   * Check if username exists
+   * GET /api/users/check-username
+   */
+  checkUsernameExists: async (username: string): Promise<boolean> => {
+    const response: any = await api.get(`/users/check-username?username=${encodeURIComponent(username)}`);
+    return response.data.exists;
   },
 };
 

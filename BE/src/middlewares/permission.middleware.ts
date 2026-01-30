@@ -133,6 +133,33 @@ export const adminOnly = (req: AuthRequest, res: Response, next: NextFunction): 
 };
 
 /**
+ * Check if user has specific role
+ * Kiểm tra user có role cụ thể không
+ * 
+ * @param roles - Các role được phép
+ * @example checkRole(UserRole.ADMIN)
+ * @example checkRole(UserRole.ADMIN, UserRole.MANAGER)
+ */
+export const checkRole = (...roles: UserRole[]) => {
+  return (req: AuthRequest, res: Response, next: NextFunction): void => {
+    if (!req.user) {
+      next(new AppError('User not authenticated', 401));
+      return;
+    }
+
+    if (!roles.includes(req.user.role)) {
+      next(new AppError(
+        `Access denied. Required role: ${roles.join(' or ')}`,
+        403
+      ));
+      return;
+    }
+
+    next();
+  };
+};
+
+/**
  * Manager or Higher Middleware
  * Cho phép manager hoặc admin truy cập
  */

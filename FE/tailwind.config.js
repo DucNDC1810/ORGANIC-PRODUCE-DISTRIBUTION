@@ -26,6 +26,15 @@ export default {
         'muted-foreground': '#64748b',
         border: '#e2e8f0',
         secondary: '#f0fdfa',
+        // Popover/Dropdown colors
+        popover: {
+          DEFAULT: '#ffffff',
+          foreground: '#1e293b',
+        },
+        card: {
+          DEFAULT: '#ffffff',
+          foreground: '#1e293b',
+        },
       },
     },
   },

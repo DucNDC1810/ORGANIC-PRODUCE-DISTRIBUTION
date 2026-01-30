@@ -10,14 +10,107 @@ interface AuthResponse {
   token: string;
 }
 
+interface UserQueryParams {
+  page?: number;
+  limit?: number;
+  search?: string;
+  role?: string;
+  isActive?: boolean;
+  isEmailVerified?: boolean;
+  sortBy?: string;
+  sortOrder?: 'asc' | 'desc';
+}
+
+interface PaginatedUsersResponse {
+  users: IUser[];
+  pagination: {
+    currentPage: number;
+    totalPages: number;
+    totalUsers: number;
+    limit: number;
+    hasNext: boolean;
+    hasPrev: boolean;
+  };
+}
+
 export class UserService {
   private emailService: EmailService;
 
   constructor() {
     this.emailService = new EmailService();
   }
-  async getAllUsers(): Promise<IUser[]> {
-    return await User.find().select('-password');
+
+  // ===== ENHANCED CRUD OPERATIONS =====
+
+  /**
+   * Get all users with pagination, search, and filters
+   */
+  async getAllUsers(params: UserQueryParams = {}): Promise<PaginatedUsersResponse> {
+    const {
+      page = 1,
+      limit = 10,
+      search,
+      role,
+      isActive,
+      isEmailVerified,
+      sortBy = 'createdAt',
+      sortOrder = 'desc'
+    } = params;
+
+    // Build query
+    const query: any = {};
+
+    // Search by name, email, or username
+    if (search) {
+      query.$or = [
+        { name: { $regex: search, $options: 'i' } },
+        { email: { $regex: search, $options: 'i' } },
+        { username: { $regex: search, $options: 'i' } }
+      ];
+    }
+
+    // Filter by role
+    if (role) {
+      query.role = role;
+    }
+
+    // Filter by active status
+    if (typeof isActive === 'boolean') {
+      query.isActive = isActive;
+    }
+
+    // Filter by email verification status
+    if (typeof isEmailVerified === 'boolean') {
+      query.isEmailVerified = isEmailVerified;
+    }
+
+    // Calculate pagination
+    const skip = (page - 1) * limit;
+    const sortOptions: any = { [sortBy]: sortOrder === 'asc' ? 1 : -1 };
+
+    // Execute query
+    const [users, totalUsers] = await Promise.all([
+      User.find(query)
+        .select('-password')
+        .sort(sortOptions)
+        .skip(skip)
+        .limit(limit),
+      User.countDocuments(query)
+    ]);
+
+    const totalPages = Math.ceil(totalUsers / limit);
+
+    return {
+      users,
+      pagination: {
+        currentPage: page,
+        totalPages,
+        totalUsers,
+        limit,
+        hasNext: page < totalPages,
+        hasPrev: page > 1
+      }
+    };
   }
 
   async getUserById(id: string): Promise<IUser> {
@@ -57,6 +150,214 @@ export class UserService {
     if (!user) {
       throw new AppError('User not found', 404);
     }
+  }
+
+  // ===== ADDITIONAL ACCOUNT MANAGEMENT METHODS =====
+
+  /**
+   * Toggle user active status (activate/deactivate account)
+   */
+  async toggleUserStatus(id: string): Promise<IUser> {
+    const user = await User.findById(id).select('-password');
+    if (!user) {
+      throw new AppError('User not found', 404);
+    }
+
+    user.isActive = !user.isActive;
+    await user.save();
+
+    return user;
+  }
+
+  /**
+   * Activate user account
+   */
+  async activateUser(id: string): Promise<IUser> {
+    const user = await User.findByIdAndUpdate(
+      id,
+      { isActive: true },
+      { new: true, runValidators: true }
+    ).select('-password');
+
+    if (!user) {
+      throw new AppError('User not found', 404);
+    }
+
+    return user;
+  }
+
+  /**
+   * Deactivate user account
+   */
+  async deactivateUser(id: string): Promise<IUser> {
+    const user = await User.findByIdAndUpdate(
+      id,
+      { isActive: false },
+      { new: true, runValidators: true }
+    ).select('-password');
+
+    if (!user) {
+      throw new AppError('User not found', 404);
+    }
+
+    return user;
+  }
+
+  /**
+   * Change user role
+   */
+  async changeUserRole(id: string, newRole: UserRole): Promise<IUser> {
+    const validRoles = Object.values(UserRole);
+    if (!validRoles.includes(newRole)) {
+      throw new AppError(`Invalid role. Valid roles are: ${validRoles.join(', ')}`, 400);
+    }
+
+    const user = await User.findByIdAndUpdate(
+      id,
+      { role: newRole },
+      { new: true, runValidators: true }
+    ).select('-password');
+
+    if (!user) {
+      throw new AppError('User not found', 404);
+    }
+
+    return user;
+  }
+
+  /**
+   * Bulk update users status
+   */
+  async bulkUpdateStatus(userIds: string[], isActive: boolean): Promise<{ modifiedCount: number }> {
+    const result = await User.updateMany(
+      { _id: { $in: userIds } },
+      { isActive }
+    );
+
+    return { modifiedCount: result.modifiedCount };
+  }
+
+  /**
+   * Bulk delete users
+   */
+  async bulkDeleteUsers(userIds: string[]): Promise<{ deletedCount: number }> {
+    const result = await User.deleteMany({ _id: { $in: userIds } });
+    return { deletedCount: result.deletedCount };
+  }
+
+  /**
+   * Get user statistics
+   */
+  async getUserStats(): Promise<{
+    totalUsers: number;
+    activeUsers: number;
+    inactiveUsers: number;
+    verifiedUsers: number;
+    unverifiedUsers: number;
+    usersByRole: Record<string, number>;
+    newUsersThisMonth: number;
+  }> {
+    const now = new Date();
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+
+    const [
+      totalUsers,
+      activeUsers,
+      verifiedUsers,
+      newUsersThisMonth,
+      roleStats
+    ] = await Promise.all([
+      User.countDocuments(),
+      User.countDocuments({ isActive: true }),
+      User.countDocuments({ isEmailVerified: true }),
+      User.countDocuments({ createdAt: { $gte: startOfMonth } }),
+      User.aggregate([
+        { $group: { _id: '$role', count: { $sum: 1 } } }
+      ])
+    ]);
+
+    const usersByRole: Record<string, number> = {};
+    roleStats.forEach((stat: { _id: string; count: number }) => {
+      usersByRole[stat._id] = stat.count;
+    });
+
+    return {
+      totalUsers,
+      activeUsers,
+      inactiveUsers: totalUsers - activeUsers,
+      verifiedUsers,
+      unverifiedUsers: totalUsers - verifiedUsers,
+      usersByRole,
+      newUsersThisMonth
+    };
+  }
+
+  /**
+   * Search users by keyword
+   */
+  async searchUsers(keyword: string, limit: number = 10): Promise<IUser[]> {
+    return await User.find({
+      $or: [
+        { name: { $regex: keyword, $options: 'i' } },
+        { email: { $regex: keyword, $options: 'i' } },
+        { username: { $regex: keyword, $options: 'i' } }
+      ]
+    })
+      .select('-password')
+      .limit(limit);
+  }
+
+  /**
+   * Check if email exists
+   */
+  async checkEmailExists(email: string): Promise<boolean> {
+    const user = await User.findOne({ email: email.toLowerCase() });
+    return !!user;
+  }
+
+  /**
+   * Check if username exists
+   */
+  async checkUsernameExists(username: string): Promise<boolean> {
+    const user = await User.findOne({ username: username.toLowerCase() });
+    return !!user;
+  }
+
+  /**
+   * Reset user password (Admin action)
+   */
+  async adminResetPassword(userId: string, newPassword: string): Promise<IUser> {
+    const user = await User.findById(userId);
+    if (!user) {
+      throw new AppError('User not found', 404);
+    }
+
+    user.password = newPassword;
+    await user.save();
+
+    // Return user without password
+    return await User.findById(userId).select('-password') as IUser;
+  }
+
+  /**
+   * Manually verify user email (Admin action)
+   */
+  async adminVerifyEmail(userId: string): Promise<IUser> {
+    const user = await User.findByIdAndUpdate(
+      userId,
+      { 
+        isEmailVerified: true,
+        emailVerificationToken: undefined,
+        emailVerificationExpires: undefined
+      },
+      { new: true, runValidators: true }
+    ).select('-password');
+
+    if (!user) {
+      throw new AppError('User not found', 404);
+    }
+
+    return user;
   }
 
   // Authentication methods
