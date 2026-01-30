@@ -81,6 +81,8 @@ export interface User {
   phone?: string;
   address?: string;
   avatar?: string;
+  dateOfBirth?: string;
+  gender?: 'male' | 'female' | 'other';
   isActive: boolean;
   isEmailVerified: boolean;
   createdAt: string;
@@ -428,6 +430,111 @@ export const productAPI = {
    */
   deleteProduct: async (id: string): Promise<void> => {
     await api.delete(`/products/${id}`);
+  },
+};
+
+// ========================
+// CART API ENDPOINTS
+// ========================
+
+export interface CartItem {
+  product: {
+    _id: string;
+    name: string;
+    price: number;
+    images?: string[];
+    thumbnail?: string;
+    stock: number;
+    isActive: boolean;
+  };
+  quantity: number;
+  price: number;
+  name: string;
+  image: string;
+}
+
+export interface Cart {
+  _id: string;
+  user: string;
+  items: CartItem[];
+  totalItems: number;
+  totalPrice: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface AddToCartData {
+  productId: string;
+  quantity?: number;
+}
+
+export interface UpdateCartItemData {
+  quantity: number;
+}
+
+export interface SyncCartData {
+  items: {
+    product: string;
+    quantity: number;
+    price: number;
+    name: string;
+    image: string;
+  }[];
+}
+
+export const cartAPI = {
+  /**
+   * Get current user's cart
+   * GET /api/cart
+   */
+  getCart: async (): Promise<Cart> => {
+    const response: any = await api.get('/cart');
+    return response.data;
+  },
+
+  /**
+   * Add item to cart
+   * POST /api/cart/add
+   */
+  addToCart: async (data: AddToCartData): Promise<Cart> => {
+    const response: any = await api.post('/cart/add', data);
+    return response.data;
+  },
+
+  /**
+   * Update cart item quantity
+   * PUT /api/cart/item/:productId
+   */
+  updateCartItem: async (productId: string, data: UpdateCartItemData): Promise<Cart> => {
+    const response: any = await api.put(`/cart/item/${productId}`, data);
+    return response.data;
+  },
+
+  /**
+   * Remove item from cart
+   * DELETE /api/cart/item/:productId
+   */
+  removeFromCart: async (productId: string): Promise<Cart> => {
+    const response: any = await api.delete(`/cart/item/${productId}`);
+    return response.data;
+  },
+
+  /**
+   * Clear entire cart
+   * DELETE /api/cart/clear
+   */
+  clearCart: async (): Promise<Cart> => {
+    const response: any = await api.delete('/cart/clear');
+    return response.data;
+  },
+
+  /**
+   * Sync local cart with database
+   * POST /api/cart/sync
+   */
+  syncCart: async (data: SyncCartData): Promise<Cart> => {
+    const response: any = await api.post('/cart/sync', data);
+    return response.data;
   },
 };
 
