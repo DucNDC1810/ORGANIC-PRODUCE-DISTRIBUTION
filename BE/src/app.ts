@@ -9,6 +9,7 @@ import passport from 'passport';
 import { errorHandler, notFoundHandler } from './middlewares/errorHandler';
 import authRoutes from './routes/auth.routes';
 import userRoutes from './routes/user.routes';
+import productRoutes from './routes/product.routes';
 // import exampleRoutes from './routes/example.routes'; // Uncomment để test
 import { configurePassport } from './config/passport';
 
@@ -34,8 +35,8 @@ app.get('/api/health', (req: Request, res: Response) => {
 // API Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
+app.use('/api/products', productRoutes);
 // app.use('/api/example', exampleRoutes); // Uncomment để test authentication
-// app.use('/api/products', productRoutes);
 
 // 404 Handler - Must be after all routes
 app.use(notFoundHandler);

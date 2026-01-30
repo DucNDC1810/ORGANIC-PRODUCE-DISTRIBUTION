@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import ProductCard from '../../components/ProductCard';
 import MiniCart from '../../components/MiniCart';
 import Header from '../../components/Header';
+import { useProducts } from '../../hooks/useProducts';
 
 // Import banner images
 import banner1 from '../../../img/banner.png';
@@ -38,78 +39,20 @@ const banners = [
   }
 ];
 
-const products = [
-  {
-    id: '1',
-    name: 'Organic Avocados',
-    description: 'Fresh, ripe, and ready to eat',
-    price: 5.99,
-    image: 'https://images.unsplash.com/photo-1523049673857-eb18f1d7b578?w=600',
-    category: 'Fruits',
-  },
-  {
-    id: '2',
-    name: 'Mixed Greens',
-    description: 'Premium salad blend',
-    price: 4.49,
-    image: 'https://images.unsplash.com/photo-1622206151226-18ca2c9ab4a1?w=600',
-    category: 'Vegetables',
-  },
-  {
-    id: '3',
-    name: 'Fresh Strawberries',
-    description: 'Sweet and juicy berries',
-    price: 6.99,
-    image: 'https://images.unsplash.com/photo-1464965911861-746a04b4bca6?w=600',
-    category: 'Fruits',
-  },
-  {
-    id: '4',
-    name: 'Organic Tomatoes',
-    description: 'Vine-ripened perfection',
-    price: 4.99,
-    image: 'https://images.unsplash.com/photo-1592921870789-04563d55041c?w=600',
-    category: 'Vegetables',
-  },
-  {
-    id: '5',
-    name: 'Fresh Blueberries',
-    description: 'Antioxidant-rich superfood',
-    price: 7.99,
-    image: 'https://images.unsplash.com/photo-1498557850523-fd3d118b962e?w=600',
-    category: 'Fruits',
-  },
-  {
-    id: '6',
-    name: 'Bell Peppers',
-    description: 'Colorful and crunchy',
-    price: 5.49,
-    image: 'https://images.unsplash.com/photo-1563565375-f3fdfdbefa83?w=600',
-    category: 'Vegetables',
-  },
-  {
-    id: '7',
-    name: 'Organic Carrots',
-    description: 'Sweet and nutritious',
-    price: 3.99,
-    image: 'https://images.unsplash.com/photo-1598170845058-32b9d6a5da37?w=600',
-    category: 'Vegetables',
-  },
-  {
-    id: '8',
-    name: 'Fresh Apples',
-    description: 'Crisp and delicious',
-    price: 4.99,
-    image: 'https://images.unsplash.com/photo-1560806887-1e4cd0b6cbd6?w=600',
-    category: 'Fruits',
-  },
-];
-
 export default function HomePage() {
   const [currentSlide, setCurrentSlide] = useState(0);
   const [productScrollIndex, setProductScrollIndex] = useState(0);
+  
+  // Use products hook to fetch real data
+  const { products, loading, error, fetchProducts } = useProducts();
+  
   const productsPerView = 5;
   const maxIndex = Math.max(0, products.length - productsPerView);
+
+  useEffect(() => {
+    // Fetch products when component mounts
+    fetchProducts();
+  }, [fetchProducts]);
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -210,37 +153,61 @@ export default function HomePage() {
 
           {/* Horizontal Scrollable Products */}
           <div className="relative px-12">
-            {/* Previous Button */}
-            <button
-              onClick={prevProducts}
-              disabled={productScrollIndex === 0}
-              className="absolute left-0 top-1/2 -translate-y-1/2 z-10 w-10 h-10 bg-white rounded-full flex items-center justify-center shadow-lg hover:bg-emerald-50 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              <ChevronLeft className="w-6 h-6 text-gray-800" />
-            </button>
-
-            {/* Products Container */}
-            <div className="overflow-hidden">
-              <div 
-                className="flex gap-4 transition-transform duration-500 ease-out"
-                style={{ transform: `translateX(-${productScrollIndex * (208 + 16)}px)` }}
-              >
-                {products.map((product) => (
-                  <div key={product.id} className="w-52 flex-shrink-0">
-                    <ProductCard product={product} />
-                  </div>
-                ))}
+            {loading ? (
+              <div className="flex justify-center py-12">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-500"></div>
               </div>
-            </div>
+            ) : error ? (
+              <div className="flex justify-center py-12">
+                <div className="text-red-500 text-center">
+                  <p>Lỗi khi tải sản phẩm: {error}</p>
+                  <button 
+                    onClick={() => fetchProducts()} 
+                    className="mt-2 px-4 py-2 bg-emerald-500 text-white rounded hover:bg-emerald-600 transition-colors"
+                  >
+                    Thử lại
+                  </button>
+                </div>
+              </div>
+            ) : products.length === 0 ? (
+              <div className="flex justify-center py-12">
+                <p className="text-gray-500">Không có sản phẩm nào</p>
+              </div>
+            ) : (
+              <>
+                {/* Previous Button */}
+                <button
+                  onClick={prevProducts}
+                  disabled={productScrollIndex === 0}
+                  className="absolute left-0 top-1/2 -translate-y-1/2 z-10 w-10 h-10 bg-white rounded-full flex items-center justify-center shadow-lg hover:bg-emerald-50 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <ChevronLeft className="w-6 h-6 text-gray-800" />
+                </button>
 
-            {/* Next Button */}
-            <button
-              onClick={nextProducts}
-              disabled={productScrollIndex >= maxIndex}
-              className="absolute right-0 top-1/2 -translate-y-1/2 z-10 w-10 h-10 bg-white rounded-full flex items-center justify-center shadow-lg hover:bg-emerald-50 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              <ChevronRight className="w-6 h-6 text-gray-800" />
-            </button>
+                {/* Products Container */}
+                <div className="overflow-hidden">
+                  <div 
+                    className="flex gap-4 transition-transform duration-500 ease-out"
+                    style={{ transform: `translateX(-${productScrollIndex * (208 + 16)}px)` }}
+                  >
+                    {products.map((product) => (
+                      <div key={product._id} className="w-52 flex-shrink-0">
+                        <ProductCard product={product} />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Next Button */}
+                <button
+                  onClick={nextProducts}
+                  disabled={productScrollIndex >= maxIndex}
+                  className="absolute right-0 top-1/2 -translate-y-1/2 z-10 w-10 h-10 bg-white rounded-full flex items-center justify-center shadow-lg hover:bg-emerald-50 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <ChevronRight className="w-6 h-6 text-gray-800" />
+                </button>
+              </>
+            )}
           </div>
           
           <div className="text-center mt-8">

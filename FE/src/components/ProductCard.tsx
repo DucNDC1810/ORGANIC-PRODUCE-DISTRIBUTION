@@ -1,17 +1,27 @@
 import { Heart } from 'lucide-react';
 import { motion } from 'framer-motion';
-import { Product, useCart } from '../context/CartContext';
+import { useCart } from '../context/CartContext';
+import { Product as APIProduct } from '../services/productService';
 import { ImageWithFallback } from '../components/figma/ImageWithFallback';
 
 interface ProductCardProps {
-  product: Product;
+  product: APIProduct;
 }
 
 export default function ProductCard({ product }: ProductCardProps) {
   const { addToCart } = useCart();
 
   const handleAddToCart = () => {
-    addToCart(product);
+    // Map API product to cart product format
+    const cartProduct = {
+      id: product._id,
+      name: product.name,
+      description: product.description,
+      price: product.price,
+      image: product.images?.[0] || product.thumbnail || '',
+      category: product.category
+    };
+    addToCart(cartProduct);
   };
 
   return (
@@ -46,7 +56,7 @@ export default function ProductCard({ product }: ProductCardProps) {
           </motion.button>
 
           <ImageWithFallback
-            src={product.image}
+            src={product.images?.[0] || product.thumbnail || ''}
             alt={product.name}
             className="w-full h-full object-contain group-hover:scale-110 transition-transform duration-500"
           />

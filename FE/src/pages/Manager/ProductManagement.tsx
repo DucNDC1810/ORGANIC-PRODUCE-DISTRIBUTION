@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useEffect } from 'react';
 import { 
   Package, 
   Plus,
@@ -11,6 +11,9 @@ import {
   Save,
   X,
   AlertTriangle,
+  Loader2,
+  Star,
+  RefreshCw,
 } from 'lucide-react';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
@@ -22,161 +25,119 @@ import { Card, CardContent } from '../../components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../../components/ui/table';
 import { Textarea } from '../../components/ui/textarea';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '../../components/ui/alert-dialog';
-import { toast } from 'sonner';
+import { Switch } from '../../components/ui/switch';
+import { useProducts } from '../../hooks/useProducts';
+import { Product, CreateProductData, UpdateProductData } from '../../services/productService';
 
-// Product interface - matching database schema
-interface Product {
-  id: string;
-  name: string;
-  description: string;
-  price: number;
-  stockQuantity: number;
-  certification: string;
-  originFarm: string;
-  nutritionInfo: string;
-  imageUrls: string[];
-  status: 'In Stock' | 'Low Stock' | 'Out of Stock' | 'Discontinued';
-  categoryId: number;
-  category: string; // For display purposes
-  createdAt: string;
-  // Computed fields for analytics
-  sales?: number;
-  revenue?: number;
-}
-
-// Category mapping for display
-const categoryMap: Record<number, string> = {
-  1: 'Fruits',
-  2: 'Vegetables',
-  3: 'Herbs',
-  4: 'Mushrooms',
-};
-
-// Initial mock data with all database fields
-const initialProducts: Product[] = [
-  { 
-    id: '1', 
-    name: 'Organic Avocados', 
-    description: 'Fresh organic avocados from local farms. Rich in healthy fats and nutrients.',
-    price: 5.99, 
-    stockQuantity: 150, 
-    certification: 'USDA Organic',
-    originFarm: 'Green Valley Farm',
-    nutritionInfo: 'Calories: 160, Fat: 15g, Carbs: 9g, Protein: 2g, Fiber: 7g',
-    imageUrls: ['https://images.unsplash.com/photo-1523049673857-eb18f1d7b578?w=100'],
-    status: 'In Stock', 
-    categoryId: 1,
-    category: 'Fruits',
-    createdAt: '2025-01-15T10:30:00Z',
-    sales: 245,
-    revenue: 1467.55
-  },
-  { 
-    id: '2', 
-    name: 'Mixed Greens', 
-    description: 'Assorted organic greens including spinach, kale, and arugula. Perfect for salads.',
-    price: 4.49, 
-    stockQuantity: 200, 
-    certification: 'Certified Organic',
-    originFarm: 'Sunrise Organic Farm',
-    nutritionInfo: 'Calories: 20, Fat: 0g, Carbs: 3g, Protein: 2g, Fiber: 2g',
-    imageUrls: ['https://images.unsplash.com/photo-1622206151226-18ca2c9ab4a1?w=100'],
-    status: 'In Stock', 
-    categoryId: 2,
-    category: 'Vegetables',
-    createdAt: '2025-01-14T08:00:00Z',
-    sales: 198,
-    revenue: 889.02
-  },
-  { 
-    id: '3', 
-    name: 'Fresh Strawberries', 
-    description: 'Sweet and juicy organic strawberries. Hand-picked at peak ripeness.',
-    price: 6.99, 
-    stockQuantity: 8, 
-    certification: 'USDA Organic',
-    originFarm: 'Berry Bliss Farm',
-    nutritionInfo: 'Calories: 50, Fat: 0g, Carbs: 12g, Protein: 1g, Fiber: 3g',
-    imageUrls: ['https://images.unsplash.com/photo-1464965911861-746a04b4bca6?w=100'],
-    status: 'Low Stock', 
-    categoryId: 1,
-    category: 'Fruits',
-    createdAt: '2025-01-13T14:20:00Z',
-    sales: 176,
-    revenue: 1230.24
-  },
-  { 
-    id: '4', 
-    name: 'Organic Tomatoes', 
-    description: 'Vine-ripened organic tomatoes. Perfect for cooking or fresh eating.',
-    price: 4.99, 
-    stockQuantity: 0, 
-    certification: 'Non-GMO Project Verified',
-    originFarm: 'Red Sun Organics',
-    nutritionInfo: 'Calories: 22, Fat: 0g, Carbs: 5g, Protein: 1g, Fiber: 1g',
-    imageUrls: ['https://images.unsplash.com/photo-1592921870789-04563d55041c?w=100'],
-    status: 'Out of Stock', 
-    categoryId: 2,
-    category: 'Vegetables',
-    createdAt: '2025-01-12T09:45:00Z',
-    sales: 165,
-    revenue: 823.35
-  },
-  { 
-    id: '5', 
-    name: 'Fresh Blueberries', 
-    description: 'Premium organic blueberries rich in antioxidants. Great for smoothies and baking.',
-    price: 7.99, 
-    stockQuantity: 80, 
-    certification: 'USDA Organic',
-    originFarm: 'Blue Mountain Farms',
-    nutritionInfo: 'Calories: 84, Fat: 0g, Carbs: 21g, Protein: 1g, Fiber: 4g',
-    imageUrls: ['https://images.unsplash.com/photo-1498557850523-fd3d118b962e?w=100'],
-    status: 'In Stock', 
-    categoryId: 1,
-    category: 'Fruits',
-    createdAt: '2025-01-10T11:15:00Z',
-    sales: 142,
-    revenue: 1134.58
-  },
+// Category options matching BE enum
+const CATEGORIES = [
+  { value: 'vegetables', label: 'Vegetables' },
+  { value: 'fruits', label: 'Fruits' },
+  { value: 'grains', label: 'Grains' },
+  { value: 'dairy', label: 'Dairy' },
+  { value: 'meat', label: 'Meat' },
+  { value: 'seafood', label: 'Seafood' },
+  { value: 'herbs', label: 'Herbs' },
+  { value: 'nuts', label: 'Nuts' },
+  { value: 'beverages', label: 'Beverages' },
+  { value: 'processed', label: 'Processed' },
+  { value: 'other', label: 'Other' },
 ];
 
-// Status type for product
-type ProductStatus = 'In Stock' | 'Low Stock' | 'Out of Stock' | 'Discontinued';
+// Unit options matching BE enum
+const UNITS = [
+  { value: 'kg', label: 'Kg' },
+  { value: 'g', label: 'Gram' },
+  { value: 'piece', label: 'Piece' },
+  { value: 'bunch', label: 'Bunch' },
+  { value: 'pack', label: 'Pack' },
+  { value: 'box', label: 'Box' },
+  { value: 'bottle', label: 'Bottle' },
+  { value: 'liter', label: 'Liter' },
+  { value: 'ml', label: 'ml' },
+];
 
-// Empty product form with all database fields
-const emptyProductForm: {
-  name: string;
-  description: string;
-  price: string;
-  stockQuantity: string;
-  certification: string;
-  originFarm: string;
-  nutritionInfo: string;
-  imageUrls: string;
-  status: ProductStatus;
-  categoryId: string;
-} = {
+// Certification options
+const CERTIFICATIONS = [
+  'VietGAP',
+  'GlobalGAP',
+  'Organic',
+  'USDA Organic',
+  'EU Organic',
+  'Non-GMO',
+];
+
+// Empty product form matching BE schema
+const emptyProductForm = {
   name: '',
   description: '',
   price: '',
-  stockQuantity: '',
-  certification: '',
-  originFarm: '',
-  nutritionInfo: '',
-  imageUrls: '',
-  status: 'In Stock',
-  categoryId: '',
+  originalPrice: '',
+  category: '',
+  thumbnail: '',
+  images: '',
+  stock: '',
+  unit: 'kg',
+  origin: '',
+  isOrganic: true,
+  certifications: [] as string[],
+  nutritionInfo: {
+    calories: '',
+    protein: '',
+    carbs: '',
+    fat: '',
+    fiber: '',
+  },
+  tags: '',
+  isFeatured: false,
 };
 
+type ProductFormType = typeof emptyProductForm;
+
 export default function ManagerProductManagement() {
-  // State for products list
-  const [products, setProducts] = useState<Product[]>(initialProducts);
-  
+  // Custom hook for products API
+  const {
+    products,
+    loading,
+    error,
+    selectedProduct,
+    fetchProducts,
+    createProduct,
+    updateProduct,
+    deleteProduct,
+    setSelectedProduct,
+  } = useProducts();
+
   // Search and filter states
   const [searchQuery, setSearchQuery] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
+  const [currentPage, setCurrentPage] = useState(1);
+  
+  // Computed filtered products (client-side filtering for immediate UI feedback)
+  // Note: API already handles filtering, this is for local search refinement
+  const filteredProducts = products.filter(product => {
+    // Search filter
+    const matchesSearch = !searchQuery || 
+      product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      product.category.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      product.origin?.toLowerCase().includes(searchQuery.toLowerCase());
+    
+    // Category filter
+    const matchesCategory = categoryFilter === 'all' || product.category === categoryFilter;
+    
+    // Status filter based on stock
+    let matchesStatus = true;
+    if (statusFilter === 'In Stock') {
+      matchesStatus = product.stock > 10;
+    } else if (statusFilter === 'Low Stock') {
+      matchesStatus = product.stock > 0 && product.stock <= 10;
+    } else if (statusFilter === 'Out of Stock') {
+      matchesStatus = product.stock === 0;
+    }
+    
+    return matchesSearch && matchesCategory && matchesStatus;
+  });
   
   // Dialog states
   const [isAddProductOpen, setIsAddProductOpen] = useState(false);
@@ -184,21 +145,62 @@ export default function ManagerProductManagement() {
   const [isViewProductOpen, setIsViewProductOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   
-  // Form and selected product states
-  const [productForm, setProductForm] = useState(emptyProductForm);
-  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
+  // Form state
+  const [productForm, setProductForm] = useState<ProductFormType>(emptyProductForm);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Calculate stock status based on quantity
-  const calculateStatus = (stock: number): 'In Stock' | 'Low Stock' | 'Out of Stock' => {
-    if (stock === 0) return 'Out of Stock';
-    if (stock <= 10) return 'Low Stock';
-    return 'In Stock';
+  // Fetch products on mount and when filters change
+  useEffect(() => {
+    const params: any = {
+      page: currentPage,
+      limit: 10,
+    };
+
+    if (searchQuery) {
+      params.search = searchQuery;
+    }
+
+    if (categoryFilter !== 'all') {
+      params.category = categoryFilter;
+    }
+
+    if (statusFilter !== 'all') {
+      if (statusFilter === 'active') {
+        params.isActive = true;
+      } else if (statusFilter === 'inactive') {
+        params.isActive = false;
+      } else if (statusFilter === 'out_of_stock') {
+        params.stockStatus = 'out_of_stock';
+      } else if (statusFilter === 'low_stock') {
+        params.stockStatus = 'low_stock';
+      }
+    }
+
+    fetchProducts(params);
+  }, [fetchProducts, currentPage, searchQuery, categoryFilter, statusFilter]);
+
+  // Debounce search
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setCurrentPage(1);
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
+  // Get stock status badge
+  const getStockBadge = (product: Product) => {
+    if (product.stock === 0) {
+      return { className: 'bg-red-100 text-red-800 hover:bg-red-100', text: 'Out of Stock' };
+    }
+    if (product.stock <= 10) {
+      return { className: 'bg-yellow-100 text-yellow-800 hover:bg-yellow-100', text: 'Low Stock' };
+    }
+    return { className: 'bg-green-100 text-green-800 hover:bg-green-100', text: 'In Stock' };
   };
 
   // Format date for display
   const formatDate = (dateString: string): string => {
-    return new Date(dateString).toLocaleDateString('vi-VN', {
+    return new Date(dateString).toLocaleDateString('en-US', {
       year: 'numeric',
       month: '2-digit',
       day: '2-digit',
@@ -207,62 +209,104 @@ export default function ManagerProductManagement() {
     });
   };
 
-  // Filter products based on search and filters
-  const filteredProducts = useMemo(() => {
-    return products.filter(product => {
-      const matchesSearch = product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                           product.category.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                           product.originFarm.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                           product.certification.toLowerCase().includes(searchQuery.toLowerCase());
-      const matchesCategory = categoryFilter === 'all' || product.category.toLowerCase() === categoryFilter.toLowerCase();
-      const matchesStatus = statusFilter === 'all' || product.status === statusFilter;
-      
-      return matchesSearch && matchesCategory && matchesStatus;
-    });
-  }, [products, searchQuery, categoryFilter, statusFilter]);
-
   // Reset form
   const resetForm = () => {
     setProductForm(emptyProductForm);
     setSelectedProduct(null);
   };
 
+  // Map product to form
+  const mapProductToForm = (product: Product): ProductFormType => {
+    return {
+      name: product.name,
+      description: product.description,
+      price: product.price.toString(),
+      originalPrice: product.originalPrice?.toString() || '',
+      category: product.category,
+      thumbnail: product.thumbnail,
+      images: product.images?.join(', ') || '',
+      stock: product.stock.toString(),
+      unit: product.unit,
+      origin: product.origin,
+      isOrganic: product.isOrganic,
+      certifications: product.certifications || [],
+      nutritionInfo: {
+        calories: product.nutritionInfo?.calories?.toString() || '',
+        protein: product.nutritionInfo?.protein?.toString() || '',
+        carbs: product.nutritionInfo?.carbs?.toString() || '',
+        fat: product.nutritionInfo?.fat?.toString() || '',
+        fiber: product.nutritionInfo?.fiber?.toString() || '',
+      },
+      tags: product.tags?.join(', ') || '',
+      isFeatured: product.isFeatured,
+    };
+  };
+
+  // Map form to API data
+  const mapFormToData = (): CreateProductData | UpdateProductData => {
+    const data: any = {
+      name: productForm.name,
+      description: productForm.description,
+      price: parseFloat(productForm.price),
+      category: productForm.category,
+      thumbnail: productForm.thumbnail || 'https://images.unsplash.com/photo-1518843875459-f738682238a6?w=400',
+      stock: parseInt(productForm.stock),
+      unit: productForm.unit,
+      origin: productForm.origin,
+      isOrganic: productForm.isOrganic,
+      isFeatured: productForm.isFeatured,
+    };
+
+    if (productForm.originalPrice) {
+      data.originalPrice = parseFloat(productForm.originalPrice);
+    }
+
+    if (productForm.images) {
+      data.images = productForm.images.split(',').map(url => url.trim()).filter(Boolean);
+    }
+
+    if (productForm.certifications.length > 0) {
+      data.certifications = productForm.certifications;
+    }
+
+    // Nutrition info
+    const nutritionInfo: any = {};
+    if (productForm.nutritionInfo.calories) nutritionInfo.calories = parseFloat(productForm.nutritionInfo.calories);
+    if (productForm.nutritionInfo.protein) nutritionInfo.protein = parseFloat(productForm.nutritionInfo.protein);
+    if (productForm.nutritionInfo.carbs) nutritionInfo.carbs = parseFloat(productForm.nutritionInfo.carbs);
+    if (productForm.nutritionInfo.fat) nutritionInfo.fat = parseFloat(productForm.nutritionInfo.fat);
+    if (productForm.nutritionInfo.fiber) nutritionInfo.fiber = parseFloat(productForm.nutritionInfo.fiber);
+    if (Object.keys(nutritionInfo).length > 0) {
+      data.nutritionInfo = nutritionInfo;
+    }
+
+    if (productForm.tags) {
+      data.tags = productForm.tags.split(',').map(tag => tag.trim()).filter(Boolean);
+    }
+
+    return data;
+  };
+
+  // Validate form
+  const validateForm = (): boolean => {
+    return !!(productForm.name && productForm.category && productForm.price && productForm.stock && productForm.origin);
+  };
+
   // CREATE - Add new product
-  const handleAddProduct = () => {
-    if (!productForm.name || !productForm.categoryId || !productForm.price || !productForm.stockQuantity) {
-      toast.error('Please fill in all required fields!');
+  const handleAddProduct = async () => {
+    if (!validateForm()) {
       return;
     }
 
-    setIsLoading(true);
-    
-    // Simulate API call
-    setTimeout(() => {
-      const categoryIdNum = parseInt(productForm.categoryId);
-      const newProduct: Product = {
-        id: Date.now().toString(),
-        name: productForm.name,
-        description: productForm.description,
-        price: parseFloat(productForm.price),
-        stockQuantity: parseInt(productForm.stockQuantity),
-        certification: productForm.certification,
-        originFarm: productForm.originFarm,
-        nutritionInfo: productForm.nutritionInfo,
-        imageUrls: productForm.imageUrls ? productForm.imageUrls.split(',').map(url => url.trim()) : ['https://images.unsplash.com/photo-1518843875459-f738682238a6?w=100'],
-        status: calculateStatus(parseInt(productForm.stockQuantity)),
-        categoryId: categoryIdNum,
-        category: categoryMap[categoryIdNum] || 'Unknown',
-        createdAt: new Date().toISOString(),
-        sales: 0,
-        revenue: 0,
-      };
+    setIsSubmitting(true);
+    const data = mapFormToData() as CreateProductData;
+    const result = await createProduct(data);
+    setIsSubmitting(false);
 
-      setProducts(prev => [newProduct, ...prev]);
+    if (result) {
       setIsAddProductOpen(false);
       resetForm();
-      setIsLoading(false);
-      toast.success('Product added successfully!');
-    }, 500);
+    }
   };
 
   // READ - View product details
@@ -274,60 +318,25 @@ export default function ManagerProductManagement() {
   // UPDATE - Open edit dialog with product data
   const handleEditClick = (product: Product) => {
     setSelectedProduct(product);
-    setProductForm({
-      name: product.name,
-      description: product.description || '',
-      price: product.price.toString(),
-      stockQuantity: product.stockQuantity.toString(),
-      certification: product.certification || '',
-      originFarm: product.originFarm || '',
-      nutritionInfo: product.nutritionInfo || '',
-      imageUrls: product.imageUrls?.join(', ') || '',
-      status: product.status,
-      categoryId: product.categoryId.toString(),
-    });
+    setProductForm(mapProductToForm(product));
     setIsEditProductOpen(true);
   };
 
   // UPDATE - Save edited product
-  const handleUpdateProduct = () => {
-    if (!productForm.name || !productForm.categoryId || !productForm.price || !productForm.stockQuantity) {
-      toast.error('Please fill in all required fields!');
+  const handleUpdateProduct = async () => {
+    if (!validateForm() || !selectedProduct) {
       return;
     }
 
-    if (!selectedProduct) return;
+    setIsSubmitting(true);
+    const data = mapFormToData() as UpdateProductData;
+    const result = await updateProduct(selectedProduct._id, data);
+    setIsSubmitting(false);
 
-    setIsLoading(true);
-
-    // Simulate API call
-    setTimeout(() => {
-      const categoryIdNum = parseInt(productForm.categoryId);
-      setProducts(prev => prev.map(product => {
-        if (product.id === selectedProduct.id) {
-          return {
-            ...product,
-            name: productForm.name,
-            description: productForm.description,
-            price: parseFloat(productForm.price),
-            stockQuantity: parseInt(productForm.stockQuantity),
-            certification: productForm.certification,
-            originFarm: productForm.originFarm,
-            nutritionInfo: productForm.nutritionInfo,
-            imageUrls: productForm.imageUrls ? productForm.imageUrls.split(',').map(url => url.trim()) : product.imageUrls,
-            status: calculateStatus(parseInt(productForm.stockQuantity)),
-            categoryId: categoryIdNum,
-            category: categoryMap[categoryIdNum] || product.category,
-          };
-        }
-        return product;
-      }));
-
+    if (result) {
       setIsEditProductOpen(false);
       resetForm();
-      setIsLoading(false);
-      toast.success('Product updated successfully!');
-    }, 500);
+    }
   };
 
   // DELETE - Open delete confirmation
@@ -337,31 +346,20 @@ export default function ManagerProductManagement() {
   };
 
   // DELETE - Confirm delete product
-  const handleDeleteProduct = () => {
+  const handleDeleteProduct = async () => {
     if (!selectedProduct) return;
 
-    setIsLoading(true);
+    setIsSubmitting(true);
+    const success = await deleteProduct(selectedProduct._id, true);
+    setIsSubmitting(false);
 
-    // Simulate API call
-    setTimeout(() => {
-      setProducts(prev => prev.filter(product => product.id !== selectedProduct.id));
+    if (success) {
       setIsDeleteDialogOpen(false);
       setSelectedProduct(null);
-      setIsLoading(false);
-      toast.success('Product deleted successfully!');
-    }, 500);
+    }
   };
 
-  const getStockBadge = (status: string) => {
-    const statusConfig: any = {
-      'In Stock': { className: 'bg-green-100 text-green-800 hover:bg-green-100' },
-      'Low Stock': { className: 'bg-yellow-100 text-yellow-800 hover:bg-yellow-100' },
-      'Out of Stock': { className: 'bg-red-100 text-red-800 hover:bg-red-100' },
-    };
-    return statusConfig[status] || { className: 'bg-gray-100 text-gray-800' };
-  };
-
-  // Render form fields (inline to avoid re-render issues)
+  // Render form fields
   const renderFormFields = () => (
     <div className="grid gap-4 py-4 max-h-[60vh] overflow-y-auto pr-2">
       {/* Row 1: Name & Category */}
@@ -370,154 +368,244 @@ export default function ManagerProductManagement() {
           <Label htmlFor="name">Product Name *</Label>
           <Input 
             id="name" 
-            placeholder="e.g., Organic Avocados" 
+            placeholder="e.g. Organic Cabbage" 
             value={productForm.name}
             onChange={(e) => setProductForm(prev => ({ ...prev, name: e.target.value }))}
           />
         </div>
         <div className="space-y-2">
-          <Label htmlFor="categoryId">Category *</Label>
-          <Select value={productForm.categoryId} onValueChange={(value) => setProductForm(prev => ({ ...prev, categoryId: value }))}>
+          <Label htmlFor="category">Category *</Label>
+          <Select value={productForm.category} onValueChange={(value) => setProductForm(prev => ({ ...prev, category: value }))}>
             <SelectTrigger>
               <SelectValue placeholder="Select category" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="1">Fruits</SelectItem>
-              <SelectItem value="2">Vegetables</SelectItem>
-              <SelectItem value="3">Herbs</SelectItem>
-              <SelectItem value="4">Mushrooms</SelectItem>
+              {CATEGORIES.map(cat => (
+                <SelectItem key={cat.value} value={cat.value}>{cat.label}</SelectItem>
+              ))}
             </SelectContent>
           </Select>
         </div>
       </div>
 
-      {/* Row 2: Price & Stock */}
+      {/* Row 2: Price & Original Price */}
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-2">
-          <Label htmlFor="price">Price ($) *</Label>
+          <Label htmlFor="price">Selling Price *</Label>
           <Input 
             id="price" 
             type="number" 
-            placeholder="0.00" 
-            step="0.01" 
+            placeholder="0" 
             min="0"
             value={productForm.price}
             onChange={(e) => setProductForm(prev => ({ ...prev, price: e.target.value }))}
           />
         </div>
         <div className="space-y-2">
-          <Label htmlFor="stockQuantity">Stock Quantity *</Label>
+          <Label htmlFor="originalPrice">Original Price</Label>
           <Input 
-            id="stockQuantity" 
+            id="originalPrice" 
             type="number" 
             placeholder="0" 
             min="0"
-            value={productForm.stockQuantity}
-            onChange={(e) => setProductForm(prev => ({ ...prev, stockQuantity: e.target.value }))}
+            value={productForm.originalPrice}
+            onChange={(e) => setProductForm(prev => ({ ...prev, originalPrice: e.target.value }))}
           />
         </div>
       </div>
 
-      {/* Row 3: Certification & Origin Farm */}
+      {/* Row 3: Stock & Unit */}
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-2">
-          <Label htmlFor="certification">Certification</Label>
-          <Select value={productForm.certification} onValueChange={(value) => setProductForm(prev => ({ ...prev, certification: value }))}>
+          <Label htmlFor="stock">Stock Quantity *</Label>
+          <Input 
+            id="stock" 
+            type="number" 
+            placeholder="0" 
+            min="0"
+            value={productForm.stock}
+            onChange={(e) => setProductForm(prev => ({ ...prev, stock: e.target.value }))}
+          />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="unit">Unit *</Label>
+          <Select value={productForm.unit} onValueChange={(value) => setProductForm(prev => ({ ...prev, unit: value }))}>
             <SelectTrigger>
-              <SelectValue placeholder="Select certification" />
+              <SelectValue placeholder="Select unit" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="USDA Organic">USDA Organic</SelectItem>
-              <SelectItem value="Certified Organic">Certified Organic</SelectItem>
-              <SelectItem value="Non-GMO Project Verified">Non-GMO Project Verified</SelectItem>
-              <SelectItem value="Fair Trade Certified">Fair Trade Certified</SelectItem>
-              <SelectItem value="Rainforest Alliance">Rainforest Alliance</SelectItem>
-              <SelectItem value="None">None</SelectItem>
+              {UNITS.map(unit => (
+                <SelectItem key={unit.value} value={unit.value}>{unit.label}</SelectItem>
+              ))}
             </SelectContent>
           </Select>
         </div>
-        <div className="space-y-2">
-          <Label htmlFor="originFarm">Origin Farm</Label>
-          <Input 
-            id="originFarm" 
-            placeholder="e.g., Green Valley Farm" 
-            value={productForm.originFarm}
-            onChange={(e) => setProductForm(prev => ({ ...prev, originFarm: e.target.value }))}
-          />
-        </div>
       </div>
 
-      {/* Row 4: Description */}
+      {/* Row 4: Origin */}
       <div className="space-y-2">
-        <Label htmlFor="description">Description</Label>
+        <Label htmlFor="origin">Origin *</Label>
+        <Input 
+          id="origin" 
+          placeholder="e.g. Da Lat, Vietnam" 
+          value={productForm.origin}
+          onChange={(e) => setProductForm(prev => ({ ...prev, origin: e.target.value }))}
+        />
+      </div>
+
+      {/* Row 5: Description */}
+      <div className="space-y-2">
+        <Label htmlFor="description">Description *</Label>
         <Textarea 
           id="description" 
-          placeholder="Product description..." 
+          placeholder="Detailed product description..." 
           rows={3} 
           value={productForm.description}
           onChange={(e) => setProductForm(prev => ({ ...prev, description: e.target.value }))}
         />
       </div>
 
-      {/* Row 5: Nutrition Info */}
+      {/* Row 6: Thumbnail */}
       <div className="space-y-2">
-        <Label htmlFor="nutritionInfo">Nutrition Information</Label>
-        <Textarea 
-          id="nutritionInfo" 
-          placeholder="e.g., Calories: 160, Fat: 15g, Carbs: 9g, Protein: 2g, Fiber: 7g" 
-          rows={2} 
-          value={productForm.nutritionInfo}
-          onChange={(e) => setProductForm(prev => ({ ...prev, nutritionInfo: e.target.value }))}
-        />
-      </div>
-
-      {/* Row 6: Product Images */}
-      <div className="space-y-2">
-        <Label htmlFor="imageUrls">Product Images (comma-separated URLs)</Label>
+        <Label htmlFor="thumbnail">Thumbnail Image (URL)</Label>
         <div className="flex gap-2">
           <Input 
-            id="imageUrls" 
-            placeholder="https://example.com/image1.jpg, https://example.com/image2.jpg" 
+            id="thumbnail" 
+            placeholder="https://example.com/image.jpg" 
             className="flex-1" 
-            value={productForm.imageUrls}
-            onChange={(e) => setProductForm(prev => ({ ...prev, imageUrls: e.target.value }))}
+            value={productForm.thumbnail}
+            onChange={(e) => setProductForm(prev => ({ ...prev, thumbnail: e.target.value }))}
           />
           <Button type="button" variant="outline" size="icon">
             <ImagePlus className="w-4 h-4" />
           </Button>
         </div>
-        {productForm.imageUrls && (
-          <div className="mt-2 flex gap-2 flex-wrap">
-            {productForm.imageUrls.split(',').map((url, index) => (
-              <img 
-                key={index}
-                src={url.trim()} 
-                alt={`Preview ${index + 1}`} 
-                className="w-16 h-16 object-cover rounded-lg border"
-                onError={(e) => {
-                  (e.target as HTMLImageElement).style.display = 'none';
-                }}
-              />
-            ))}
-          </div>
+        {productForm.thumbnail && (
+          <img 
+            src={productForm.thumbnail} 
+            alt="Preview" 
+            className="w-20 h-20 object-cover rounded-lg border mt-2"
+            onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+          />
         )}
       </div>
 
-      {/* Row 7: Status (for edit mode) */}
+      {/* Row 7: Additional Images */}
       <div className="space-y-2">
-        <Label htmlFor="status">Status</Label>
-        <Select value={productForm.status} onValueChange={(value: 'In Stock' | 'Low Stock' | 'Out of Stock' | 'Discontinued') => setProductForm(prev => ({ ...prev, status: value }))}>
-          <SelectTrigger>
-            <SelectValue placeholder="Select status" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="In Stock">In Stock</SelectItem>
-            <SelectItem value="Low Stock">Low Stock</SelectItem>
-            <SelectItem value="Out of Stock">Out of Stock</SelectItem>
-            <SelectItem value="Discontinued">Discontinued</SelectItem>
-          </SelectContent>
-        </Select>
-        <p className="text-xs text-muted-foreground">Status is auto-calculated based on stock, but can be overridden</p>
+        <Label htmlFor="images">Additional Images (URLs, comma-separated)</Label>
+        <Input 
+          id="images" 
+          placeholder="https://example.com/img1.jpg, https://example.com/img2.jpg" 
+          value={productForm.images}
+          onChange={(e) => setProductForm(prev => ({ ...prev, images: e.target.value }))}
+        />
+      </div>
+
+      {/* Row 8: Certifications */}
+      <div className="space-y-2">
+        <Label>Certifications</Label>
+        <div className="flex flex-wrap gap-2">
+          {CERTIFICATIONS.map(cert => (
+            <Badge
+              key={cert}
+              variant={productForm.certifications.includes(cert) ? 'default' : 'outline'}
+              className="cursor-pointer"
+              onClick={() => {
+                setProductForm(prev => ({
+                  ...prev,
+                  certifications: prev.certifications.includes(cert)
+                    ? prev.certifications.filter(c => c !== cert)
+                    : [...prev.certifications, cert]
+                }));
+              }}
+            >
+              {cert}
+            </Badge>
+          ))}
+        </div>
+      </div>
+
+      {/* Row 9: Nutrition Info */}
+      <div className="space-y-2">
+        <Label>Nutrition Information (per 100g)</Label>
+        <div className="grid grid-cols-5 gap-2">
+          <Input 
+            placeholder="Calories" 
+            type="number"
+            value={productForm.nutritionInfo.calories}
+            onChange={(e) => setProductForm(prev => ({ 
+              ...prev, 
+              nutritionInfo: { ...prev.nutritionInfo, calories: e.target.value }
+            }))}
+          />
+          <Input 
+            placeholder="Protein (g)" 
+            type="number"
+            value={productForm.nutritionInfo.protein}
+            onChange={(e) => setProductForm(prev => ({ 
+              ...prev, 
+              nutritionInfo: { ...prev.nutritionInfo, protein: e.target.value }
+            }))}
+          />
+          <Input 
+            placeholder="Carbs (g)" 
+            type="number"
+            value={productForm.nutritionInfo.carbs}
+            onChange={(e) => setProductForm(prev => ({ 
+              ...prev, 
+              nutritionInfo: { ...prev.nutritionInfo, carbs: e.target.value }
+            }))}
+          />
+          <Input 
+            placeholder="Fat (g)" 
+            type="number"
+            value={productForm.nutritionInfo.fat}
+            onChange={(e) => setProductForm(prev => ({ 
+              ...prev, 
+              nutritionInfo: { ...prev.nutritionInfo, fat: e.target.value }
+            }))}
+          />
+          <Input 
+            placeholder="Fiber (g)" 
+            type="number"
+            value={productForm.nutritionInfo.fiber}
+            onChange={(e) => setProductForm(prev => ({ 
+              ...prev, 
+              nutritionInfo: { ...prev.nutritionInfo, fiber: e.target.value }
+            }))}
+          />
+        </div>
+      </div>
+
+      {/* Row 10: Tags */}
+      <div className="space-y-2">
+        <Label htmlFor="tags">Tags (comma-separated)</Label>
+        <Input 
+          id="tags" 
+          placeholder="organic, fresh, vegetables" 
+          value={productForm.tags}
+          onChange={(e) => setProductForm(prev => ({ ...prev, tags: e.target.value }))}
+        />
+      </div>
+
+      {/* Row 11: Switches */}
+      <div className="flex items-center gap-6">
+        <div className="flex items-center space-x-2">
+          <Switch
+            id="isOrganic"
+            checked={productForm.isOrganic}
+            onCheckedChange={(checked) => setProductForm(prev => ({ ...prev, isOrganic: checked }))}
+          />
+          <Label htmlFor="isOrganic">Organic Product</Label>
+        </div>
+        <div className="flex items-center space-x-2">
+          <Switch
+            id="isFeatured"
+            checked={productForm.isFeatured}
+            onCheckedChange={(checked) => setProductForm(prev => ({ ...prev, isFeatured: checked }))}
+          />
+          <Label htmlFor="isFeatured">Featured Product</Label>
+        </div>
       </div>
     </div>
   );
@@ -530,8 +618,20 @@ export default function ManagerProductManagement() {
           <p className="text-muted-foreground mt-1">Manage your organic produce inventory</p>
         </div>
         
-        {/* ADD PRODUCT DIALOG */}
-        <Dialog open={isAddProductOpen} onOpenChange={(open) => {
+        <div className="flex items-center gap-3">
+          {/* REFRESH BUTTON */}
+          <Button 
+            variant="outline" 
+            onClick={() => fetchProducts()}
+            disabled={loading}
+            className="gap-2"
+          >
+            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+            Refresh
+          </Button>
+
+          {/* ADD PRODUCT DIALOG */}
+          <Dialog open={isAddProductOpen} onOpenChange={(open) => {
           setIsAddProductOpen(open);
           if (!open) resetForm();
         }}>
@@ -544,7 +644,7 @@ export default function ManagerProductManagement() {
           <DialogContent className="max-w-2xl">
             <DialogHeader>
               <DialogTitle className="text-xl">Add New Product</DialogTitle>
-              <DialogDescription>Create a new organic product listing</DialogDescription>
+              <DialogDescription>Create a new organic produce product</DialogDescription>
             </DialogHeader>
             {renderFormFields()}
             <DialogFooter className="gap-3">
@@ -555,10 +655,10 @@ export default function ManagerProductManagement() {
               <Button 
                 className="bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white"
                 onClick={handleAddProduct}
-                disabled={isLoading}
+                disabled={isSubmitting || !validateForm()}
               >
-                {isLoading ? (
-                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />
+                {isSubmitting ? (
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                 ) : (
                   <Save className="w-4 h-4 mr-2" />
                 )}
@@ -567,6 +667,7 @@ export default function ManagerProductManagement() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+        </div>
       </div>
 
       {/* EDIT PRODUCT DIALOG */}
@@ -581,17 +682,17 @@ export default function ManagerProductManagement() {
           </DialogHeader>
           {renderFormFields()}
           <DialogFooter className="gap-3">
-            <Button variant="outline" onClick={() => setIsEditProductOpen(false)}>
+            <Button variant="outline" onClick={() => setIsEditProductOpen(false)} disabled={isSubmitting}>
               <X className="w-4 h-4 mr-2" />
               Cancel
             </Button>
             <Button 
               className="bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white"
               onClick={handleUpdateProduct}
-              disabled={isLoading}
+              disabled={isSubmitting}
             >
-              {isLoading ? (
-                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />
+              {isSubmitting ? (
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
               ) : (
                 <Save className="w-4 h-4 mr-2" />
               )}
@@ -615,13 +716,13 @@ export default function ManagerProductManagement() {
                 {/* Product Image */}
                 <div className="shrink-0">
                   <img 
-                    src={selectedProduct.imageUrls?.[0] || 'https://via.placeholder.com/120'} 
+                    src={selectedProduct.thumbnail || selectedProduct.images?.[0] || 'https://via.placeholder.com/120'} 
                     alt={selectedProduct.name}
                     className="w-28 h-28 object-cover rounded-xl border-2 border-gray-100 shadow-sm"
                   />
-                  {selectedProduct.imageUrls && selectedProduct.imageUrls.length > 1 && (
+                  {selectedProduct.images && selectedProduct.images.length > 1 && (
                     <div className="flex gap-1 mt-2">
-                      {selectedProduct.imageUrls.slice(1, 4).map((url, index) => (
+                      {selectedProduct.images.slice(1, 4).map((url, index) => (
                         <img 
                           key={index}
                           src={url} 
@@ -629,9 +730,9 @@ export default function ManagerProductManagement() {
                           className="w-8 h-8 object-cover rounded border"
                         />
                       ))}
-                      {selectedProduct.imageUrls.length > 4 && (
+                      {selectedProduct.images.length > 4 && (
                         <div className="w-8 h-8 rounded border bg-gray-100 flex items-center justify-center text-xs text-gray-500">
-                          +{selectedProduct.imageUrls.length - 4}
+                          +{selectedProduct.images.length - 4}
                         </div>
                       )}
                     </div>
@@ -640,16 +741,26 @@ export default function ManagerProductManagement() {
                 
                 {/* Product Info */}
                 <div className="flex-1 min-w-0">
-                  <h3 className="text-xl font-bold text-foreground truncate">{selectedProduct.name}</h3>
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-xl font-bold text-foreground truncate">{selectedProduct.name}</h3>
+                    {selectedProduct.isOrganic && (
+                      <Badge className="bg-green-100 text-green-700 text-xs">Organic</Badge>
+                    )}
+                    {selectedProduct.isFeatured && (
+                      <Star className="w-4 h-4 text-yellow-500 fill-yellow-500" />
+                    )}
+                  </div>
                   <div className="flex flex-wrap gap-2 mt-2">
                     <Badge variant="outline" className="text-xs">{selectedProduct.category}</Badge>
-                    {selectedProduct.certification && (
-                      <Badge className="bg-emerald-100 text-emerald-700 hover:bg-emerald-100 text-xs">
-                        {selectedProduct.certification}
-                      </Badge>
+                    {selectedProduct.certifications && selectedProduct.certifications.length > 0 && (
+                      selectedProduct.certifications.map((cert, idx) => (
+                        <Badge key={idx} className="bg-emerald-100 text-emerald-700 hover:bg-emerald-100 text-xs">
+                          {cert}
+                        </Badge>
+                      ))
                     )}
-                    <Badge {...getStockBadge(selectedProduct.status)} className="text-xs">
-                      {selectedProduct.status}
+                    <Badge {...getStockBadge(selectedProduct)} className="text-xs">
+                      {selectedProduct.stock > 10 ? 'In Stock' : selectedProduct.stock > 0 ? 'Low Stock' : 'Out of Stock'}
                     </Badge>
                   </div>
                   <p className="text-xs text-muted-foreground mt-2">
@@ -663,35 +774,39 @@ export default function ManagerProductManagement() {
                 <Card className="bg-green-50 border-green-100">
                   <CardContent className="p-3 text-center">
                     <p className="text-[10px] text-green-600 font-medium uppercase tracking-wide">Price</p>
-                    <p className="text-lg font-bold text-green-700">${selectedProduct.price}</p>
+                    <p className="text-lg font-bold text-green-700">${selectedProduct.price?.toLocaleString()}</p>
+                    {selectedProduct.originalPrice && selectedProduct.originalPrice > selectedProduct.price && (
+                      <p className="text-[10px] text-gray-400 line-through">${selectedProduct.originalPrice?.toLocaleString()}</p>
+                    )}
                   </CardContent>
                 </Card>
                 <Card className="bg-blue-50 border-blue-100">
                   <CardContent className="p-3 text-center">
                     <p className="text-[10px] text-blue-600 font-medium uppercase tracking-wide">Stock</p>
-                    <p className="text-lg font-bold text-blue-700">{selectedProduct.stockQuantity}</p>
-                    <p className="text-[10px] text-blue-500">units</p>
+                    <p className="text-lg font-bold text-blue-700">{selectedProduct.stock}</p>
+                    <p className="text-[10px] text-blue-500">{selectedProduct.unit}</p>
                   </CardContent>
                 </Card>
                 <Card className="bg-purple-50 border-purple-100">
                   <CardContent className="p-3 text-center">
                     <p className="text-[10px] text-purple-600 font-medium uppercase tracking-wide">Sold</p>
-                    <p className="text-lg font-bold text-purple-700">{selectedProduct.sales || 0}</p>
+                    <p className="text-lg font-bold text-purple-700">{selectedProduct.soldCount || 0}</p>
                   </CardContent>
                 </Card>
                 <Card className="bg-amber-50 border-amber-100">
                   <CardContent className="p-3 text-center">
-                    <p className="text-[10px] text-amber-600 font-medium uppercase tracking-wide">Revenue</p>
-                    <p className="text-lg font-bold text-amber-700">${(selectedProduct.revenue || 0).toFixed(2)}</p>
+                    <p className="text-[10px] text-amber-600 font-medium uppercase tracking-wide">Rating</p>
+                    <p className="text-lg font-bold text-amber-700">{selectedProduct.rating?.toFixed(1) || 'N/A'}</p>
+                    <p className="text-[10px] text-amber-500">({selectedProduct.reviewCount || 0} reviews)</p>
                   </CardContent>
                 </Card>
               </div>
 
-              {/* Origin Farm */}
-              {selectedProduct.originFarm && (
+              {/* Origin */}
+              {selectedProduct.origin && (
                 <div className="bg-gray-50 px-4 py-3 rounded-lg border border-gray-100">
-                  <p className="text-xs text-muted-foreground font-medium mb-1">Origin Farm</p>
-                  <p className="text-sm font-medium text-foreground">{selectedProduct.originFarm}</p>
+                  <p className="text-xs text-muted-foreground font-medium mb-1">Origin</p>
+                  <p className="text-sm font-medium text-foreground">{selectedProduct.origin}</p>
                 </div>
               )}
 
@@ -707,14 +822,20 @@ export default function ManagerProductManagement() {
               {selectedProduct.nutritionInfo && (
                 <div className="bg-blue-50 px-4 py-3 rounded-lg border border-blue-100">
                   <h4 className="text-sm font-semibold text-blue-800 mb-1">Nutrition Information</h4>
-                  <p className="text-sm text-blue-700">{selectedProduct.nutritionInfo}</p>
+                  <div className="grid grid-cols-2 gap-2 text-sm text-blue-700">
+                    {selectedProduct.nutritionInfo.calories && <span>Calories: {selectedProduct.nutritionInfo.calories}</span>}
+                    {selectedProduct.nutritionInfo.protein && <span>Protein: {selectedProduct.nutritionInfo.protein}</span>}
+                    {selectedProduct.nutritionInfo.carbs && <span>Carbs: {selectedProduct.nutritionInfo.carbs}</span>}
+                    {selectedProduct.nutritionInfo.fat && <span>Fat: {selectedProduct.nutritionInfo.fat}</span>}
+                    {selectedProduct.nutritionInfo.fiber && <span>Fiber: {selectedProduct.nutritionInfo.fiber}</span>}
+                  </div>
                 </div>
               )}
 
               {/* Additional Info - Footer */}
               <div className="flex items-center justify-between pt-2 border-t text-xs text-muted-foreground">
-                <span>Product ID: <span className="font-medium text-foreground">{selectedProduct.id}</span></span>
-                <span>Category ID: <span className="font-medium text-foreground">{selectedProduct.categoryId}</span></span>
+                <span>SKU: <span className="font-medium text-foreground">{selectedProduct.sku || 'N/A'}</span></span>
+                <span>Status: <span className="font-medium text-foreground">{selectedProduct.isActive ? 'Active' : 'Inactive'}</span></span>
               </div>
             </div>
           )}
@@ -750,14 +871,14 @@ export default function ManagerProductManagement() {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel disabled={isSubmitting}>Cancel</AlertDialogCancel>
             <AlertDialogAction 
               className="bg-red-600 hover:bg-red-700 text-white"
               onClick={handleDeleteProduct}
-              disabled={isLoading}
+              disabled={isSubmitting}
             >
-              {isLoading ? (
-                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />
+              {isSubmitting ? (
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
               ) : (
                 <Trash2 className="w-4 h-4 mr-2" />
               )}
@@ -786,10 +907,9 @@ export default function ManagerProductManagement() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Categories</SelectItem>
-                <SelectItem value="Fruits">Fruits</SelectItem>
-                <SelectItem value="Vegetables">Vegetables</SelectItem>
-                <SelectItem value="Herbs">Herbs</SelectItem>
-                <SelectItem value="Mushrooms">Mushrooms</SelectItem>
+                {CATEGORIES.map((cat) => (
+                  <SelectItem key={cat.value} value={cat.value}>{cat.label}</SelectItem>
+                ))}
               </SelectContent>
             </Select>
             <Select value={statusFilter} onValueChange={setStatusFilter}>
@@ -797,7 +917,7 @@ export default function ManagerProductManagement() {
                 <SelectValue placeholder="Status" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All</SelectItem>
+                <SelectItem value="all">All Status</SelectItem>
                 <SelectItem value="In Stock">In Stock</SelectItem>
                 <SelectItem value="Low Stock">Low Stock</SelectItem>
                 <SelectItem value="Out of Stock">Out of Stock</SelectItem>
@@ -818,10 +938,24 @@ export default function ManagerProductManagement() {
       {/* Products Table */}
       <Card className="shadow-sm">
         <CardContent className="p-0">
-          {filteredProducts.length === 0 ? (
+          {loading ? (
+            <div className="flex items-center justify-center py-12">
+              <Loader2 className="w-8 h-8 animate-spin text-green-600" />
+              <span className="ml-2 text-muted-foreground">Loading products...</span>
+            </div>
+          ) : error ? (
+            <div className="text-center py-12">
+              <AlertTriangle className="w-16 h-16 text-red-300 mx-auto mb-3" />
+              <h3 className="text-lg font-semibold text-foreground mb-1">Error Loading Data</h3>
+              <p className="text-sm text-muted-foreground mb-4">{error}</p>
+              <Button onClick={() => fetchProducts()} variant="outline">
+                Retry
+              </Button>
+            </div>
+          ) : filteredProducts.length === 0 ? (
             <div className="text-center py-12">
               <Package className="w-16 h-16 text-gray-300 mx-auto mb-3" />
-              <h3 className="text-lg font-semibold text-foreground mb-1">No products found</h3>
+              <h3 className="text-lg font-semibold text-foreground mb-1">No Products Found</h3>
               <p className="text-sm text-muted-foreground mb-4">
                 {products.length === 0 
                   ? 'Get started by adding your first product' 
@@ -843,27 +977,35 @@ export default function ManagerProductManagement() {
                 <TableRow>
                   <TableHead className="w-[250px]">Product</TableHead>
                   <TableHead>Category</TableHead>
-                  <TableHead>Origin Farm</TableHead>
+                  <TableHead>Origin</TableHead>
                   <TableHead>Price</TableHead>
                   <TableHead>Stock</TableHead>
-                  <TableHead>Certification</TableHead>
+                  <TableHead>Certifications</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {filteredProducts.map((product) => (
-                  <TableRow key={product.id} className="hover:bg-gray-50">
+                  <TableRow key={product._id} className="hover:bg-gray-50">
                     <TableCell>
                       <div className="flex items-center gap-3">
                         <img 
-                          src={product.imageUrls?.[0] || 'https://via.placeholder.com/100'} 
+                          src={product.thumbnail || product.images?.[0] || 'https://via.placeholder.com/100'} 
                           alt={product.name} 
                           className="w-12 h-12 rounded-lg object-cover border border-gray-200" 
                         />
                         <div>
-                          <span className="font-medium text-gray-900 block">{product.name}</span>
-                          <span className="text-xs text-muted-foreground">ID: {product.id}</span>
+                          <div className="flex items-center gap-1">
+                            <span className="font-medium text-gray-900 block">{product.name}</span>
+                            {product.isOrganic && (
+                              <Badge className="bg-green-100 text-green-700 text-[10px] px-1">Organic</Badge>
+                            )}
+                            {product.isFeatured && (
+                              <Star className="w-3 h-3 text-yellow-500 fill-yellow-500" />
+                            )}
+                          </div>
+                          <span className="text-xs text-muted-foreground">SKU: {product.sku || 'N/A'}</span>
                         </div>
                       </div>
                     </TableCell>
@@ -872,19 +1014,26 @@ export default function ManagerProductManagement() {
                         {product.category}
                       </Badge>
                     </TableCell>
-                    <TableCell className="text-gray-700 text-sm">{product.originFarm || '-'}</TableCell>
-                    <TableCell className="font-semibold text-gray-900">${product.price}</TableCell>
-                    <TableCell className="text-gray-700">{product.stockQuantity} units</TableCell>
+                    <TableCell className="text-gray-700 text-sm">{product.origin || '-'}</TableCell>
+                    <TableCell className="font-semibold text-gray-900">${product.price?.toLocaleString()}</TableCell>
+                    <TableCell className="text-gray-700">{product.stock} {product.unit}</TableCell>
                     <TableCell>
-                      {product.certification ? (
-                        <Badge variant="secondary" className="bg-emerald-50 text-emerald-700 text-xs">
-                          {product.certification}
-                        </Badge>
+                      {product.certifications && product.certifications.length > 0 ? (
+                        <div className="flex flex-wrap gap-1">
+                          {product.certifications.slice(0, 2).map((cert, idx) => (
+                            <Badge key={idx} variant="secondary" className="bg-emerald-50 text-emerald-700 text-xs">
+                              {cert}
+                            </Badge>
+                          ))}
+                          {product.certifications.length > 2 && (
+                            <Badge variant="secondary" className="text-xs">+{product.certifications.length - 2}</Badge>
+                          )}
+                        </div>
                       ) : '-'}
                     </TableCell>
                     <TableCell>
-                      <Badge {...getStockBadge(product.status)}>
-                        {product.status}
+                      <Badge {...getStockBadge(product)}>
+                        {product.stock > 10 ? 'In Stock' : product.stock > 0 ? 'Low Stock' : 'Out of Stock'}
                       </Badge>
                     </TableCell>
                     <TableCell>
@@ -935,15 +1084,15 @@ export default function ManagerProductManagement() {
           <div className="flex gap-4">
             <span className="flex items-center gap-1">
               <div className="w-2 h-2 rounded-full bg-green-500"></div>
-              In Stock: {products.filter(p => p.status === 'In Stock').length}
+              In Stock: {products.filter(p => p.stock > 10).length}
             </span>
             <span className="flex items-center gap-1">
               <div className="w-2 h-2 rounded-full bg-yellow-500"></div>
-              Low Stock: {products.filter(p => p.status === 'Low Stock').length}
+              Low Stock: {products.filter(p => p.stock > 0 && p.stock <= 10).length}
             </span>
             <span className="flex items-center gap-1">
               <div className="w-2 h-2 rounded-full bg-red-500"></div>
-              Out of Stock: {products.filter(p => p.status === 'Out of Stock').length}
+              Out of Stock: {products.filter(p => p.stock === 0).length}
             </span>
           </div>
         </div>
