@@ -1,15 +1,10 @@
 import { useState, useRef, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { 
-  Package, 
-  ShoppingCart, 
-  FolderTree, 
-  Users,
   Leaf, 
-  LayoutDashboard,
   Menu,
   X,
-  BarChart3,
+  ShoppingCart,
   User,
   Settings,
   LogOut,
@@ -23,6 +18,7 @@ import OrderManagement from './OrderManagement';
 import CustomerManagement from './CustomerManagement';
 import ProductCategories from '../Manager/CategoryManagement';
 import ReportsAnalytics from './ReportsAnalytics';
+import Sidebar from './Sidebar';
 
 export default function AdminDashboard() {
   const [activeTab, setActiveTab] = useState('overview');
@@ -49,15 +45,6 @@ export default function AdminDashboard() {
     toast.success('Đăng xuất thành công!');
     navigate('/login');
   };
-
-  const menuItems = [
-    { id: 'overview', label: 'Overview', icon: LayoutDashboard },
-    { id: 'products', label: 'Products', icon: Package },
-    { id: 'orders', label: 'Orders', icon: ShoppingCart },
-    { id: 'customers', label: 'Customers', icon: Users },
-    { id: 'categories', label: 'Categories', icon: FolderTree },
-    { id: 'reports', label: 'Reports', icon: BarChart3 },
-  ];
 
   const renderContent = () => {
     switch (activeTab) {
@@ -170,40 +157,12 @@ export default function AdminDashboard() {
 
       <div className="flex">
         {/* Sidebar */}
-        <aside
-          className={`
-            fixed lg:sticky top-16 left-0 h-[calc(100vh-4rem)] bg-white border-r border-border
-            transition-transform duration-300 ease-in-out z-30 shadow-lg lg:shadow-none
-            ${sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
-            w-64
-          `}
-        >
-          <nav className="p-4 space-y-1">
-            {menuItems.map((item) => {
-              const Icon = item.icon;
-              const isActive = activeTab === item.id;
-              return (
-                <button
-                  key={item.id}
-                  onClick={() => {
-                    setActiveTab(item.id);
-                    if (window.innerWidth < 1024) setSidebarOpen(false);
-                  }}
-                  className={`
-                    w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200
-                    ${isActive 
-                      ? 'bg-gradient-to-r from-green-500 to-emerald-600 text-white shadow-md' 
-                      : 'text-foreground hover:bg-secondary'
-                    }
-                  `}
-                >
-                  <Icon className="w-5 h-5" />
-                  <span className="font-medium">{item.label}</span>
-                </button>
-              );
-            })}
-          </nav>
-        </aside>
+        <Sidebar 
+          activeTab={activeTab}
+          onTabChange={setActiveTab}
+          isOpen={sidebarOpen}
+          onClose={() => setSidebarOpen(false)}
+        />
 
         {/* Main Content */}
         <main className="flex-1 p-6 lg:p-8">
