@@ -24,92 +24,149 @@ import { Textarea } from '../../components/ui/textarea';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '../../components/ui/alert-dialog';
 import { toast } from 'sonner';
 
-// Product interface
+// Product interface - matching database schema
 interface Product {
   id: string;
   name: string;
-  category: string;
+  description: string;
   price: number;
-  stock: number;
-  status: string;
-  image: string;
-  description?: string;
-  sales: number;
-  revenue: number;
+  stockQuantity: number;
+  certification: string;
+  originFarm: string;
+  nutritionInfo: string;
+  imageUrls: string[];
+  status: 'In Stock' | 'Low Stock' | 'Out of Stock' | 'Discontinued';
+  categoryId: number;
+  category: string; // For display purposes
+  createdAt: string;
+  // Computed fields for analytics
+  sales?: number;
+  revenue?: number;
 }
 
-// Initial mock data
+// Category mapping for display
+const categoryMap: Record<number, string> = {
+  1: 'Fruits',
+  2: 'Vegetables',
+  3: 'Herbs',
+  4: 'Mushrooms',
+};
+
+// Initial mock data with all database fields
 const initialProducts: Product[] = [
   { 
     id: '1', 
     name: 'Organic Avocados', 
-    category: 'Fruits', 
+    description: 'Fresh organic avocados from local farms. Rich in healthy fats and nutrients.',
     price: 5.99, 
-    stock: 150, 
+    stockQuantity: 150, 
+    certification: 'USDA Organic',
+    originFarm: 'Green Valley Farm',
+    nutritionInfo: 'Calories: 160, Fat: 15g, Carbs: 9g, Protein: 2g, Fiber: 7g',
+    imageUrls: ['https://images.unsplash.com/photo-1523049673857-eb18f1d7b578?w=100'],
     status: 'In Stock', 
-    image: 'https://images.unsplash.com/photo-1523049673857-eb18f1d7b578?w=100',
-    description: 'Fresh organic avocados from local farms',
+    categoryId: 1,
+    category: 'Fruits',
+    createdAt: '2025-01-15T10:30:00Z',
     sales: 245,
     revenue: 1467.55
   },
   { 
     id: '2', 
     name: 'Mixed Greens', 
-    category: 'Vegetables', 
+    description: 'Assorted organic greens including spinach, kale, and arugula. Perfect for salads.',
     price: 4.49, 
-    stock: 200, 
+    stockQuantity: 200, 
+    certification: 'Certified Organic',
+    originFarm: 'Sunrise Organic Farm',
+    nutritionInfo: 'Calories: 20, Fat: 0g, Carbs: 3g, Protein: 2g, Fiber: 2g',
+    imageUrls: ['https://images.unsplash.com/photo-1622206151226-18ca2c9ab4a1?w=100'],
     status: 'In Stock', 
-    image: 'https://images.unsplash.com/photo-1622206151226-18ca2c9ab4a1?w=100',
-    description: 'Assorted organic greens including spinach, kale, and arugula',
+    categoryId: 2,
+    category: 'Vegetables',
+    createdAt: '2025-01-14T08:00:00Z',
     sales: 198,
     revenue: 889.02
   },
   { 
     id: '3', 
     name: 'Fresh Strawberries', 
-    category: 'Fruits', 
+    description: 'Sweet and juicy organic strawberries. Hand-picked at peak ripeness.',
     price: 6.99, 
-    stock: 8, 
+    stockQuantity: 8, 
+    certification: 'USDA Organic',
+    originFarm: 'Berry Bliss Farm',
+    nutritionInfo: 'Calories: 50, Fat: 0g, Carbs: 12g, Protein: 1g, Fiber: 3g',
+    imageUrls: ['https://images.unsplash.com/photo-1464965911861-746a04b4bca6?w=100'],
     status: 'Low Stock', 
-    image: 'https://images.unsplash.com/photo-1464965911861-746a04b4bca6?w=100',
-    description: 'Sweet and juicy organic strawberries',
+    categoryId: 1,
+    category: 'Fruits',
+    createdAt: '2025-01-13T14:20:00Z',
     sales: 176,
     revenue: 1230.24
   },
   { 
     id: '4', 
     name: 'Organic Tomatoes', 
-    category: 'Vegetables', 
+    description: 'Vine-ripened organic tomatoes. Perfect for cooking or fresh eating.',
     price: 4.99, 
-    stock: 0, 
+    stockQuantity: 0, 
+    certification: 'Non-GMO Project Verified',
+    originFarm: 'Red Sun Organics',
+    nutritionInfo: 'Calories: 22, Fat: 0g, Carbs: 5g, Protein: 1g, Fiber: 1g',
+    imageUrls: ['https://images.unsplash.com/photo-1592921870789-04563d55041c?w=100'],
     status: 'Out of Stock', 
-    image: 'https://images.unsplash.com/photo-1592921870789-04563d55041c?w=100',
-    description: 'Vine-ripened organic tomatoes',
+    categoryId: 2,
+    category: 'Vegetables',
+    createdAt: '2025-01-12T09:45:00Z',
     sales: 165,
     revenue: 823.35
   },
   { 
     id: '5', 
     name: 'Fresh Blueberries', 
-    category: 'Fruits', 
+    description: 'Premium organic blueberries rich in antioxidants. Great for smoothies and baking.',
     price: 7.99, 
-    stock: 80, 
+    stockQuantity: 80, 
+    certification: 'USDA Organic',
+    originFarm: 'Blue Mountain Farms',
+    nutritionInfo: 'Calories: 84, Fat: 0g, Carbs: 21g, Protein: 1g, Fiber: 4g',
+    imageUrls: ['https://images.unsplash.com/photo-1498557850523-fd3d118b962e?w=100'],
     status: 'In Stock', 
-    image: 'https://images.unsplash.com/photo-1498557850523-fd3d118b962e?w=100',
-    description: 'Premium organic blueberries rich in antioxidants',
+    categoryId: 1,
+    category: 'Fruits',
+    createdAt: '2025-01-10T11:15:00Z',
     sales: 142,
     revenue: 1134.58
   },
 ];
 
-// Empty product form
-const emptyProductForm = {
+// Status type for product
+type ProductStatus = 'In Stock' | 'Low Stock' | 'Out of Stock' | 'Discontinued';
+
+// Empty product form with all database fields
+const emptyProductForm: {
+  name: string;
+  description: string;
+  price: string;
+  stockQuantity: string;
+  certification: string;
+  originFarm: string;
+  nutritionInfo: string;
+  imageUrls: string;
+  status: ProductStatus;
+  categoryId: string;
+} = {
   name: '',
-  category: '',
-  price: '',
-  stock: '',
   description: '',
-  image: '',
+  price: '',
+  stockQuantity: '',
+  certification: '',
+  originFarm: '',
+  nutritionInfo: '',
+  imageUrls: '',
+  status: 'In Stock',
+  categoryId: '',
 };
 
 export default function ManagerProductManagement() {
@@ -133,17 +190,30 @@ export default function ManagerProductManagement() {
   const [isLoading, setIsLoading] = useState(false);
 
   // Calculate stock status based on quantity
-  const calculateStatus = (stock: number): string => {
+  const calculateStatus = (stock: number): 'In Stock' | 'Low Stock' | 'Out of Stock' => {
     if (stock === 0) return 'Out of Stock';
     if (stock <= 10) return 'Low Stock';
     return 'In Stock';
+  };
+
+  // Format date for display
+  const formatDate = (dateString: string): string => {
+    return new Date(dateString).toLocaleDateString('vi-VN', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
   };
 
   // Filter products based on search and filters
   const filteredProducts = useMemo(() => {
     return products.filter(product => {
       const matchesSearch = product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                           product.category.toLowerCase().includes(searchQuery.toLowerCase());
+                           product.category.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                           product.originFarm.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                           product.certification.toLowerCase().includes(searchQuery.toLowerCase());
       const matchesCategory = categoryFilter === 'all' || product.category.toLowerCase() === categoryFilter.toLowerCase();
       const matchesStatus = statusFilter === 'all' || product.status === statusFilter;
       
@@ -159,7 +229,7 @@ export default function ManagerProductManagement() {
 
   // CREATE - Add new product
   const handleAddProduct = () => {
-    if (!productForm.name || !productForm.category || !productForm.price || !productForm.stock) {
+    if (!productForm.name || !productForm.categoryId || !productForm.price || !productForm.stockQuantity) {
       toast.error('Please fill in all required fields!');
       return;
     }
@@ -168,15 +238,21 @@ export default function ManagerProductManagement() {
     
     // Simulate API call
     setTimeout(() => {
+      const categoryIdNum = parseInt(productForm.categoryId);
       const newProduct: Product = {
         id: Date.now().toString(),
         name: productForm.name,
-        category: productForm.category,
-        price: parseFloat(productForm.price),
-        stock: parseInt(productForm.stock),
-        status: calculateStatus(parseInt(productForm.stock)),
-        image: productForm.image || 'https://images.unsplash.com/photo-1518843875459-f738682238a6?w=100',
         description: productForm.description,
+        price: parseFloat(productForm.price),
+        stockQuantity: parseInt(productForm.stockQuantity),
+        certification: productForm.certification,
+        originFarm: productForm.originFarm,
+        nutritionInfo: productForm.nutritionInfo,
+        imageUrls: productForm.imageUrls ? productForm.imageUrls.split(',').map(url => url.trim()) : ['https://images.unsplash.com/photo-1518843875459-f738682238a6?w=100'],
+        status: calculateStatus(parseInt(productForm.stockQuantity)),
+        categoryId: categoryIdNum,
+        category: categoryMap[categoryIdNum] || 'Unknown',
+        createdAt: new Date().toISOString(),
         sales: 0,
         revenue: 0,
       };
@@ -200,18 +276,22 @@ export default function ManagerProductManagement() {
     setSelectedProduct(product);
     setProductForm({
       name: product.name,
-      category: product.category,
-      price: product.price.toString(),
-      stock: product.stock.toString(),
       description: product.description || '',
-      image: product.image,
+      price: product.price.toString(),
+      stockQuantity: product.stockQuantity.toString(),
+      certification: product.certification || '',
+      originFarm: product.originFarm || '',
+      nutritionInfo: product.nutritionInfo || '',
+      imageUrls: product.imageUrls?.join(', ') || '',
+      status: product.status,
+      categoryId: product.categoryId.toString(),
     });
     setIsEditProductOpen(true);
   };
 
   // UPDATE - Save edited product
   const handleUpdateProduct = () => {
-    if (!productForm.name || !productForm.category || !productForm.price || !productForm.stock) {
+    if (!productForm.name || !productForm.categoryId || !productForm.price || !productForm.stockQuantity) {
       toast.error('Please fill in all required fields!');
       return;
     }
@@ -222,17 +302,22 @@ export default function ManagerProductManagement() {
 
     // Simulate API call
     setTimeout(() => {
+      const categoryIdNum = parseInt(productForm.categoryId);
       setProducts(prev => prev.map(product => {
         if (product.id === selectedProduct.id) {
           return {
             ...product,
             name: productForm.name,
-            category: productForm.category,
-            price: parseFloat(productForm.price),
-            stock: parseInt(productForm.stock),
-            status: calculateStatus(parseInt(productForm.stock)),
-            image: productForm.image || product.image,
             description: productForm.description,
+            price: parseFloat(productForm.price),
+            stockQuantity: parseInt(productForm.stockQuantity),
+            certification: productForm.certification,
+            originFarm: productForm.originFarm,
+            nutritionInfo: productForm.nutritionInfo,
+            imageUrls: productForm.imageUrls ? productForm.imageUrls.split(',').map(url => url.trim()) : product.imageUrls,
+            status: calculateStatus(parseInt(productForm.stockQuantity)),
+            categoryId: categoryIdNum,
+            category: categoryMap[categoryIdNum] || product.category,
           };
         }
         return product;
@@ -278,7 +363,8 @@ export default function ManagerProductManagement() {
 
   // Render form fields (inline to avoid re-render issues)
   const renderFormFields = () => (
-    <div className="grid gap-4 py-4">
+    <div className="grid gap-4 py-4 max-h-[60vh] overflow-y-auto pr-2">
+      {/* Row 1: Name & Category */}
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-2">
           <Label htmlFor="name">Product Name *</Label>
@@ -290,20 +376,22 @@ export default function ManagerProductManagement() {
           />
         </div>
         <div className="space-y-2">
-          <Label htmlFor="category">Category *</Label>
-          <Select value={productForm.category} onValueChange={(value) => setProductForm(prev => ({ ...prev, category: value }))}>
+          <Label htmlFor="categoryId">Category *</Label>
+          <Select value={productForm.categoryId} onValueChange={(value) => setProductForm(prev => ({ ...prev, categoryId: value }))}>
             <SelectTrigger>
               <SelectValue placeholder="Select category" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="Fruits">Fruits</SelectItem>
-              <SelectItem value="Vegetables">Vegetables</SelectItem>
-              <SelectItem value="Herbs">Herbs</SelectItem>
-              <SelectItem value="Mushrooms">Mushrooms</SelectItem>
+              <SelectItem value="1">Fruits</SelectItem>
+              <SelectItem value="2">Vegetables</SelectItem>
+              <SelectItem value="3">Herbs</SelectItem>
+              <SelectItem value="4">Mushrooms</SelectItem>
             </SelectContent>
           </Select>
         </div>
       </div>
+
+      {/* Row 2: Price & Stock */}
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-2">
           <Label htmlFor="price">Price ($) *</Label>
@@ -312,21 +400,54 @@ export default function ManagerProductManagement() {
             type="number" 
             placeholder="0.00" 
             step="0.01" 
+            min="0"
             value={productForm.price}
             onChange={(e) => setProductForm(prev => ({ ...prev, price: e.target.value }))}
           />
         </div>
         <div className="space-y-2">
-          <Label htmlFor="stock">Stock Quantity *</Label>
+          <Label htmlFor="stockQuantity">Stock Quantity *</Label>
           <Input 
-            id="stock" 
+            id="stockQuantity" 
             type="number" 
             placeholder="0" 
-            value={productForm.stock}
-            onChange={(e) => setProductForm(prev => ({ ...prev, stock: e.target.value }))}
+            min="0"
+            value={productForm.stockQuantity}
+            onChange={(e) => setProductForm(prev => ({ ...prev, stockQuantity: e.target.value }))}
           />
         </div>
       </div>
+
+      {/* Row 3: Certification & Origin Farm */}
+      <div className="grid grid-cols-2 gap-4">
+        <div className="space-y-2">
+          <Label htmlFor="certification">Certification</Label>
+          <Select value={productForm.certification} onValueChange={(value) => setProductForm(prev => ({ ...prev, certification: value }))}>
+            <SelectTrigger>
+              <SelectValue placeholder="Select certification" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="USDA Organic">USDA Organic</SelectItem>
+              <SelectItem value="Certified Organic">Certified Organic</SelectItem>
+              <SelectItem value="Non-GMO Project Verified">Non-GMO Project Verified</SelectItem>
+              <SelectItem value="Fair Trade Certified">Fair Trade Certified</SelectItem>
+              <SelectItem value="Rainforest Alliance">Rainforest Alliance</SelectItem>
+              <SelectItem value="None">None</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="originFarm">Origin Farm</Label>
+          <Input 
+            id="originFarm" 
+            placeholder="e.g., Green Valley Farm" 
+            value={productForm.originFarm}
+            onChange={(e) => setProductForm(prev => ({ ...prev, originFarm: e.target.value }))}
+          />
+        </div>
+      </div>
+
+      {/* Row 4: Description */}
       <div className="space-y-2">
         <Label htmlFor="description">Description</Label>
         <Textarea 
@@ -337,32 +458,66 @@ export default function ManagerProductManagement() {
           onChange={(e) => setProductForm(prev => ({ ...prev, description: e.target.value }))}
         />
       </div>
+
+      {/* Row 5: Nutrition Info */}
       <div className="space-y-2">
-        <Label htmlFor="image">Product Image</Label>
+        <Label htmlFor="nutritionInfo">Nutrition Information</Label>
+        <Textarea 
+          id="nutritionInfo" 
+          placeholder="e.g., Calories: 160, Fat: 15g, Carbs: 9g, Protein: 2g, Fiber: 7g" 
+          rows={2} 
+          value={productForm.nutritionInfo}
+          onChange={(e) => setProductForm(prev => ({ ...prev, nutritionInfo: e.target.value }))}
+        />
+      </div>
+
+      {/* Row 6: Product Images */}
+      <div className="space-y-2">
+        <Label htmlFor="imageUrls">Product Images (comma-separated URLs)</Label>
         <div className="flex gap-2">
           <Input 
-            id="image" 
-            placeholder="Image URL" 
+            id="imageUrls" 
+            placeholder="https://example.com/image1.jpg, https://example.com/image2.jpg" 
             className="flex-1" 
-            value={productForm.image}
-            onChange={(e) => setProductForm(prev => ({ ...prev, image: e.target.value }))}
+            value={productForm.imageUrls}
+            onChange={(e) => setProductForm(prev => ({ ...prev, imageUrls: e.target.value }))}
           />
           <Button type="button" variant="outline" size="icon">
             <ImagePlus className="w-4 h-4" />
           </Button>
         </div>
-        {productForm.image && (
-          <div className="mt-2">
-            <img 
-              src={productForm.image} 
-              alt="Preview" 
-              className="w-20 h-20 object-cover rounded-lg border"
-              onError={(e) => {
-                (e.target as HTMLImageElement).style.display = 'none';
-              }}
-            />
+        {productForm.imageUrls && (
+          <div className="mt-2 flex gap-2 flex-wrap">
+            {productForm.imageUrls.split(',').map((url, index) => (
+              <img 
+                key={index}
+                src={url.trim()} 
+                alt={`Preview ${index + 1}`} 
+                className="w-16 h-16 object-cover rounded-lg border"
+                onError={(e) => {
+                  (e.target as HTMLImageElement).style.display = 'none';
+                }}
+              />
+            ))}
           </div>
         )}
+      </div>
+
+      {/* Row 7: Status (for edit mode) */}
+      <div className="space-y-2">
+        <Label htmlFor="status">Status</Label>
+        <Select value={productForm.status} onValueChange={(value: 'In Stock' | 'Low Stock' | 'Out of Stock' | 'Discontinued') => setProductForm(prev => ({ ...prev, status: value }))}>
+          <SelectTrigger>
+            <SelectValue placeholder="Select status" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="In Stock">In Stock</SelectItem>
+            <SelectItem value="Low Stock">Low Stock</SelectItem>
+            <SelectItem value="Out of Stock">Out of Stock</SelectItem>
+            <SelectItem value="Discontinued">Discontinued</SelectItem>
+          </SelectContent>
+        </Select>
+        <p className="text-xs text-muted-foreground">Status is auto-calculated based on stock, but can be overridden</p>
       </div>
     </div>
   );
@@ -448,61 +603,119 @@ export default function ManagerProductManagement() {
 
       {/* VIEW PRODUCT DIALOG */}
       <Dialog open={isViewProductOpen} onOpenChange={setIsViewProductOpen}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="max-w-xl">
           <DialogHeader>
-            <DialogTitle className="text-xl">Product Details</DialogTitle>
-            <DialogDescription>View detailed product information</DialogDescription>
+            <DialogTitle className="text-lg font-semibold">Product Details</DialogTitle>
+            <DialogDescription className="text-sm">View detailed product information</DialogDescription>
           </DialogHeader>
           {selectedProduct && (
-            <div className="py-4">
-              <div className="flex gap-6">
-                <img 
-                  src={selectedProduct.image} 
-                  alt={selectedProduct.name}
-                  className="w-32 h-32 object-cover rounded-xl border shadow-sm"
-                />
-                <div className="flex-1 space-y-3">
-                  <div>
-                    <h3 className="text-2xl font-bold text-foreground">{selectedProduct.name}</h3>
-                    <Badge variant="outline" className="mt-1">{selectedProduct.category}</Badge>
+            <div className="py-4 space-y-5">
+              {/* Header with image and basic info */}
+              <div className="flex gap-5 items-start">
+                {/* Product Image */}
+                <div className="shrink-0">
+                  <img 
+                    src={selectedProduct.imageUrls?.[0] || 'https://via.placeholder.com/120'} 
+                    alt={selectedProduct.name}
+                    className="w-28 h-28 object-cover rounded-xl border-2 border-gray-100 shadow-sm"
+                  />
+                  {selectedProduct.imageUrls && selectedProduct.imageUrls.length > 1 && (
+                    <div className="flex gap-1 mt-2">
+                      {selectedProduct.imageUrls.slice(1, 4).map((url, index) => (
+                        <img 
+                          key={index}
+                          src={url} 
+                          alt={`${selectedProduct.name} - ${index + 2}`}
+                          className="w-8 h-8 object-cover rounded border"
+                        />
+                      ))}
+                      {selectedProduct.imageUrls.length > 4 && (
+                        <div className="w-8 h-8 rounded border bg-gray-100 flex items-center justify-center text-xs text-gray-500">
+                          +{selectedProduct.imageUrls.length - 4}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+                
+                {/* Product Info */}
+                <div className="flex-1 min-w-0">
+                  <h3 className="text-xl font-bold text-foreground truncate">{selectedProduct.name}</h3>
+                  <div className="flex flex-wrap gap-2 mt-2">
+                    <Badge variant="outline" className="text-xs">{selectedProduct.category}</Badge>
+                    {selectedProduct.certification && (
+                      <Badge className="bg-emerald-100 text-emerald-700 hover:bg-emerald-100 text-xs">
+                        {selectedProduct.certification}
+                      </Badge>
+                    )}
+                    <Badge {...getStockBadge(selectedProduct.status)} className="text-xs">
+                      {selectedProduct.status}
+                    </Badge>
                   </div>
-                  <Badge {...getStockBadge(selectedProduct.status)}>{selectedProduct.status}</Badge>
+                  <p className="text-xs text-muted-foreground mt-2">
+                    Created: {formatDate(selectedProduct.createdAt)}
+                  </p>
                 </div>
               </div>
               
-              <div className="grid grid-cols-2 gap-4 mt-6">
-                <Card className="bg-green-50 border-green-200">
-                  <CardContent className="pt-4">
-                    <p className="text-sm text-green-600 font-medium">Price</p>
-                    <p className="text-2xl font-bold text-green-700">${selectedProduct.price}</p>
+              {/* Stats Cards - 2x2 Grid */}
+              <div className="grid grid-cols-4 gap-2">
+                <Card className="bg-green-50 border-green-100">
+                  <CardContent className="p-3 text-center">
+                    <p className="text-[10px] text-green-600 font-medium uppercase tracking-wide">Price</p>
+                    <p className="text-lg font-bold text-green-700">${selectedProduct.price}</p>
                   </CardContent>
                 </Card>
-                <Card className="bg-blue-50 border-blue-200">
-                  <CardContent className="pt-4">
-                    <p className="text-sm text-blue-600 font-medium">Stock</p>
-                    <p className="text-2xl font-bold text-blue-700">{selectedProduct.stock} units</p>
+                <Card className="bg-blue-50 border-blue-100">
+                  <CardContent className="p-3 text-center">
+                    <p className="text-[10px] text-blue-600 font-medium uppercase tracking-wide">Stock</p>
+                    <p className="text-lg font-bold text-blue-700">{selectedProduct.stockQuantity}</p>
+                    <p className="text-[10px] text-blue-500">units</p>
                   </CardContent>
                 </Card>
-                <Card className="bg-purple-50 border-purple-200">
-                  <CardContent className="pt-4">
-                    <p className="text-sm text-purple-600 font-medium">Sold</p>
-                    <p className="text-2xl font-bold text-purple-700">{selectedProduct.sales}</p>
+                <Card className="bg-purple-50 border-purple-100">
+                  <CardContent className="p-3 text-center">
+                    <p className="text-[10px] text-purple-600 font-medium uppercase tracking-wide">Sold</p>
+                    <p className="text-lg font-bold text-purple-700">{selectedProduct.sales || 0}</p>
                   </CardContent>
                 </Card>
-                <Card className="bg-amber-50 border-amber-200">
-                  <CardContent className="pt-4">
-                    <p className="text-sm text-amber-600 font-medium">Revenue</p>
-                    <p className="text-2xl font-bold text-amber-700">${selectedProduct.revenue.toFixed(2)}</p>
+                <Card className="bg-amber-50 border-amber-100">
+                  <CardContent className="p-3 text-center">
+                    <p className="text-[10px] text-amber-600 font-medium uppercase tracking-wide">Revenue</p>
+                    <p className="text-lg font-bold text-amber-700">${(selectedProduct.revenue || 0).toFixed(2)}</p>
                   </CardContent>
                 </Card>
               </div>
 
-              {selectedProduct.description && (
-                <div className="mt-6">
-                  <h4 className="font-semibold text-foreground mb-2">Description</h4>
-                  <p className="text-muted-foreground">{selectedProduct.description}</p>
+              {/* Origin Farm */}
+              {selectedProduct.originFarm && (
+                <div className="bg-gray-50 px-4 py-3 rounded-lg border border-gray-100">
+                  <p className="text-xs text-muted-foreground font-medium mb-1">Origin Farm</p>
+                  <p className="text-sm font-medium text-foreground">{selectedProduct.originFarm}</p>
                 </div>
               )}
+
+              {/* Description */}
+              {selectedProduct.description && (
+                <div>
+                  <h4 className="text-sm font-semibold text-foreground mb-1.5">Description</h4>
+                  <p className="text-sm text-muted-foreground leading-relaxed">{selectedProduct.description}</p>
+                </div>
+              )}
+
+              {/* Nutrition Info */}
+              {selectedProduct.nutritionInfo && (
+                <div className="bg-blue-50 px-4 py-3 rounded-lg border border-blue-100">
+                  <h4 className="text-sm font-semibold text-blue-800 mb-1">Nutrition Information</h4>
+                  <p className="text-sm text-blue-700">{selectedProduct.nutritionInfo}</p>
+                </div>
+              )}
+
+              {/* Additional Info - Footer */}
+              <div className="flex items-center justify-between pt-2 border-t text-xs text-muted-foreground">
+                <span>Product ID: <span className="font-medium text-foreground">{selectedProduct.id}</span></span>
+                <span>Category ID: <span className="font-medium text-foreground">{selectedProduct.categoryId}</span></span>
+              </div>
             </div>
           )}
           <DialogFooter>
@@ -628,10 +841,12 @@ export default function ManagerProductManagement() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="w-[300px]">Product</TableHead>
+                  <TableHead className="w-[250px]">Product</TableHead>
                   <TableHead>Category</TableHead>
+                  <TableHead>Origin Farm</TableHead>
                   <TableHead>Price</TableHead>
                   <TableHead>Stock</TableHead>
+                  <TableHead>Certification</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
@@ -642,11 +857,14 @@ export default function ManagerProductManagement() {
                     <TableCell>
                       <div className="flex items-center gap-3">
                         <img 
-                          src={product.image} 
+                          src={product.imageUrls?.[0] || 'https://via.placeholder.com/100'} 
                           alt={product.name} 
                           className="w-12 h-12 rounded-lg object-cover border border-gray-200" 
                         />
-                        <span className="font-medium text-gray-900">{product.name}</span>
+                        <div>
+                          <span className="font-medium text-gray-900 block">{product.name}</span>
+                          <span className="text-xs text-muted-foreground">ID: {product.id}</span>
+                        </div>
                       </div>
                     </TableCell>
                     <TableCell>
@@ -654,8 +872,16 @@ export default function ManagerProductManagement() {
                         {product.category}
                       </Badge>
                     </TableCell>
+                    <TableCell className="text-gray-700 text-sm">{product.originFarm || '-'}</TableCell>
                     <TableCell className="font-semibold text-gray-900">${product.price}</TableCell>
-                    <TableCell className="text-gray-700">{product.stock} units</TableCell>
+                    <TableCell className="text-gray-700">{product.stockQuantity} units</TableCell>
+                    <TableCell>
+                      {product.certification ? (
+                        <Badge variant="secondary" className="bg-emerald-50 text-emerald-700 text-xs">
+                          {product.certification}
+                        </Badge>
+                      ) : '-'}
+                    </TableCell>
                     <TableCell>
                       <Badge {...getStockBadge(product.status)}>
                         {product.status}

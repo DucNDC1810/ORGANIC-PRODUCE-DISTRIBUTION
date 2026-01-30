@@ -7,13 +7,23 @@ export interface ApiResponse<T = any> {
 
 export interface Product {
   _id: string;
+  product_id?: number;
   name: string;
   description: string;
   price: number;
-  category: string;
-  image: string;
-  stock: number;
-  farmerId: string;
+  stockQuantity: number;
+  certification?: string;
+  originFarm?: string;
+  nutritionInfo?: string;
+  imageUrls: string[];
+  status: 'In Stock' | 'Low Stock' | 'Out of Stock' | 'Discontinued';
+  categoryId: number;
+  category?: string;
+  createdAt: string;
+  // Legacy fields for backward compatibility
+  image?: string;
+  stock?: number;
+  farmerId?: string;
 }
 
 export interface Order {
