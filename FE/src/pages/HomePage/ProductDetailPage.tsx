@@ -23,6 +23,8 @@ import { Button } from '../../components/ui/button';
 import { Badge } from '../../components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../components/ui/tabs';
 import { ImageWithFallback } from '../../components/figma/ImageWithFallback';
+import { RatingDisplay } from '../../components/RatingDisplay';
+import { ProductReviews } from '../../components/ProductReviews';
 
 export default function ProductDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -229,24 +231,16 @@ export default function ProductDetailPage() {
                 
                 {/* Rating */}
                 <div className="flex items-center gap-4">
-                  <div className="flex items-center gap-1">
-                    {[1, 2, 3, 4, 5].map((star) => (
-                      <Star
-                        key={star}
-                        className={`w-5 h-5 ${
-                          star <= Math.round(selectedProduct.rating || 0)
-                            ? 'fill-amber-400 text-amber-400'
-                            : 'text-gray-300'
-                        }`}
-                      />
-                    ))}
-                    <span className="ml-2 text-sm text-gray-600">
-                      ({selectedProduct.reviewCount || 0} reviews)
+                  <RatingDisplay 
+                    rating={selectedProduct.rating || 0}
+                    reviewCount={selectedProduct.reviewCount || 0}
+                    size="md"
+                  />
+                  {selectedProduct.soldCount && selectedProduct.soldCount > 0 && (
+                    <span className="text-sm text-gray-500">
+                      {selectedProduct.soldCount} sold
                     </span>
-                  </div>
-                  <span className="text-sm text-gray-500">
-                    {selectedProduct.soldCount || 0} sold
-                  </span>
+                  )}
                 </div>
               </div>
 
@@ -484,32 +478,7 @@ export default function ProductDetailPage() {
             </TabsContent>
             
             <TabsContent value="reviews" className="space-y-4">
-              <h3 className="text-xl font-semibold text-gray-900">Customer Reviews</h3>
-              <div className="flex items-center gap-4 p-4 bg-gray-50 rounded-lg">
-                <div className="text-center">
-                  <div className="text-4xl font-bold text-gray-900">
-                    {(selectedProduct.rating || 0).toFixed(1)}
-                  </div>
-                  <div className="flex items-center justify-center mt-1">
-                    {[1, 2, 3, 4, 5].map((star) => (
-                      <Star
-                        key={star}
-                        className={`w-4 h-4 ${
-                          star <= Math.round(selectedProduct.rating || 0)
-                            ? 'fill-amber-400 text-amber-400'
-                            : 'text-gray-300'
-                        }`}
-                      />
-                    ))}
-                  </div>
-                  <div className="text-sm text-gray-500 mt-1">
-                    {selectedProduct.reviewCount || 0} reviews
-                  </div>
-                </div>
-              </div>
-              <p className="text-gray-500 text-center py-8">
-                Reviews feature coming soon!
-              </p>
+              <ProductReviews productId={selectedProduct._id} />
             </TabsContent>
           </Tabs>
         </div>

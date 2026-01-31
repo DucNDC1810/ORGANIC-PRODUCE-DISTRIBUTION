@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom';
 import { useCart } from '../context/CartContext';
 import { Product as APIProduct } from '../services/productService';
 import { ImageWithFallback } from '../components/figma/ImageWithFallback';
+import { RatingDisplay } from './RatingDisplay';
 
 interface ProductCardProps {
   product: APIProduct;
@@ -75,10 +76,19 @@ export default function ProductCard({ product }: ProductCardProps) {
         {/* Product Info */}
         <div className="p-4 flex flex-col flex-grow border-t border-gray-100">
           <Link to={`/product/${product._id}`}>
-            <h3 className="font-bold text-sm text-gray-800 mb-3 uppercase tracking-wide line-clamp-2 min-h-[2.5rem] hover:text-emerald-600 transition-colors cursor-pointer">
+            <h3 className="font-bold text-sm text-gray-800 mb-2 uppercase tracking-wide line-clamp-2 min-h-[2.5rem] hover:text-emerald-600 transition-colors cursor-pointer">
               {product.name}
             </h3>
           </Link>
+
+          {/* Rating */}
+          <div className="mb-2">
+            <RatingDisplay 
+              rating={product.rating || 0}
+              reviewCount={product.reviewCount || 0}
+              size="sm"
+            />
+          </div>
 
           {/* Price */}
           <div className="mt-auto flex items-center justify-between">

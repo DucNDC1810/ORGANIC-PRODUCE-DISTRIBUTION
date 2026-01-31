@@ -229,6 +229,13 @@ productSchema.virtual('stockStatus').get(function() {
   return 'in_stock';
 });
 
+// Virtual for reviews
+productSchema.virtual('reviews', {
+  ref: 'Review',
+  localField: '_id',
+  foreignField: 'product'
+});
+
 // Pre-save middleware to generate SKU if not provided
 productSchema.pre('save', function(next) {
   if (!this.sku) {
