@@ -4,8 +4,6 @@ export interface ICategory extends Document {
   name: string;
   slug: string;
   description?: string;
-  icon?: string;
-  color?: string;
   image?: string;
   parentCategory?: mongoose.Types.ObjectId;
   isActive: boolean;
@@ -34,16 +32,6 @@ const categorySchema = new Schema<ICategory>(
     description: {
       type: String,
       maxlength: [500, 'Description cannot exceed 500 characters']
-    },
-    icon: {
-      type: String,
-      trim: true,
-      maxlength: [10, 'Icon cannot exceed 10 characters']
-    },
-    color: {
-      type: String,
-      trim: true,
-      default: '#2D5A27'
     },
     image: {
       type: String,

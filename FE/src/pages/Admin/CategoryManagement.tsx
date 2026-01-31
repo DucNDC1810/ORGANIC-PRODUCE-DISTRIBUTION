@@ -15,24 +15,45 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../..
 import { Separator } from '../../components/ui/separator';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '../../components/ui/alert-dialog';
 
+// Default icon and color mappings based on category slug
+const CATEGORY_STYLES: Record<string, { icon: string; color: string }> = {
+  vegetables: { icon: '🥬', color: '#2D5A27' },
+  fruits: { icon: '🍎', color: '#E53935' },
+  herbs: { icon: '🌿', color: '#43A047' },
+  mushrooms: { icon: '🍄', color: '#8D6E63' },
+  'dried-seafood': { icon: '🦐', color: '#0288D1' },
+  dairy: { icon: '🥛', color: '#FDD835' },
+  meat: { icon: '🥩', color: '#D32F2F' },
+  seafood: { icon: '🐟', color: '#0097A7' },
+  grains: { icon: '🌾', color: '#FFA000' },
+  beverages: { icon: '🍹', color: '#7B1FA2' },
+  snacks: { icon: '🍪', color: '#FF7043' },
+  organic: { icon: '🌱', color: '#66BB6A' },
+};
+
+const DEFAULT_STYLE = { icon: '📦', color: '#2D5A27' };
+
+// Helper function to get category style
+const getCategoryStyle = (slug: string) => {
+  return CATEGORY_STYLES[slug] || DEFAULT_STYLE;
+};
+
 // Type definition
 interface Category {
   id: string;
   name: string;
   slug: string;
   productCount: number;
-  icon: string;
-  color: string;
   description?: string;
 }
 
-// Initial mock data with "Đồ khô dưới biển" category
+// Initial mock data
 const initialCategories: Category[] = [
-  { id: '1', name: 'Vegetables', slug: 'vegetables', productCount: 45, icon: '🥬', color: '#2D5A27', description: 'Fresh organic vegetables' },
-  { id: '2', name: 'Fruits', slug: 'fruits', productCount: 32, icon: '🍎', color: '#ff6b6b', description: 'Fresh organic fruits' },
-  { id: '3', name: 'Herbs', slug: 'herbs', productCount: 18, icon: '🌿', color: '#51cf66', description: 'Fresh herbs and spices' },
-  { id: '4', name: 'Mushrooms', slug: 'mushrooms', productCount: 12, icon: '🍄', color: '#ffd43b', description: 'Organic mushrooms' },
-  { id: '5', name: 'Dried Seafood', slug: 'dried-seafood', productCount: 25, icon: '🦐', color: '#0ea5e9', description: 'Dried seafood such as dried shrimp, dried fish, dried squid, seaweed' },
+  { id: '1', name: 'Vegetables', slug: 'vegetables', productCount: 45, description: 'Fresh organic vegetables' },
+  { id: '2', name: 'Fruits', slug: 'fruits', productCount: 32, description: 'Fresh organic fruits' },
+  { id: '3', name: 'Herbs', slug: 'herbs', productCount: 18, description: 'Fresh herbs and spices' },
+  { id: '4', name: 'Mushrooms', slug: 'mushrooms', productCount: 12, description: 'Organic mushrooms' },
+  { id: '5', name: 'Dried Seafood', slug: 'dried-seafood', productCount: 25, description: 'Dried seafood such as dried shrimp, dried fish, dried squid, seaweed' },
 ];
 
 export default function AdminCategoryManagement() {
@@ -47,8 +68,6 @@ export default function AdminCategoryManagement() {
   const [formData, setFormData] = useState({
     name: '',
     slug: '',
-    icon: '',
-    color: '#2D5A27',
     description: '',
   });
 
@@ -75,8 +94,6 @@ export default function AdminCategoryManagement() {
     setFormData({
       name: '',
       slug: '',
-      icon: '',
-      color: '#2D5A27',
       description: '',
     });
   };
@@ -89,8 +106,6 @@ export default function AdminCategoryManagement() {
       id: Date.now().toString(),
       name: formData.name,
       slug: formData.slug || generateSlug(formData.name),
-      icon: formData.icon || '📦',
-      color: formData.color,
       productCount: 0,
       description: formData.description,
     };
@@ -106,8 +121,6 @@ export default function AdminCategoryManagement() {
     setFormData({
       name: category.name,
       slug: category.slug,
-      icon: category.icon,
-      color: category.color,
       description: category.description || '',
     });
     setIsEditCategoryOpen(true);
@@ -123,8 +136,6 @@ export default function AdminCategoryManagement() {
             ...cat,
             name: formData.name,
             slug: formData.slug || generateSlug(formData.name),
-            icon: formData.icon || cat.icon,
-            color: formData.color,
             description: formData.description,
           }
         : cat
@@ -196,34 +207,6 @@ export default function AdminCategoryManagement() {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="cat-icon">Icon (Emoji)</Label>
-                <Input 
-                  id="cat-icon" 
-                  placeholder="🥬" 
-                  maxLength={2} 
-                  value={formData.icon}
-                  onChange={(e) => setFormData({...formData, icon: e.target.value})}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="cat-color">Brand Color</Label>
-                <div className="flex gap-2">
-                  <Input 
-                    id="cat-color" 
-                    type="color" 
-                    value={formData.color} 
-                    className="w-20"
-                    onChange={(e) => setFormData({...formData, color: e.target.value})}
-                  />
-                  <Input 
-                    placeholder="#2D5A27" 
-                    className="flex-1" 
-                    value={formData.color}
-                    onChange={(e) => setFormData({...formData, color: e.target.value})}
-                  />
-                </div>
-              </div>
-              <div className="space-y-2">
                 <Label htmlFor="cat-description">Description</Label>
                 <Input 
                   id="cat-description" 
@@ -268,13 +251,15 @@ export default function AdminCategoryManagement() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {filteredCategories.map((category) => (
-          <Card key={category.id} className="shadow-sm hover:shadow-md transition-all border-l-4" style={{ borderLeftColor: category.color }}>
+        {filteredCategories.map((category) => {
+          const style = getCategoryStyle(category.slug);
+          return (
+          <Card key={category.id} className="shadow-sm hover:shadow-md transition-all border-l-4" style={{ borderLeftColor: style.color }}>
             <CardHeader>
               <div className="flex items-start justify-between">
                 <div className="flex items-center gap-3">
-                  <div className="w-14 h-14 rounded-xl flex items-center justify-center text-3xl shadow-sm" style={{ backgroundColor: `${category.color}15` }}>
-                    {category.icon}
+                  <div className="w-14 h-14 rounded-xl flex items-center justify-center text-3xl shadow-sm" style={{ backgroundColor: `${style.color}15` }}>
+                    {style.icon}
                   </div>
                   <div>
                     <CardTitle className="text-lg">{category.name}</CardTitle>
@@ -295,8 +280,8 @@ export default function AdminCategoryManagement() {
                   <p className="text-2xl font-bold text-gray-900">{category.productCount}</p>
                   <p className="text-sm text-gray-500">Products</p>
                 </div>
-                <div className="w-12 h-12 rounded-full flex items-center justify-center" style={{ backgroundColor: `${category.color}20` }}>
-                  <Package className="w-6 h-6" style={{ color: category.color }} />
+                <div className="w-12 h-12 rounded-full flex items-center justify-center" style={{ backgroundColor: `${style.color}20` }}>
+                  <Package className="w-6 h-6" style={{ color: style.color }} />
                 </div>
               </div>
               <Separator className="my-4" />
@@ -321,7 +306,8 @@ export default function AdminCategoryManagement() {
               </div>
             </CardContent>
           </Card>
-        ))}
+          );
+        })}
       </div>
 
       {filteredCategories.length === 0 && (
@@ -366,34 +352,6 @@ export default function AdminCategoryManagement() {
                 value={formData.slug}
                 onChange={(e) => setFormData({...formData, slug: e.target.value})}
               />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="edit-cat-icon">Icon (Emoji)</Label>
-              <Input 
-                id="edit-cat-icon" 
-                placeholder="🥬" 
-                maxLength={2} 
-                value={formData.icon}
-                onChange={(e) => setFormData({...formData, icon: e.target.value})}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="edit-cat-color">Brand Color</Label>
-              <div className="flex gap-2">
-                <Input 
-                  id="edit-cat-color" 
-                  type="color" 
-                  value={formData.color} 
-                  className="w-20"
-                  onChange={(e) => setFormData({...formData, color: e.target.value})}
-                />
-                <Input 
-                  placeholder="#2D5A27" 
-                  className="flex-1" 
-                  value={formData.color}
-                  onChange={(e) => setFormData({...formData, color: e.target.value})}
-                />
-              </div>
             </div>
             <div className="space-y-2">
               <Label htmlFor="edit-cat-description">Description</Label>

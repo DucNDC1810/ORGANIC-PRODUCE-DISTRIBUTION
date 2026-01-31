@@ -7,8 +7,6 @@ export interface Category {
   name: string;
   slug: string;
   description?: string;
-  icon?: string;
-  color?: string;
   image?: string;
   parentCategory?: {
     _id: string;
@@ -70,8 +68,6 @@ export interface CreateCategoryData {
   name: string;
   slug?: string;
   description?: string;
-  icon?: string;
-  color?: string;
   image?: string;
   parentCategory?: string | null;
   isActive?: boolean;

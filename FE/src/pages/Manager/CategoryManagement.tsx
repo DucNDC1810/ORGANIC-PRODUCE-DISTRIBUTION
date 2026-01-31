@@ -20,20 +20,39 @@ import { Badge } from '../../components/ui/badge';
 import { useCategories } from '../../hooks/useCategories';
 import { Category, CreateCategoryData, UpdateCategoryData } from '../../services/categoryService';
 
+// Default icon and color mappings based on category slug
+const CATEGORY_STYLES: Record<string, { icon: string; color: string }> = {
+  vegetables: { icon: '🥬', color: '#2D5A27' },
+  fruits: { icon: '🍎', color: '#E53935' },
+  herbs: { icon: '🌿', color: '#43A047' },
+  mushrooms: { icon: '🍄', color: '#8D6E63' },
+  'dried-seafood': { icon: '🦐', color: '#0288D1' },
+  dairy: { icon: '🥛', color: '#FDD835' },
+  meat: { icon: '🥩', color: '#D32F2F' },
+  seafood: { icon: '🐟', color: '#0097A7' },
+  grains: { icon: '🌾', color: '#FFA000' },
+  beverages: { icon: '🍹', color: '#7B1FA2' },
+  snacks: { icon: '🍪', color: '#FF7043' },
+  organic: { icon: '🌱', color: '#66BB6A' },
+};
+
+const DEFAULT_STYLE = { icon: '📦', color: '#2D5A27' };
+
+// Helper function to get category style
+const getCategoryStyle = (slug: string) => {
+  return CATEGORY_STYLES[slug] || DEFAULT_STYLE;
+};
+
 // Form state type
 interface CategoryFormData {
   name: string;
   slug: string;
-  icon: string;
-  color: string;
   description: string;
 }
 
 const emptyFormData: CategoryFormData = {
   name: '',
   slug: '',
-  icon: '',
-  color: '#2D5A27',
   description: '',
 };
 
@@ -94,8 +113,6 @@ export default function ManagerCategoryManagement() {
     return {
       name: category.name,
       slug: category.slug,
-      icon: category.icon || '',
-      color: category.color || '#2D5A27',
       description: category.description || '',
     };
   };
@@ -105,8 +122,6 @@ export default function ManagerCategoryManagement() {
     return {
       name: formData.name,
       slug: formData.slug || generateSlug(formData.name),
-      icon: formData.icon || '📦',
-      color: formData.color,
       description: formData.description || undefined,
     };
   };
@@ -115,8 +130,6 @@ export default function ManagerCategoryManagement() {
     return {
       name: formData.name,
       slug: formData.slug || generateSlug(formData.name),
-      icon: formData.icon || undefined,
-      color: formData.color,
       description: formData.description || undefined,
     };
   };
@@ -245,34 +258,6 @@ export default function ManagerCategoryManagement() {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="cat-icon">Icon (Emoji)</Label>
-                <Input 
-                  id="cat-icon" 
-                  placeholder="🥬" 
-                  maxLength={2} 
-                  value={formData.icon}
-                  onChange={(e) => setFormData({...formData, icon: e.target.value})}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="cat-color">Brand Color</Label>
-                <div className="flex gap-2">
-                  <Input 
-                    id="cat-color" 
-                    type="color" 
-                    value={formData.color} 
-                    className="w-20"
-                    onChange={(e) => setFormData({...formData, color: e.target.value})}
-                  />
-                  <Input 
-                    placeholder="#2D5A27" 
-                    className="flex-1" 
-                    value={formData.color}
-                    onChange={(e) => setFormData({...formData, color: e.target.value})}
-                  />
-                </div>
-              </div>
-              <div className="space-y-2">
                 <Label htmlFor="cat-description">Description</Label>
                 <Input 
                   id="cat-description" 
@@ -333,13 +318,15 @@ export default function ManagerCategoryManagement() {
       )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {categories.map((category) => (
-          <Card key={category._id} className="shadow-sm hover:shadow-md transition-all border-l-4" style={{ borderLeftColor: category.color || '#2D5A27' }}>
+        {categories.map((category) => {
+          const style = getCategoryStyle(category.slug);
+          return (
+          <Card key={category._id} className="shadow-sm hover:shadow-md transition-all border-l-4" style={{ borderLeftColor: style.color }}>
             <CardHeader>
               <div className="flex items-start justify-between">
                 <div className="flex items-center gap-3">
-                  <div className="w-14 h-14 rounded-xl flex items-center justify-center text-3xl shadow-sm" style={{ backgroundColor: `${category.color || '#2D5A27'}15` }}>
-                    {category.icon || '📦'}
+                  <div className="w-14 h-14 rounded-xl flex items-center justify-center text-3xl shadow-sm" style={{ backgroundColor: `${style.color}15` }}>
+                    {style.icon}
                   </div>
                   <div>
                     <CardTitle className="text-lg flex items-center gap-2">
@@ -365,8 +352,8 @@ export default function ManagerCategoryManagement() {
                   <p className="text-2xl font-bold text-gray-900">{category.productCount}</p>
                   <p className="text-sm text-gray-500">Products</p>
                 </div>
-                <div className="w-12 h-12 rounded-full flex items-center justify-center" style={{ backgroundColor: `${category.color || '#2D5A27'}20` }}>
-                  <Package className="w-6 h-6" style={{ color: category.color || '#2D5A27' }} />
+                <div className="w-12 h-12 rounded-full flex items-center justify-center" style={{ backgroundColor: `${style.color}20` }}>
+                  <Package className="w-6 h-6" style={{ color: style.color }} />
                 </div>
               </div>
               <Separator className="my-4" />
@@ -391,7 +378,8 @@ export default function ManagerCategoryManagement() {
               </div>
             </CardContent>
           </Card>
-        ))}
+          );
+        })}
       </div>
 
       {!loading && categories.length === 0 && (
@@ -437,34 +425,6 @@ export default function ManagerCategoryManagement() {
                 value={formData.slug}
                 onChange={(e) => setFormData({...formData, slug: e.target.value})}
               />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="edit-cat-icon">Icon (Emoji)</Label>
-              <Input 
-                id="edit-cat-icon" 
-                placeholder="🥬" 
-                maxLength={2} 
-                value={formData.icon}
-                onChange={(e) => setFormData({...formData, icon: e.target.value})}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="edit-cat-color">Brand Color</Label>
-              <div className="flex gap-2">
-                <Input 
-                  id="edit-cat-color" 
-                  type="color" 
-                  value={formData.color} 
-                  className="w-20"
-                  onChange={(e) => setFormData({...formData, color: e.target.value})}
-                />
-                <Input 
-                  placeholder="#2D5A27" 
-                  className="flex-1" 
-                  value={formData.color}
-                  onChange={(e) => setFormData({...formData, color: e.target.value})}
-                />
-              </div>
             </div>
             <div className="space-y-2">
               <Label htmlFor="edit-cat-description">Description</Label>
