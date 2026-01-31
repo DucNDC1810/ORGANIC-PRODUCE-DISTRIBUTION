@@ -100,6 +100,7 @@ export default function ManagerProductManagement() {
     products,
     loading,
     error,
+    pagination,
     selectedProduct,
     fetchProducts,
     createProduct,
@@ -622,7 +623,18 @@ export default function ManagerProductManagement() {
           {/* REFRESH BUTTON */}
           <Button 
             variant="outline" 
-            onClick={() => fetchProducts()}
+            onClick={() => {
+              const params: any = { page: currentPage, limit: 10 };
+              if (searchQuery) params.search = searchQuery;
+              if (categoryFilter !== 'all') params.category = categoryFilter;
+              if (statusFilter !== 'all') {
+                if (statusFilter === 'active') params.isActive = true;
+                else if (statusFilter === 'inactive') params.isActive = false;
+                else if (statusFilter === 'out_of_stock') params.stockStatus = 'out_of_stock';
+                else if (statusFilter === 'low_stock') params.stockStatus = 'low_stock';
+              }
+              fetchProducts(params);
+            }}
             disabled={loading}
             className="gap-2"
           >
@@ -1079,7 +1091,8 @@ export default function ManagerProductManagement() {
       {products.length > 0 && (
         <div className="flex items-center justify-between text-sm text-muted-foreground">
           <span>
-            Showing {filteredProducts.length} / {products.length} products
+            Showing {filteredProducts.length} of {pagination?.totalProducts || products.length} products
+            {pagination && ` (Page ${pagination.currentPage} of ${pagination.totalPages})`}
           </span>
           <div className="flex gap-4">
             <span className="flex items-center gap-1">
@@ -1095,6 +1108,101 @@ export default function ManagerProductManagement() {
               Out of Stock: {products.filter(p => p.stock === 0).length}
             </span>
           </div>
+        </div>
+      )}
+
+      {/* Pagination */}
+      {pagination && pagination.totalPages > 1 && (
+        <div className="flex items-center justify-center gap-2 mt-4">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setCurrentPage(1)}
+            disabled={!pagination.hasPrev}
+            className="hidden sm:flex"
+          >
+            First
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+            disabled={!pagination.hasPrev}
+          >
+            Previous
+          </Button>
+          
+          {/* Page Numbers */}
+          <div className="flex items-center gap-1">
+            {(() => {
+              const pages: (number | string)[] = [];
+              const totalPages = pagination.totalPages;
+              const current = pagination.currentPage;
+              
+              if (totalPages <= 7) {
+                // Show all pages if 7 or less
+                for (let i = 1; i <= totalPages; i++) {
+                  pages.push(i);
+                }
+              } else {
+                // Always show first page
+                pages.push(1);
+                
+                if (current > 3) {
+                  pages.push('...');
+                }
+                
+                // Show pages around current
+                const start = Math.max(2, current - 1);
+                const end = Math.min(totalPages - 1, current + 1);
+                
+                for (let i = start; i <= end; i++) {
+                  pages.push(i);
+                }
+                
+                if (current < totalPages - 2) {
+                  pages.push('...');
+                }
+                
+                // Always show last page
+                pages.push(totalPages);
+              }
+              
+              return pages.map((page, index) => (
+                typeof page === 'number' ? (
+                  <Button
+                    key={index}
+                    variant={page === current ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => setCurrentPage(page)}
+                    className={page === current ? 'bg-green-600 hover:bg-green-700' : ''}
+                  >
+                    {page}
+                  </Button>
+                ) : (
+                  <span key={index} className="px-2 text-muted-foreground">...</span>
+                )
+              ));
+            })()}
+          </div>
+          
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setCurrentPage(prev => Math.min(pagination.totalPages, prev + 1))}
+            disabled={!pagination.hasNext}
+          >
+            Next
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setCurrentPage(pagination.totalPages)}
+            disabled={!pagination.hasNext}
+            className="hidden sm:flex"
+          >
+            Last
+          </Button>
         </div>
       )}
     </div>
