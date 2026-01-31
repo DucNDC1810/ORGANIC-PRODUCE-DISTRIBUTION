@@ -36,9 +36,16 @@ export default function ProductDetailPage() {
 
   useEffect(() => {
     if (id) {
+      // Scroll to top with smooth animation when product changes
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      
       fetchProductById(id);
       // Fetch related products
       fetchProducts({ limit: 8 });
+      
+      // Reset states when switching products
+      setSelectedImageIndex(0);
+      setQuantity(1);
     }
   }, [id, fetchProductById, fetchProducts]);
 
