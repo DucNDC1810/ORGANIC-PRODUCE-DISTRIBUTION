@@ -3,7 +3,6 @@ import { Search, Filter, ChevronDown, X } from 'lucide-react';
 import { useSearchParams } from 'react-router-dom';
 import Header from '../../components/Header';
 import ProductCard from '../../components/ProductCard';
-import MiniCart from '../../components/MiniCart';
 import { useProducts } from '../../hooks/useProducts';
 import { Input } from '../../components/ui/input';
 import { Button } from '../../components/ui/button';
@@ -142,7 +141,6 @@ export default function ProductsPage() {
   return (
     <div className="min-h-screen bg-gray-50">
       <Header />
-      <MiniCart />
 
       {/* Hero Section */}
       <section className="bg-gradient-to-r from-emerald-600 to-green-500 py-12">

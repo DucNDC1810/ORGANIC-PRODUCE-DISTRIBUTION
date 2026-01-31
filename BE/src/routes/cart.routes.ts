@@ -20,7 +20,4 @@ router.delete('/item/:productId', authenticate as any, cartController.removeFrom
 // @ts-ignore - Type compatibility issue with AuthRequest
 router.delete('/clear', authenticate as any, cartController.clearCart as RequestHandler);
 
-// @ts-ignore - Type compatibility issue with AuthRequest
-router.post('/sync', authenticate as any, cartController.syncCart as RequestHandler);
-
 export default router;

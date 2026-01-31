@@ -16,7 +16,6 @@ import {
   Leaf
 } from 'lucide-react';
 import Header from '../../components/Header';
-import MiniCart from '../../components/MiniCart';
 import ProductCard from '../../components/ProductCard';
 import { useProducts } from '../../hooks/useProducts';
 import { useCart } from '../../context/CartContext';
@@ -111,7 +110,6 @@ export default function ProductDetailPage() {
   return (
     <div className="min-h-screen bg-gray-50">
       <Header />
-      <MiniCart />
 
       {/* Breadcrumb */}
       <div className="bg-white border-b">

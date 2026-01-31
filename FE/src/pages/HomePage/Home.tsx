@@ -2,7 +2,6 @@ import { Leaf, Truck, Shield, Clock, ChevronLeft, ChevronRight } from 'lucide-re
 import { Link } from 'react-router-dom';
 import { useState, useEffect } from 'react';
 import ProductCard from '../../components/ProductCard';
-import MiniCart from '../../components/MiniCart';
 import Header from '../../components/Header';
 import { useProducts } from '../../hooks/useProducts';
 
@@ -336,9 +335,6 @@ export default function HomePage() {
           </div>
         </div>
       </footer>
-
-      {/* Mini Cart */}
-      <MiniCart />
     </div>
   );
 }

@@ -3,6 +3,7 @@ import { Toaster } from 'sonner';
 import { CartProvider } from './context/CartContext';
 import { AuthProvider } from './context/AuthContext';
 import { ProtectedRoute, CustomerRoute, AdminRoute, ManagerRoute } from './components/ProtectedRoute';
+import MiniCart from './components/MiniCart';
 import HomePage from './pages/HomePage/Home';
 import CartPage from './pages/HomePage/CartPage';
 import CheckoutPage from './pages/HomePage/CheckoutPage';
@@ -29,6 +30,7 @@ export default function App() {
       <CartProvider>
         <BrowserRouter>
           <Toaster position="top-right" richColors />
+          <MiniCart />
           <Routes>
             {/* Public routes */}
             <Route path="/" element={<HomePage />} />

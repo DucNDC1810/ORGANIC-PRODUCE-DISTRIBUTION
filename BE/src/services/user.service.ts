@@ -405,7 +405,15 @@ export class UserService {
         name: user.name,
         username: user.username,
         role: user.role,
-        isEmailVerified: user.isEmailVerified
+        phone: user.phone,
+        address: user.address,
+        avatar: user.avatar,
+        dateOfBirth: user.dateOfBirth,
+        gender: user.gender,
+        isEmailVerified: user.isEmailVerified,
+        isActive: user.isActive,
+        createdAt: user.createdAt,
+        updatedAt: user.updatedAt
       },
       token
     };
@@ -452,7 +460,15 @@ export class UserService {
         name: user.name,
         username: user.username,
         role: user.role,
-        isEmailVerified: user.isEmailVerified
+        phone: user.phone,
+        address: user.address,
+        avatar: user.avatar,
+        dateOfBirth: user.dateOfBirth,
+        gender: user.gender,
+        isEmailVerified: user.isEmailVerified,
+        isActive: user.isActive,
+        createdAt: user.createdAt,
+        updatedAt: user.updatedAt
       },
       token
     };
@@ -578,7 +594,15 @@ export class UserService {
         name: user.name,
         username: user.username,
         role: user.role,
-        isEmailVerified: user.isEmailVerified
+        phone: user.phone,
+        address: user.address,
+        avatar: user.avatar,
+        dateOfBirth: user.dateOfBirth,
+        gender: user.gender,
+        isEmailVerified: user.isEmailVerified,
+        isActive: user.isActive,
+        createdAt: user.createdAt,
+        updatedAt: user.updatedAt
       },
       token
     };

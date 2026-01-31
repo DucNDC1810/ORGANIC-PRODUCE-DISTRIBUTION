@@ -161,39 +161,4 @@ export class CartController {
       next(error);
     }
   };
-
-  /**
-   * Sync local cart with database (when user logs in)
-   */
-  syncCart = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
-    try {
-      if (!req.user?.id) {
-        res.status(401).json({
-          success: false,
-          message: 'User not authenticated'
-        });
-        return;
-      }
-
-      const { items } = req.body;
-
-      if (!Array.isArray(items)) {
-        res.status(400).json({
-          success: false,
-          message: 'Items must be an array'
-        });
-        return;
-      }
-
-      const cart = await this.cartService.syncCart(req.user.id, items);
-
-      res.status(200).json({
-        success: true,
-        message: 'Cart synced',
-        data: cart
-      });
-    } catch (error) {
-      next(error);
-    }
-  };
 }
