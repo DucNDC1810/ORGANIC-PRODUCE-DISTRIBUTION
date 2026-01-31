@@ -5,9 +5,7 @@ import {
   Users,
   LayoutDashboard,
   BarChart3,
-  ChevronRight,
   LucideIcon,
-  Leaf,
   LogOut,
   Settings,
   User,
@@ -49,7 +47,6 @@ interface MenuItemButtonProps {
 // CONSTANTS
 // ============================================
 
-const SIDEBAR_WIDTH = 288; // 72 * 4px = 288px (w-72)
 const MOBILE_BREAKPOINT = 1024; // lg breakpoint
 
 const menuItems: MenuItem[] = [

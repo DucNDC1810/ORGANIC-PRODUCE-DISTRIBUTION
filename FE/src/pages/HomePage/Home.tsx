@@ -6,10 +6,10 @@ import MiniCart from '../../components/MiniCart';
 import Header from '../../components/Header';
 import { useProducts } from '../../hooks/useProducts';
 
-// Import banner images
-import banner1 from '../../../img/banner.png';
-import banner2 from '../../../img/Banner2.png';
-import banner3 from '../../../img/Broccoli.png';
+// External banner image URLs (replace with your actual CDN/hosting URLs)
+const banner1 = 'https://res.cloudinary.com/dbtjki0vq/image/upload/v1769863222/banner_oywsgi.png';
+const banner2 = 'https://res.cloudinary.com/dbtjki0vq/image/upload/v1769863219/Broccoli_qewlkz.png';
+const banner3 = 'https://res.cloudinary.com/dbtjki0vq/image/upload/v1769863218/Banner2_tlwsht.png';
 
 const banners = [
   {
