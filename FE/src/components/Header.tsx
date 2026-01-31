@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Search, ShoppingCart, Leaf, Apple, Carrot, Beef, Nut, BookOpen, Lightbulb, Gift, User, LogOut, Settings } from 'lucide-react';
+import { Search, ShoppingCart, Leaf, Apple, Carrot, Beef, Fish, Wheat, Milk, Cookie, Coffee, Nut, BookOpen, Lightbulb, Gift, User, LogOut, Settings } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
@@ -20,10 +20,16 @@ interface DropdownItem {
 }
 
 const productsDropdown: DropdownItem[] = [
-  { icon: <Carrot className="w-5 h-5" />, label: 'Fresh Vegetables', href: '/products/vegetables' },
-  { icon: <Apple className="w-5 h-5" />, label: 'Seasonal Fruits', href: '/products/fruits' },
-  { icon: <Beef className="w-5 h-5" />, label: 'Meat & Seafood', href: '/products/meat-seafood' },
-  { icon: <Nut className="w-5 h-5" />, label: 'Nuts & Pantry', href: '/products/nuts-pantry' },
+  { icon: <Carrot className="w-5 h-5" />, label: 'Vegetables', href: '/products?category=vegetables' },
+  { icon: <Apple className="w-5 h-5" />, label: 'Fruits', href: '/products?category=fruits' },
+  { icon: <Wheat className="w-5 h-5" />, label: 'Grains', href: '/products?category=grains' },
+  { icon: <Milk className="w-5 h-5" />, label: 'Dairy', href: '/products?category=dairy' },
+  { icon: <Beef className="w-5 h-5" />, label: 'Meat', href: '/products?category=meat' },
+  { icon: <Fish className="w-5 h-5" />, label: 'Seafood', href: '/products?category=seafood' },
+  { icon: <Leaf className="w-5 h-5" />, label: 'Herbs', href: '/products?category=herbs' },
+  { icon: <Nut className="w-5 h-5" />, label: 'Nuts', href: '/products?category=nuts' },
+  { icon: <Coffee className="w-5 h-5" />, label: 'Beverages', href: '/products?category=beverages' },
+  { icon: <Cookie className="w-5 h-5" />, label: 'Processed Foods', href: '/products?category=processed' },
 ];
 
 const blogsDropdown: DropdownItem[] = [
@@ -107,9 +113,9 @@ export default function Header() {
               onMouseEnter={() => setProductsOpen(true)}
               onMouseLeave={() => setProductsOpen(false)}
             >
-              <button className="text-foreground hover:text-emerald-600 transition-colors font-medium">
+              <Link to="/products" className="text-foreground hover:text-emerald-600 transition-colors font-medium">
                 Products
-              </button>
+              </Link>
               <DropdownMenu items={productsDropdown} isOpen={productsOpen} />
             </div>
 

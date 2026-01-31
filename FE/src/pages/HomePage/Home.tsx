@@ -46,12 +46,15 @@ export default function HomePage() {
   // Use products hook to fetch real data
   const { products, loading, error, fetchProducts } = useProducts();
   
+  // Filter only featured products for display
+  const featuredProducts = products.filter(product => product.isFeatured);
+  
   const productsPerView = 5;
-  const maxIndex = Math.max(0, products.length - productsPerView);
+  const maxIndex = Math.max(0, featuredProducts.length - productsPerView);
 
   useEffect(() => {
-    // Fetch products when component mounts
-    fetchProducts();
+    // Fetch featured products when component mounts
+    fetchProducts({ isFeatured: true });
   }, [fetchProducts]);
 
   useEffect(() => {
@@ -162,16 +165,16 @@ export default function HomePage() {
                 <div className="text-red-500 text-center">
                   <p>Lỗi khi tải sản phẩm: {error}</p>
                   <button 
-                    onClick={() => fetchProducts()} 
+                    onClick={() => fetchProducts({ isFeatured: true })} 
                     className="mt-2 px-4 py-2 bg-emerald-500 text-white rounded hover:bg-emerald-600 transition-colors"
                   >
                     Thử lại
                   </button>
                 </div>
               </div>
-            ) : products.length === 0 ? (
+            ) : featuredProducts.length === 0 ? (
               <div className="flex justify-center py-12">
-                <p className="text-gray-500">Không có sản phẩm nào</p>
+                <p className="text-gray-500">Không có sản phẩm nổi bật nào</p>
               </div>
             ) : (
               <>
@@ -190,7 +193,7 @@ export default function HomePage() {
                     className="flex gap-4 transition-transform duration-500 ease-out"
                     style={{ transform: `translateX(-${productScrollIndex * (208 + 16)}px)` }}
                   >
-                    {products.map((product) => (
+                    {featuredProducts.map((product) => (
                       <div key={product._id} className="w-52 flex-shrink-0">
                         <ProductCard product={product} />
                       </div>
@@ -212,9 +215,9 @@ export default function HomePage() {
           
           <div className="text-center mt-8">
             <div className="w-full h-px bg-gradient-to-r from-transparent via-gray-300 to-transparent mb-8"></div>
-            <button className="px-8 py-3 bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-lg font-medium hover:from-green-600 hover:to-emerald-700 hover:shadow-lg transition-all duration-300">
+            <Link to="/products" className="inline-block px-8 py-3 bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-lg font-medium hover:from-green-600 hover:to-emerald-700 hover:shadow-lg transition-all duration-300">
               View All Products →
-            </button>
+            </Link>
           </div>
         </div>
       </section>
