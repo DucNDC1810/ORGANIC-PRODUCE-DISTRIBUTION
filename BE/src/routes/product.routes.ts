@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { ProductController } from '../controllers/product.controller';
+import reviewController from '../controllers/review.controller';
 import { authenticate } from '../middlewares/auth.middleware';
 import { checkPermission, checkRole } from '../middlewares/permission.middleware';
 import { Permission, UserRole } from '../constants/roles';
@@ -29,6 +30,20 @@ router.get('/farmer/:farmerId', productController.getProductsByFarmer as any);
 
 // Get product by SKU
 router.get('/sku/:sku', productController.getProductBySku as any);
+
+// ===== REVIEW ROUTES =====
+
+// Get product reviews (public)
+router.get('/:productId/reviews', reviewController.getProductReviews as any);
+
+// Get product rating stats (public)
+router.get('/:productId/reviews/stats', reviewController.getProductRatingStats as any);
+
+// Get my review for a product (protected)
+router.get('/:productId/reviews/my', authenticate as any, reviewController.getMyProductReview as any);
+
+// Create review for a product (protected)
+router.post('/:productId/reviews', authenticate as any, reviewController.createReview as any);
 
 // Get product by ID (public)
 router.get('/:id', productController.getProductById as any);
