@@ -24,12 +24,6 @@ const productsDropdown: DropdownItem[] = [
   { icon: <Apple className="w-5 h-5" />, label: 'Fruits', href: '/products?category=fruits' },
   { icon: <Wheat className="w-5 h-5" />, label: 'Grains', href: '/products?category=grains' },
   { icon: <Milk className="w-5 h-5" />, label: 'Dairy', href: '/products?category=dairy' },
-  { icon: <Beef className="w-5 h-5" />, label: 'Meat', href: '/products?category=meat' },
-  { icon: <Fish className="w-5 h-5" />, label: 'Seafood', href: '/products?category=seafood' },
-  { icon: <Leaf className="w-5 h-5" />, label: 'Herbs', href: '/products?category=herbs' },
-  { icon: <Nut className="w-5 h-5" />, label: 'Nuts', href: '/products?category=nuts' },
-  { icon: <Coffee className="w-5 h-5" />, label: 'Beverages', href: '/products?category=beverages' },
-  { icon: <Cookie className="w-5 h-5" />, label: 'Processed Foods', href: '/products?category=processed' },
 ];
 
 const blogsDropdown: DropdownItem[] = [
