@@ -58,21 +58,31 @@ export default function CartPage() {
                   >
                     <div className="flex gap-6">
                       {/* Product Image */}
-                      <div className="w-32 h-32 bg-muted rounded-xl overflow-hidden flex-shrink-0">
+                      <Link 
+                        to={`/product/${item.id}`} 
+                        className="w-32 h-32 bg-muted rounded-xl overflow-hidden flex-shrink-0 block relative z-10"
+                        onClick={(e) => e.stopPropagation()}
+                      >
                         <ImageWithFallback
                           src={item.image}
                           alt={item.name}
-                          className="w-full h-full object-cover"
+                          className="w-full h-full object-cover hover:scale-105 transition-transform"
                         />
-                      </div>
+                      </Link>
 
                       {/* Product Info */}
                       <div className="flex-1 min-w-0">
                         <div className="flex items-start justify-between mb-3">
                           <div>
-                            <h3 className="text-lg font-semibold text-foreground mb-1">
-                              {item.name}
-                            </h3>
+                            <Link 
+                              to={`/product/${item.id}`} 
+                              className="block relative z-10"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <h3 className="text-lg font-semibold text-foreground mb-1 hover:text-primary transition-colors cursor-pointer">
+                                {item.name}
+                              </h3>
+                            </Link>
                             <p className="text-sm text-muted-foreground">{item.description}</p>
                             <div className="mt-2 inline-block px-3 py-1 bg-primary/10 rounded-full text-xs font-medium text-primary">
                               {item.category}

@@ -75,19 +75,29 @@ export default function MiniCart() {
                       className="flex gap-4 p-4 bg-muted rounded-xl"
                     >
                       {/* Product Image */}
-                      <div className="w-20 h-20 bg-white rounded-lg overflow-hidden flex-shrink-0">
+                      <Link 
+                        to={`/product/${item.id}`}
+                        onClick={closeCart}
+                        className="w-20 h-20 bg-white rounded-lg overflow-hidden flex-shrink-0 block relative z-10"
+                      >
                         <ImageWithFallback
                           src={item.image}
                           alt={item.name}
-                          className="w-full h-full object-cover"
+                          className="w-full h-full object-cover hover:scale-105 transition-transform"
                         />
-                      </div>
+                      </Link>
 
                       {/* Product Info */}
                       <div className="flex-1 min-w-0">
                         <div className="flex items-start justify-between mb-2">
                           <div className="flex-1">
-                            <h4 className="font-semibold text-foreground truncate">{item.name}</h4>
+                            <Link 
+                              to={`/product/${item.id}`}
+                              onClick={closeCart}
+                              className="block relative z-10"
+                            >
+                              <h4 className="font-semibold text-foreground truncate hover:text-primary transition-colors cursor-pointer">{item.name}</h4>
+                            </Link>
                             <p className="text-sm text-muted-foreground">{item.category}</p>
                           </div>
                           <button
