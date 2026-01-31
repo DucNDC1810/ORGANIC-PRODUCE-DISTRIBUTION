@@ -240,5 +240,91 @@ productSchema.pre('save', function(next) {
   next();
 });
 
+// ===== AUTO UPDATE CATEGORY productCount =====
+
+// Helper function to update category productCount
+const updateCategoryProductCount = async (categorySlug: string, increment: number) => {
+  if (!categorySlug) return;
+  
+  try {
+    // Import Category model dynamically to avoid circular dependency
+    const Category = mongoose.model('Category');
+    await Category.findOneAndUpdate(
+      { slug: categorySlug },
+      { $inc: { productCount: increment } }
+    );
+    console.log(`Updated productCount for category "${categorySlug}" by ${increment}`);
+  } catch (error) {
+    console.error(`Error updating productCount for category "${categorySlug}":`, error);
+  }
+};
+
+// After creating a new product → increment category productCount
+productSchema.post('save', async function(doc, next) {
+  // Only increment if this is a new document (not an update)
+  if (doc.isNew !== false) {
+    await updateCategoryProductCount(doc.category, 1);
+  }
+  next();
+});
+
+// Store original category before update (for findOneAndUpdate operations)
+productSchema.pre('findOneAndUpdate', async function(next) {
+  const docToUpdate = await this.model.findOne(this.getQuery());
+  if (docToUpdate) {
+    (this as any)._originalCategory = docToUpdate.category;
+  }
+  next();
+});
+
+// After updating a product → check if category changed
+productSchema.post('findOneAndUpdate', async function(doc) {
+  if (!doc) return;
+  
+  const originalCategory = (this as any)._originalCategory;
+  const newCategory = doc.category;
+  
+  // If category changed, update both old and new category counts
+  if (originalCategory && originalCategory !== newCategory) {
+    await updateCategoryProductCount(originalCategory, -1); // Decrement old
+    await updateCategoryProductCount(newCategory, 1);       // Increment new
+    console.log(`Product moved from "${originalCategory}" to "${newCategory}"`);
+  }
+});
+
+// After deleting a product → decrement category productCount
+productSchema.post('findOneAndDelete', async function(doc) {
+  if (doc) {
+    await updateCategoryProductCount(doc.category, -1);
+  }
+});
+
+// For deleteOne operations
+productSchema.post('deleteOne', { document: true, query: false }, async function() {
+  await updateCategoryProductCount(this.category, -1);
+});
+
+// For deleteMany operations - need to count affected documents first
+productSchema.pre('deleteMany', async function(next) {
+  const docs = await this.model.find(this.getQuery()).select('category');
+  const categoryCounts: { [key: string]: number } = {};
+  
+  docs.forEach(doc => {
+    categoryCounts[doc.category] = (categoryCounts[doc.category] || 0) + 1;
+  });
+  
+  (this as any)._categoryCounts = categoryCounts;
+  next();
+});
+
+productSchema.post('deleteMany', async function() {
+  const categoryCounts = (this as any)._categoryCounts;
+  if (categoryCounts) {
+    for (const [category, count] of Object.entries(categoryCounts)) {
+      await updateCategoryProductCount(category, -(count as number));
+    }
+  }
+});
+
 export const Product = mongoose.model<IProduct>('Product', productSchema);
 export default Product;

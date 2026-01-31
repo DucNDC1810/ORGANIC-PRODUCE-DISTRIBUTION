@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { 
   Package, 
   Plus,
@@ -6,6 +6,8 @@ import {
   Trash2,
   MoreVertical,
   Search,
+  RefreshCw,
+  Loader2,
 } from 'lucide-react';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
@@ -14,49 +16,60 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../components/ui/card';
 import { Separator } from '../../components/ui/separator';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '../../components/ui/alert-dialog';
+import { Badge } from '../../components/ui/badge';
+import { useCategories } from '../../hooks/useCategories';
+import { Category, CreateCategoryData, UpdateCategoryData } from '../../services/categoryService';
 
-// Type definition
-interface Category {
-  id: string;
+// Form state type
+interface CategoryFormData {
   name: string;
   slug: string;
-  productCount: number;
   icon: string;
   color: string;
-  description?: string;
+  description: string;
 }
 
-// Initial mock data with "Đồ khô dưới biển" category
-const initialCategories: Category[] = [
-  { id: '1', name: 'Vegetables', slug: 'vegetables', productCount: 45, icon: '🥬', color: '#2D5A27', description: 'Fresh organic vegetables' },
-  { id: '2', name: 'Fruits', slug: 'fruits', productCount: 32, icon: '🍎', color: '#ff6b6b', description: 'Fresh organic fruits' },
-  { id: '3', name: 'Herbs', slug: 'herbs', productCount: 18, icon: '🌿', color: '#51cf66', description: 'Fresh herbs and spices' },
-  { id: '4', name: 'Mushrooms', slug: 'mushrooms', productCount: 12, icon: '🍄', color: '#ffd43b', description: 'Organic mushrooms' },
-  { id: '5', name: 'Dried Seafood', slug: 'dried-seafood', productCount: 25, icon: '🦐', color: '#0ea5e9', description: 'Dried seafood such as dried shrimp, dried fish, dried squid, seaweed' },
-];
+const emptyFormData: CategoryFormData = {
+  name: '',
+  slug: '',
+  icon: '',
+  color: '#2D5A27',
+  description: '',
+};
 
 export default function ManagerCategoryManagement() {
-  const [categories, setCategories] = useState<Category[]>(initialCategories);
+  // Use categories hook for API calls
+  const {
+    categories,
+    loading,
+    pagination,
+    fetchCategories,
+    createCategory,
+    updateCategory,
+    deleteCategory,
+    selectedCategory,
+    setSelectedCategory,
+  } = useCategories();
+
+  // Local state
   const [isAddCategoryOpen, setIsAddCategoryOpen] = useState(false);
   const [isEditCategoryOpen, setIsEditCategoryOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState<Category | null>(null);
-  
-  // Form state
-  const [formData, setFormData] = useState({
-    name: '',
-    slug: '',
-    icon: '',
-    color: '#2D5A27',
-    description: '',
-  });
+  const [formData, setFormData] = useState<CategoryFormData>(emptyFormData);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Filter categories based on search
-  const filteredCategories = categories.filter(cat => 
-    cat.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    cat.slug.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  // Fetch categories on mount and when search changes
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      fetchCategories({
+        search: searchTerm || undefined,
+        limit: 50, // Get more categories for grid view
+      });
+    }, 300); // Debounce search
+
+    return () => clearTimeout(timer);
+  }, [fetchCategories, searchTerm]);
 
   // Generate slug from name
   const generateSlug = (name: string) => {
@@ -72,67 +85,77 @@ export default function ManagerCategoryManagement() {
 
   // Reset form
   const resetForm = () => {
-    setFormData({
-      name: '',
-      slug: '',
-      icon: '',
-      color: '#2D5A27',
-      description: '',
-    });
+    setFormData(emptyFormData);
+    setSelectedCategory(null);
   };
 
-  // Handle Create
-  const handleCreate = () => {
-    if (!formData.name.trim()) return;
-    
-    const newCategory: Category = {
-      id: Date.now().toString(),
+  // Map category to form data
+  const mapCategoryToForm = (category: Category): CategoryFormData => {
+    return {
+      name: category.name,
+      slug: category.slug,
+      icon: category.icon || '',
+      color: category.color || '#2D5A27',
+      description: category.description || '',
+    };
+  };
+
+  // Map form data to API data
+  const mapFormToCreateData = (): CreateCategoryData => {
+    return {
       name: formData.name,
       slug: formData.slug || generateSlug(formData.name),
       icon: formData.icon || '📦',
       color: formData.color,
-      productCount: 0,
-      description: formData.description,
+      description: formData.description || undefined,
     };
+  };
+
+  const mapFormToUpdateData = (): UpdateCategoryData => {
+    return {
+      name: formData.name,
+      slug: formData.slug || generateSlug(formData.name),
+      icon: formData.icon || undefined,
+      color: formData.color,
+      description: formData.description || undefined,
+    };
+  };
+
+  // Handle Create
+  const handleCreate = async () => {
+    if (!formData.name.trim()) return;
     
-    setCategories([...categories, newCategory]);
-    setIsAddCategoryOpen(false);
-    resetForm();
+    setIsSubmitting(true);
+    const data = mapFormToCreateData();
+    const result = await createCategory(data);
+    setIsSubmitting(false);
+    
+    if (result) {
+      setIsAddCategoryOpen(false);
+      resetForm();
+    }
   };
 
   // Handle Edit - Open dialog
   const handleEditClick = (category: Category) => {
     setSelectedCategory(category);
-    setFormData({
-      name: category.name,
-      slug: category.slug,
-      icon: category.icon,
-      color: category.color,
-      description: category.description || '',
-    });
+    setFormData(mapCategoryToForm(category));
     setIsEditCategoryOpen(true);
   };
 
   // Handle Update
-  const handleUpdate = () => {
+  const handleUpdate = async () => {
     if (!selectedCategory || !formData.name.trim()) return;
     
-    setCategories(categories.map(cat => 
-      cat.id === selectedCategory.id 
-        ? {
-            ...cat,
-            name: formData.name,
-            slug: formData.slug || generateSlug(formData.name),
-            icon: formData.icon || cat.icon,
-            color: formData.color,
-            description: formData.description,
-          }
-        : cat
-    ));
+    setIsSubmitting(true);
+    const data = mapFormToUpdateData();
+    const result = await updateCategory(selectedCategory._id, data);
+    setIsSubmitting(false);
     
-    setIsEditCategoryOpen(false);
-    setSelectedCategory(null);
-    resetForm();
+    if (result) {
+      setIsEditCategoryOpen(false);
+      resetForm();
+    }
   };
 
   // Handle Delete - Open dialog
@@ -142,13 +165,30 @@ export default function ManagerCategoryManagement() {
   };
 
   // Handle Delete - Confirm
-  const handleDeleteConfirm = () => {
+  const handleDeleteConfirm = async () => {
     if (!selectedCategory) return;
     
-    setCategories(categories.filter(cat => cat.id !== selectedCategory.id));
-    setIsDeleteDialogOpen(false);
-    setSelectedCategory(null);
+    setIsSubmitting(true);
+    const hasProducts = selectedCategory.productCount > 0;
+    const success = await deleteCategory(selectedCategory._id, hasProducts);
+    setIsSubmitting(false);
+    
+    if (success) {
+      setIsDeleteDialogOpen(false);
+      setSelectedCategory(null);
+    }
   };
+
+  // Handle Refresh
+  const handleRefresh = () => {
+    fetchCategories({
+      search: searchTerm || undefined,
+      limit: 50,
+    });
+  };
+
+  // Calculate totals
+  const totalProducts = categories.reduce((sum, cat) => sum + cat.productCount, 0);
 
   return (
     <div className="space-y-6">
@@ -157,16 +197,25 @@ export default function ManagerCategoryManagement() {
           <h2 className="text-3xl font-bold text-foreground">Category Management</h2>
           <p className="text-muted-foreground mt-1">Organize your product categories</p>
         </div>
-        <Dialog open={isAddCategoryOpen} onOpenChange={(open) => {
-          setIsAddCategoryOpen(open);
-          if (!open) resetForm();
-        }}>
-          <DialogTrigger asChild>
-            <Button className="bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white shadow-md">
-              <Plus className="w-4 h-4 mr-2" />
-              Add Category
-            </Button>
-          </DialogTrigger>
+        <div className="flex items-center gap-2">
+          <Button 
+            variant="outline" 
+            size="icon"
+            onClick={handleRefresh}
+            disabled={loading}
+          >
+            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+          </Button>
+          <Dialog open={isAddCategoryOpen} onOpenChange={(open) => {
+            setIsAddCategoryOpen(open);
+            if (!open) resetForm();
+          }}>
+            <DialogTrigger asChild>
+              <Button className="bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white shadow-md">
+                <Plus className="w-4 h-4 mr-2" />
+                Add Category
+              </Button>
+            </DialogTrigger>
           <DialogContent>
             <DialogHeader>
               <DialogTitle className="text-xl">Create New Category</DialogTitle>
@@ -241,13 +290,21 @@ export default function ManagerCategoryManagement() {
               <Button 
                 className="bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white"
                 onClick={handleCreate}
-                disabled={!formData.name.trim()}
+                disabled={!formData.name.trim() || isSubmitting}
               >
-                Create Category
+                {isSubmitting ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Creating...
+                  </>
+                ) : (
+                  'Create Category'
+                )}
               </Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
+        </div>
       </div>
 
       {/* Search Bar */}
@@ -263,21 +320,34 @@ export default function ManagerCategoryManagement() {
 
       {/* Stats */}
       <div className="flex gap-4 text-sm text-muted-foreground">
-        <span>Total Categories: <strong className="text-foreground">{categories.length}</strong></span>
-        <span>Total Products: <strong className="text-foreground">{categories.reduce((sum, cat) => sum + cat.productCount, 0)}</strong></span>
+        <span>Total Categories: <strong className="text-foreground">{pagination?.totalCategories || categories.length}</strong></span>
+        <span>Total Products: <strong className="text-foreground">{totalProducts}</strong></span>
       </div>
 
+      {/* Loading state */}
+      {loading && categories.length === 0 && (
+        <div className="flex items-center justify-center py-12">
+          <Loader2 className="w-8 h-8 animate-spin text-green-600" />
+          <span className="ml-2 text-muted-foreground">Loading categories...</span>
+        </div>
+      )}
+
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {filteredCategories.map((category) => (
-          <Card key={category.id} className="shadow-sm hover:shadow-md transition-all border-l-4" style={{ borderLeftColor: category.color }}>
+        {categories.map((category) => (
+          <Card key={category._id} className="shadow-sm hover:shadow-md transition-all border-l-4" style={{ borderLeftColor: category.color || '#2D5A27' }}>
             <CardHeader>
               <div className="flex items-start justify-between">
                 <div className="flex items-center gap-3">
-                  <div className="w-14 h-14 rounded-xl flex items-center justify-center text-3xl shadow-sm" style={{ backgroundColor: `${category.color}15` }}>
-                    {category.icon}
+                  <div className="w-14 h-14 rounded-xl flex items-center justify-center text-3xl shadow-sm" style={{ backgroundColor: `${category.color || '#2D5A27'}15` }}>
+                    {category.icon || '📦'}
                   </div>
                   <div>
-                    <CardTitle className="text-lg">{category.name}</CardTitle>
+                    <CardTitle className="text-lg flex items-center gap-2">
+                      {category.name}
+                      {!category.isActive && (
+                        <Badge variant="secondary" className="text-xs">Inactive</Badge>
+                      )}
+                    </CardTitle>
                     <CardDescription className="text-xs">/{category.slug}</CardDescription>
                   </div>
                 </div>
@@ -295,8 +365,8 @@ export default function ManagerCategoryManagement() {
                   <p className="text-2xl font-bold text-gray-900">{category.productCount}</p>
                   <p className="text-sm text-gray-500">Products</p>
                 </div>
-                <div className="w-12 h-12 rounded-full flex items-center justify-center" style={{ backgroundColor: `${category.color}20` }}>
-                  <Package className="w-6 h-6" style={{ color: category.color }} />
+                <div className="w-12 h-12 rounded-full flex items-center justify-center" style={{ backgroundColor: `${category.color || '#2D5A27'}20` }}>
+                  <Package className="w-6 h-6" style={{ color: category.color || '#2D5A27' }} />
                 </div>
               </div>
               <Separator className="my-4" />
@@ -324,10 +394,11 @@ export default function ManagerCategoryManagement() {
         ))}
       </div>
 
-      {filteredCategories.length === 0 && (
+      {!loading && categories.length === 0 && (
         <div className="text-center py-12 text-muted-foreground">
           <Package className="w-12 h-12 mx-auto mb-4 opacity-50" />
           <p>No categories found</p>
+          <p className="text-sm mt-1">Create your first category to get started</p>
         </div>
       )}
 
@@ -414,9 +485,16 @@ export default function ManagerCategoryManagement() {
             <Button 
               className="bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white"
               onClick={handleUpdate}
-              disabled={!formData.name.trim()}
+              disabled={!formData.name.trim() || isSubmitting}
             >
-              Update Category
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Updating...
+                </>
+              ) : (
+                'Update Category'
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -441,8 +519,16 @@ export default function ManagerCategoryManagement() {
             <AlertDialogAction 
               className="bg-red-600 hover:bg-red-700 text-white"
               onClick={handleDeleteConfirm}
+              disabled={isSubmitting}
             >
-              Delete
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Deleting...
+                </>
+              ) : (
+                'Delete'
+              )}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

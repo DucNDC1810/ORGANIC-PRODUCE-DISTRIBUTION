@@ -32,6 +32,13 @@ export enum Permission {
   PRODUCT_DELETE = 'product:delete',
   PRODUCT_MANAGE_ALL = 'product:manage_all',
 
+  // Category Management
+  CATEGORY_CREATE = 'category:create',
+  CATEGORY_READ = 'category:read',
+  CATEGORY_UPDATE = 'category:update',
+  CATEGORY_DELETE = 'category:delete',
+  CATEGORY_MANAGE_ALL = 'category:manage_all',
+
   // Order Management
   ORDER_CREATE = 'order:create',
   ORDER_READ = 'order:read',
@@ -74,6 +81,11 @@ export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     Permission.PRODUCT_UPDATE,
     Permission.PRODUCT_DELETE,
     Permission.PRODUCT_MANAGE_ALL,
+    Permission.CATEGORY_CREATE,
+    Permission.CATEGORY_READ,
+    Permission.CATEGORY_UPDATE,
+    Permission.CATEGORY_DELETE,
+    Permission.CATEGORY_MANAGE_ALL,
     Permission.ORDER_CREATE,
     Permission.ORDER_READ,
     Permission.ORDER_UPDATE,
@@ -96,6 +108,11 @@ export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     Permission.PRODUCT_UPDATE,
     Permission.PRODUCT_DELETE,
     Permission.PRODUCT_MANAGE_ALL,
+    Permission.CATEGORY_CREATE,
+    Permission.CATEGORY_READ,
+    Permission.CATEGORY_UPDATE,
+    Permission.CATEGORY_DELETE,
+    Permission.CATEGORY_MANAGE_ALL,
     Permission.ORDER_READ,
     Permission.ORDER_UPDATE,
     Permission.ORDER_MANAGE_ALL,
