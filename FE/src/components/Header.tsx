@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Search, ShoppingCart, Leaf, Apple, Carrot, Beef, Fish, Wheat, Milk, Cookie, Coffee, Nut, BookOpen, Lightbulb, Gift, User, LogOut, Settings } from 'lucide-react';
+import { Search, ShoppingCart, Leaf, Apple, Carrot, Wheat, Milk, BookOpen, Lightbulb, Gift, User, LogOut, Settings } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
