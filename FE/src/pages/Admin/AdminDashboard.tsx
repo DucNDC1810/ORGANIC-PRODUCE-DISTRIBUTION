@@ -2,8 +2,6 @@ import { useState, useRef, useEffect, lazy, Suspense } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   Leaf, 
-  Menu,
-  X,
   User,
   Settings,
   LogOut,
@@ -13,6 +11,7 @@ import {
 import { useAuth } from '../../context/AuthContext';
 import { toast } from 'sonner';
 import Sidebar from './Sidebar';
+import { cn } from '../../components/ui/utils';
 
 // Lazy load components for better performance
 const Overview = lazy(() => import('./Overview'));
@@ -94,23 +93,51 @@ export default function AdminDashboard() {
           <div className="flex items-center gap-4">
             <button
               onClick={() => setSidebarOpen(!sidebarOpen)}
-              className="lg:hidden p-2 hover:bg-gray-100 rounded-lg transition-all duration-200 hover:shadow-sm active:scale-95"
-              aria-label="Toggle sidebar"
+              className="flex items-center gap-3 cursor-pointer group relative"
+              aria-label={sidebarOpen ? "Đóng sidebar" : "Mở sidebar"}
             >
-              {sidebarOpen ? <X className="w-5 h-5 text-gray-700" /> : <Menu className="w-5 h-5 text-gray-700" />}
-            </button>
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-gradient-to-br from-emerald-500 via-green-500 to-teal-600 rounded-xl flex items-center justify-center shadow-md hover:shadow-lg transition-shadow duration-300 relative overflow-hidden group">
-                <div className="absolute inset-0 bg-white opacity-0 group-hover:opacity-20 transition-opacity duration-300"></div>
-                <Leaf className="w-6 h-6 text-white relative z-10" />
+              {/* Logo với hiệu ứng */}
+              <div className="relative">
+                <div className="w-12 h-12 bg-gradient-to-br from-emerald-500 via-green-500 to-teal-600 rounded-xl flex items-center justify-center shadow-md group-hover:shadow-xl transition-all duration-300 relative overflow-hidden group-active:scale-95">
+                  {/* Gradient overlay khi hover */}
+                  <div className="absolute inset-0 bg-white opacity-0 group-hover:opacity-20 transition-opacity duration-300"></div>
+                  {/* Sweep effect */}
+                  <div className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/30 to-white/0 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700"></div>
+                  {/* Icon */}
+                  <Leaf className={cn(
+                    "w-7 h-7 text-white relative z-10 transition-all duration-700 ease-in-out",
+                    "group-hover:scale-110",
+                    sidebarOpen ? "rotate-[360deg]" : "rotate-0"
+                  )} />
+                  {/* Indicator dots - hiển thị trạng thái sidebar */}
+                  <div className="absolute -bottom-1 -right-1 flex gap-0.5">
+                    <div className={cn(
+                      "w-1.5 h-1.5 rounded-full transition-all duration-300",
+                      sidebarOpen ? "bg-white scale-100" : "bg-white/50 scale-75"
+                    )} />
+                    <div className={cn(
+                      "w-1.5 h-1.5 rounded-full transition-all duration-300",
+                      sidebarOpen ? "bg-white scale-100" : "bg-white/50 scale-75"
+                    )} />
+                  </div>
+                </div>
+                {/* Tooltip */}
+                <div className="absolute top-full left-1/2 -translate-x-1/2 mt-2 px-3 py-1.5 bg-gray-900 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-all duration-200 pointer-events-none whitespace-nowrap shadow-lg z-50">
+                  <div className="absolute -top-1 left-1/2 -translate-x-1/2 w-2 h-2 bg-gray-900 rotate-45" />
+                  {sidebarOpen ? 'Click để đóng menu' : 'Click để mở menu'}
+                </div>
               </div>
-              <div>
-                <h1 className="text-xl font-bold bg-gradient-to-r from-emerald-600 to-teal-600 bg-clip-text text-transparent">
+              
+              {/* Text */}
+              <div className="group-hover:translate-x-1 transition-transform duration-300">
+                <h1 className="text-xl font-bold bg-gradient-to-r from-emerald-600 to-teal-600 bg-clip-text text-transparent group-hover:from-emerald-500 group-hover:to-teal-500 transition-all duration-300">
                   Organic Produce
                 </h1>
-                <p className="text-xs text-gray-500 font-medium">Admin Portal</p>
+                <p className="text-xs text-gray-500 font-medium group-hover:text-emerald-600 transition-colors duration-300">
+                  Admin Portal
+                </p>
               </div>
-            </div>
+            </button>
           </div>
 
           {/* Right Section */}
@@ -274,7 +301,10 @@ export default function AdminDashboard() {
         />
 
         {/* Main Content */}
-        <main className="flex-1 min-h-[calc(100vh-4rem)] overflow-x-hidden">
+        <main className={cn(
+          "flex-1 min-h-[calc(100vh-4rem)] overflow-x-hidden transition-all duration-500",
+          sidebarOpen ? "lg:ml-72" : "lg:ml-0"
+        )}>
           {/* Breadcrumb */}
           <div className="bg-white border-b border-gray-200 px-6 lg:px-8 py-4">
             <div className="max-w-7xl mx-auto">
