@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Search, ShoppingCart, Leaf, Apple, Carrot, Beef, Nut, BookOpen, Lightbulb, Gift, User, LogOut, Settings } from 'lucide-react';
+import { Search, ShoppingCart, Leaf, Apple, Carrot, Beef, Fish, Wheat, Milk, Cookie, Coffee, Nut, BookOpen, Lightbulb, Gift, User, LogOut, Settings } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
@@ -20,10 +20,10 @@ interface DropdownItem {
 }
 
 const productsDropdown: DropdownItem[] = [
-  { icon: <Carrot className="w-5 h-5" />, label: 'Fresh Vegetables', href: '/products/vegetables' },
-  { icon: <Apple className="w-5 h-5" />, label: 'Seasonal Fruits', href: '/products/fruits' },
-  { icon: <Beef className="w-5 h-5" />, label: 'Meat & Seafood', href: '/products/meat-seafood' },
-  { icon: <Nut className="w-5 h-5" />, label: 'Nuts & Pantry', href: '/products/nuts-pantry' },
+  { icon: <Carrot className="w-5 h-5" />, label: 'Vegetables', href: '/products?category=vegetables' },
+  { icon: <Apple className="w-5 h-5" />, label: 'Fruits', href: '/products?category=fruits' },
+  { icon: <Wheat className="w-5 h-5" />, label: 'Grains', href: '/products?category=grains' },
+  { icon: <Milk className="w-5 h-5" />, label: 'Dairy', href: '/products?category=dairy' },
 ];
 
 const blogsDropdown: DropdownItem[] = [
@@ -63,7 +63,7 @@ function DropdownMenu({ items, isOpen }: DropdownMenuProps) {
 }
 
 export default function Header() {
-  const { getTotalItems } = useCart();
+  const { getTotalItems, openCart } = useCart();
   const { user, isAuthenticated, logout } = useAuth();
   const navigate = useNavigate();
   const [productsOpen, setProductsOpen] = useState(false);
@@ -107,9 +107,9 @@ export default function Header() {
               onMouseEnter={() => setProductsOpen(true)}
               onMouseLeave={() => setProductsOpen(false)}
             >
-              <button className="text-foreground hover:text-emerald-600 transition-colors font-medium">
+              <Link to="/products" className="text-foreground hover:text-emerald-600 transition-colors font-medium">
                 Products
-              </button>
+              </Link>
               <DropdownMenu items={productsDropdown} isOpen={productsOpen} />
             </div>
 
@@ -178,8 +178,8 @@ export default function Header() {
             <button className="p-2 hover:bg-muted rounded-lg transition-colors">
               <Search className="w-5 h-5 text-muted-foreground" />
             </button>
-            <Link 
-              to="/cart" 
+            <button 
+              onClick={openCart}
               className="relative p-2 hover:bg-muted rounded-lg transition-colors group"
             >
               <ShoppingCart className="w-5 h-5 text-muted-foreground group-hover:text-emerald-600 transition-colors" />
@@ -188,7 +188,7 @@ export default function Header() {
                   {getTotalItems()}
                 </span>
               )}
-            </Link>
+            </button>
           </div>
         </div>
       </div>

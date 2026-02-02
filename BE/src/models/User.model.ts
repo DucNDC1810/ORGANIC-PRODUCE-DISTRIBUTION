@@ -9,6 +9,9 @@ export interface IUser extends Document {
   role: 'admin' | 'manager' | 'customer' | 'user' | 'shipper' | 'farmer';
   phone?: string;
   address?: string;
+  avatar?: string;
+  dateOfBirth?: Date;
+  gender?: 'male' | 'female' | 'other';
   googleId?: string;
   isEmailVerified: boolean;
   isActive: boolean;
@@ -55,6 +58,19 @@ const userSchema = new Schema<IUser>(
     },
     phone: String,
     address: String,
+    avatar: {
+      type: String,
+      default: null
+    },
+    dateOfBirth: {
+      type: Date,
+      default: null
+    },
+    gender: {
+      type: String,
+      enum: ['male', 'female', 'other'],
+      default: null
+    },
     googleId: {
       type: String,
       unique: true,

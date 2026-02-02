@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useEffect } from 'react';
 import { 
   Package, 
   Plus,
@@ -11,6 +11,9 @@ import {
   Save,
   X,
   AlertTriangle,
+  Loader2,
+  Star,
+  RefreshCw,
 } from 'lucide-react';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
@@ -22,104 +25,120 @@ import { Card, CardContent } from '../../components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../../components/ui/table';
 import { Textarea } from '../../components/ui/textarea';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '../../components/ui/alert-dialog';
-import { toast } from 'sonner';
+import { Switch } from '../../components/ui/switch';
+import { useProducts } from '../../hooks/useProducts';
+import { Product, CreateProductData, UpdateProductData } from '../../services/productService';
 
-// Product interface
-interface Product {
-  id: string;
-  name: string;
-  category: string;
-  price: number;
-  stock: number;
-  status: string;
-  image: string;
-  description?: string;
-  sales: number;
-  revenue: number;
-}
-
-// Initial mock data
-const initialProducts: Product[] = [
-  { 
-    id: '1', 
-    name: 'Organic Avocados', 
-    category: 'Fruits', 
-    price: 5.99, 
-    stock: 150, 
-    status: 'In Stock', 
-    image: 'https://images.unsplash.com/photo-1523049673857-eb18f1d7b578?w=100',
-    description: 'Fresh organic avocados from local farms',
-    sales: 245,
-    revenue: 1467.55
-  },
-  { 
-    id: '2', 
-    name: 'Mixed Greens', 
-    category: 'Vegetables', 
-    price: 4.49, 
-    stock: 200, 
-    status: 'In Stock', 
-    image: 'https://images.unsplash.com/photo-1622206151226-18ca2c9ab4a1?w=100',
-    description: 'Assorted organic greens including spinach, kale, and arugula',
-    sales: 198,
-    revenue: 889.02
-  },
-  { 
-    id: '3', 
-    name: 'Fresh Strawberries', 
-    category: 'Fruits', 
-    price: 6.99, 
-    stock: 8, 
-    status: 'Low Stock', 
-    image: 'https://images.unsplash.com/photo-1464965911861-746a04b4bca6?w=100',
-    description: 'Sweet and juicy organic strawberries',
-    sales: 176,
-    revenue: 1230.24
-  },
-  { 
-    id: '4', 
-    name: 'Organic Tomatoes', 
-    category: 'Vegetables', 
-    price: 4.99, 
-    stock: 0, 
-    status: 'Out of Stock', 
-    image: 'https://images.unsplash.com/photo-1592921870789-04563d55041c?w=100',
-    description: 'Vine-ripened organic tomatoes',
-    sales: 165,
-    revenue: 823.35
-  },
-  { 
-    id: '5', 
-    name: 'Fresh Blueberries', 
-    category: 'Fruits', 
-    price: 7.99, 
-    stock: 80, 
-    status: 'In Stock', 
-    image: 'https://images.unsplash.com/photo-1498557850523-fd3d118b962e?w=100',
-    description: 'Premium organic blueberries rich in antioxidants',
-    sales: 142,
-    revenue: 1134.58
-  },
+// Category options matching BE enum
+const CATEGORIES = [
+  { value: 'vegetables', label: 'Vegetables' },
+  { value: 'fruits', label: 'Fruits' },
+  { value: 'grains', label: 'Grains' },
+  { value: 'dairy', label: 'Dairy' },
+  { value: 'meat', label: 'Meat' },
+  { value: 'seafood', label: 'Seafood' },
+  { value: 'herbs', label: 'Herbs' },
+  { value: 'nuts', label: 'Nuts' },
+  { value: 'beverages', label: 'Beverages' },
+  { value: 'processed', label: 'Processed' },
+  { value: 'other', label: 'Other' },
 ];
 
-// Empty product form
+// Unit options matching BE enum
+const UNITS = [
+  { value: 'kg', label: 'Kg' },
+  { value: 'g', label: 'Gram' },
+  { value: 'piece', label: 'Piece' },
+  { value: 'bunch', label: 'Bunch' },
+  { value: 'pack', label: 'Pack' },
+  { value: 'box', label: 'Box' },
+  { value: 'bottle', label: 'Bottle' },
+  { value: 'liter', label: 'Liter' },
+  { value: 'ml', label: 'ml' },
+];
+
+// Certification options
+const CERTIFICATIONS = [
+  'VietGAP',
+  'GlobalGAP',
+  'Organic',
+  'USDA Organic',
+  'EU Organic',
+  'Non-GMO',
+];
+
+// Empty product form matching BE schema
 const emptyProductForm = {
   name: '',
-  category: '',
-  price: '',
-  stock: '',
   description: '',
-  image: '',
+  price: '',
+  originalPrice: '',
+  category: '',
+  thumbnail: '',
+  images: '',
+  stock: '',
+  unit: 'kg',
+  origin: '',
+  isOrganic: true,
+  certifications: [] as string[],
+  nutritionInfo: {
+    calories: '',
+    protein: '',
+    carbs: '',
+    fat: '',
+    fiber: '',
+  },
+  tags: '',
+  isFeatured: false,
 };
 
+type ProductFormType = typeof emptyProductForm;
+
 export default function ManagerProductManagement() {
-  // State for products list
-  const [products, setProducts] = useState<Product[]>(initialProducts);
-  
+  // Custom hook for products API
+  const {
+    products,
+    loading,
+    error,
+    pagination,
+    selectedProduct,
+    fetchProducts,
+    createProduct,
+    updateProduct,
+    deleteProduct,
+    setSelectedProduct,
+  } = useProducts();
+
   // Search and filter states
   const [searchQuery, setSearchQuery] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
+  const [currentPage, setCurrentPage] = useState(1);
+  
+  // Computed filtered products (client-side filtering for immediate UI feedback)
+  // Note: API already handles filtering, this is for local search refinement
+  const filteredProducts = products.filter(product => {
+    // Search filter
+    const matchesSearch = !searchQuery || 
+      product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      product.category.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      product.origin?.toLowerCase().includes(searchQuery.toLowerCase());
+    
+    // Category filter
+    const matchesCategory = categoryFilter === 'all' || product.category === categoryFilter;
+    
+    // Status filter based on stock
+    let matchesStatus = true;
+    if (statusFilter === 'In Stock') {
+      matchesStatus = product.stock > 10;
+    } else if (statusFilter === 'Low Stock') {
+      matchesStatus = product.stock > 0 && product.stock <= 10;
+    } else if (statusFilter === 'Out of Stock') {
+      matchesStatus = product.stock === 0;
+    }
+    
+    return matchesSearch && matchesCategory && matchesStatus;
+  });
   
   // Dialog states
   const [isAddProductOpen, setIsAddProductOpen] = useState(false);
@@ -127,29 +146,69 @@ export default function ManagerProductManagement() {
   const [isViewProductOpen, setIsViewProductOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   
-  // Form and selected product states
-  const [productForm, setProductForm] = useState(emptyProductForm);
-  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
+  // Form state
+  const [productForm, setProductForm] = useState<ProductFormType>(emptyProductForm);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Calculate stock status based on quantity
-  const calculateStatus = (stock: number): string => {
-    if (stock === 0) return 'Out of Stock';
-    if (stock <= 10) return 'Low Stock';
-    return 'In Stock';
+  // Fetch products on mount and when filters change
+  useEffect(() => {
+    const params: any = {
+      page: currentPage,
+      limit: 10,
+    };
+
+    if (searchQuery) {
+      params.search = searchQuery;
+    }
+
+    if (categoryFilter !== 'all') {
+      params.category = categoryFilter;
+    }
+
+    if (statusFilter !== 'all') {
+      if (statusFilter === 'active') {
+        params.isActive = true;
+      } else if (statusFilter === 'inactive') {
+        params.isActive = false;
+      } else if (statusFilter === 'out_of_stock') {
+        params.stockStatus = 'out_of_stock';
+      } else if (statusFilter === 'low_stock') {
+        params.stockStatus = 'low_stock';
+      }
+    }
+
+    fetchProducts(params);
+  }, [fetchProducts, currentPage, searchQuery, categoryFilter, statusFilter]);
+
+  // Debounce search
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setCurrentPage(1);
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
+  // Get stock status badge
+  const getStockBadge = (product: Product) => {
+    if (product.stock === 0) {
+      return { className: 'bg-red-100 text-red-800 hover:bg-red-100', text: 'Out of Stock' };
+    }
+    if (product.stock <= 10) {
+      return { className: 'bg-yellow-100 text-yellow-800 hover:bg-yellow-100', text: 'Low Stock' };
+    }
+    return { className: 'bg-green-100 text-green-800 hover:bg-green-100', text: 'In Stock' };
   };
 
-  // Filter products based on search and filters
-  const filteredProducts = useMemo(() => {
-    return products.filter(product => {
-      const matchesSearch = product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                           product.category.toLowerCase().includes(searchQuery.toLowerCase());
-      const matchesCategory = categoryFilter === 'all' || product.category.toLowerCase() === categoryFilter.toLowerCase();
-      const matchesStatus = statusFilter === 'all' || product.status === statusFilter;
-      
-      return matchesSearch && matchesCategory && matchesStatus;
+  // Format date for display
+  const formatDate = (dateString: string): string => {
+    return new Date(dateString).toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit'
     });
-  }, [products, searchQuery, categoryFilter, statusFilter]);
+  };
 
   // Reset form
   const resetForm = () => {
@@ -157,36 +216,98 @@ export default function ManagerProductManagement() {
     setSelectedProduct(null);
   };
 
+  // Map product to form
+  const mapProductToForm = (product: Product): ProductFormType => {
+    return {
+      name: product.name,
+      description: product.description,
+      price: product.price.toString(),
+      originalPrice: product.originalPrice?.toString() || '',
+      category: product.category,
+      thumbnail: product.thumbnail,
+      images: product.images?.join(', ') || '',
+      stock: product.stock.toString(),
+      unit: product.unit,
+      origin: product.origin,
+      isOrganic: product.isOrganic,
+      certifications: product.certifications || [],
+      nutritionInfo: {
+        calories: product.nutritionInfo?.calories?.toString() || '',
+        protein: product.nutritionInfo?.protein?.toString() || '',
+        carbs: product.nutritionInfo?.carbs?.toString() || '',
+        fat: product.nutritionInfo?.fat?.toString() || '',
+        fiber: product.nutritionInfo?.fiber?.toString() || '',
+      },
+      tags: product.tags?.join(', ') || '',
+      isFeatured: product.isFeatured,
+    };
+  };
+
+  // Map form to API data
+  const mapFormToData = (): CreateProductData | UpdateProductData => {
+    const data: any = {
+      name: productForm.name,
+      description: productForm.description,
+      price: parseFloat(productForm.price),
+      category: productForm.category,
+      thumbnail: productForm.thumbnail || 'https://images.unsplash.com/photo-1518843875459-f738682238a6?w=400',
+      stock: parseInt(productForm.stock),
+      unit: productForm.unit,
+      origin: productForm.origin,
+      isOrganic: productForm.isOrganic,
+      isFeatured: productForm.isFeatured,
+    };
+
+    if (productForm.originalPrice) {
+      data.originalPrice = parseFloat(productForm.originalPrice);
+    }
+
+    if (productForm.images) {
+      data.images = productForm.images.split(',').map(url => url.trim()).filter(Boolean);
+    }
+
+    if (productForm.certifications.length > 0) {
+      data.certifications = productForm.certifications;
+    }
+
+    // Nutrition info
+    const nutritionInfo: any = {};
+    if (productForm.nutritionInfo.calories) nutritionInfo.calories = parseFloat(productForm.nutritionInfo.calories);
+    if (productForm.nutritionInfo.protein) nutritionInfo.protein = parseFloat(productForm.nutritionInfo.protein);
+    if (productForm.nutritionInfo.carbs) nutritionInfo.carbs = parseFloat(productForm.nutritionInfo.carbs);
+    if (productForm.nutritionInfo.fat) nutritionInfo.fat = parseFloat(productForm.nutritionInfo.fat);
+    if (productForm.nutritionInfo.fiber) nutritionInfo.fiber = parseFloat(productForm.nutritionInfo.fiber);
+    if (Object.keys(nutritionInfo).length > 0) {
+      data.nutritionInfo = nutritionInfo;
+    }
+
+    if (productForm.tags) {
+      data.tags = productForm.tags.split(',').map(tag => tag.trim()).filter(Boolean);
+    }
+
+    return data;
+  };
+
+  // Validate form
+  const validateForm = (): boolean => {
+    return !!(productForm.name && productForm.category && productForm.price && productForm.stock && productForm.origin);
+  };
+
   // CREATE - Add new product
-  const handleAddProduct = () => {
-    if (!productForm.name || !productForm.category || !productForm.price || !productForm.stock) {
-      toast.error('Please fill in all required fields!');
+  const handleAddProduct = async () => {
+    if (!validateForm()) {
       return;
     }
 
-    setIsLoading(true);
-    
-    // Simulate API call
-    setTimeout(() => {
-      const newProduct: Product = {
-        id: Date.now().toString(),
-        name: productForm.name,
-        category: productForm.category,
-        price: parseFloat(productForm.price),
-        stock: parseInt(productForm.stock),
-        status: calculateStatus(parseInt(productForm.stock)),
-        image: productForm.image || 'https://images.unsplash.com/photo-1518843875459-f738682238a6?w=100',
-        description: productForm.description,
-        sales: 0,
-        revenue: 0,
-      };
+    setIsSubmitting(true);
+    const data = mapFormToData() as CreateProductData;
+    const result = await createProduct(data);
+    setIsSubmitting(false);
 
-      setProducts(prev => [newProduct, ...prev]);
+    if (result) {
       setIsAddProductOpen(false);
       resetForm();
-      setIsLoading(false);
-      toast.success('Product added successfully!');
-    }, 500);
+    }
   };
 
   // READ - View product details
@@ -198,51 +319,25 @@ export default function ManagerProductManagement() {
   // UPDATE - Open edit dialog with product data
   const handleEditClick = (product: Product) => {
     setSelectedProduct(product);
-    setProductForm({
-      name: product.name,
-      category: product.category,
-      price: product.price.toString(),
-      stock: product.stock.toString(),
-      description: product.description || '',
-      image: product.image,
-    });
+    setProductForm(mapProductToForm(product));
     setIsEditProductOpen(true);
   };
 
   // UPDATE - Save edited product
-  const handleUpdateProduct = () => {
-    if (!productForm.name || !productForm.category || !productForm.price || !productForm.stock) {
-      toast.error('Please fill in all required fields!');
+  const handleUpdateProduct = async () => {
+    if (!validateForm() || !selectedProduct) {
       return;
     }
 
-    if (!selectedProduct) return;
+    setIsSubmitting(true);
+    const data = mapFormToData() as UpdateProductData;
+    const result = await updateProduct(selectedProduct._id, data);
+    setIsSubmitting(false);
 
-    setIsLoading(true);
-
-    // Simulate API call
-    setTimeout(() => {
-      setProducts(prev => prev.map(product => {
-        if (product.id === selectedProduct.id) {
-          return {
-            ...product,
-            name: productForm.name,
-            category: productForm.category,
-            price: parseFloat(productForm.price),
-            stock: parseInt(productForm.stock),
-            status: calculateStatus(parseInt(productForm.stock)),
-            image: productForm.image || product.image,
-            description: productForm.description,
-          };
-        }
-        return product;
-      }));
-
+    if (result) {
       setIsEditProductOpen(false);
       resetForm();
-      setIsLoading(false);
-      toast.success('Product updated successfully!');
-    }, 500);
+    }
   };
 
   // DELETE - Open delete confirmation
@@ -252,39 +347,29 @@ export default function ManagerProductManagement() {
   };
 
   // DELETE - Confirm delete product
-  const handleDeleteProduct = () => {
+  const handleDeleteProduct = async () => {
     if (!selectedProduct) return;
 
-    setIsLoading(true);
+    setIsSubmitting(true);
+    const success = await deleteProduct(selectedProduct._id, true);
+    setIsSubmitting(false);
 
-    // Simulate API call
-    setTimeout(() => {
-      setProducts(prev => prev.filter(product => product.id !== selectedProduct.id));
+    if (success) {
       setIsDeleteDialogOpen(false);
       setSelectedProduct(null);
-      setIsLoading(false);
-      toast.success('Product deleted successfully!');
-    }, 500);
+    }
   };
 
-  const getStockBadge = (status: string) => {
-    const statusConfig: any = {
-      'In Stock': { className: 'bg-green-100 text-green-800 hover:bg-green-100' },
-      'Low Stock': { className: 'bg-yellow-100 text-yellow-800 hover:bg-yellow-100' },
-      'Out of Stock': { className: 'bg-red-100 text-red-800 hover:bg-red-100' },
-    };
-    return statusConfig[status] || { className: 'bg-gray-100 text-gray-800' };
-  };
-
-  // Render form fields (inline to avoid re-render issues)
+  // Render form fields
   const renderFormFields = () => (
-    <div className="grid gap-4 py-4">
+    <div className="grid gap-4 py-4 max-h-[60vh] overflow-y-auto pr-2">
+      {/* Row 1: Name & Category */}
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-2">
           <Label htmlFor="name">Product Name *</Label>
           <Input 
             id="name" 
-            placeholder="e.g., Organic Avocados" 
+            placeholder="e.g. Organic Cabbage" 
             value={productForm.name}
             onChange={(e) => setProductForm(prev => ({ ...prev, name: e.target.value }))}
           />
@@ -296,73 +381,232 @@ export default function ManagerProductManagement() {
               <SelectValue placeholder="Select category" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="Fruits">Fruits</SelectItem>
-              <SelectItem value="Vegetables">Vegetables</SelectItem>
-              <SelectItem value="Herbs">Herbs</SelectItem>
-              <SelectItem value="Mushrooms">Mushrooms</SelectItem>
+              {CATEGORIES.map(cat => (
+                <SelectItem key={cat.value} value={cat.value}>{cat.label}</SelectItem>
+              ))}
             </SelectContent>
           </Select>
         </div>
       </div>
+
+      {/* Row 2: Price & Original Price */}
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-2">
-          <Label htmlFor="price">Price ($) *</Label>
+          <Label htmlFor="price">Selling Price *</Label>
           <Input 
             id="price" 
             type="number" 
-            placeholder="0.00" 
-            step="0.01" 
+            placeholder="0" 
+            min="0"
             value={productForm.price}
             onChange={(e) => setProductForm(prev => ({ ...prev, price: e.target.value }))}
           />
         </div>
+        <div className="space-y-2">
+          <Label htmlFor="originalPrice">Original Price</Label>
+          <Input 
+            id="originalPrice" 
+            type="number" 
+            placeholder="0" 
+            min="0"
+            value={productForm.originalPrice}
+            onChange={(e) => setProductForm(prev => ({ ...prev, originalPrice: e.target.value }))}
+          />
+        </div>
+      </div>
+
+      {/* Row 3: Stock & Unit */}
+      <div className="grid grid-cols-2 gap-4">
         <div className="space-y-2">
           <Label htmlFor="stock">Stock Quantity *</Label>
           <Input 
             id="stock" 
             type="number" 
             placeholder="0" 
+            min="0"
             value={productForm.stock}
             onChange={(e) => setProductForm(prev => ({ ...prev, stock: e.target.value }))}
           />
         </div>
+        <div className="space-y-2">
+          <Label htmlFor="unit">Unit *</Label>
+          <Select value={productForm.unit} onValueChange={(value) => setProductForm(prev => ({ ...prev, unit: value }))}>
+            <SelectTrigger>
+              <SelectValue placeholder="Select unit" />
+            </SelectTrigger>
+            <SelectContent>
+              {UNITS.map(unit => (
+                <SelectItem key={unit.value} value={unit.value}>{unit.label}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
       </div>
+
+      {/* Row 4: Origin */}
       <div className="space-y-2">
-        <Label htmlFor="description">Description</Label>
+        <Label htmlFor="origin">Origin *</Label>
+        <Input 
+          id="origin" 
+          placeholder="e.g. Da Lat, Vietnam" 
+          value={productForm.origin}
+          onChange={(e) => setProductForm(prev => ({ ...prev, origin: e.target.value }))}
+        />
+      </div>
+
+      {/* Row 5: Description */}
+      <div className="space-y-2">
+        <Label htmlFor="description">Description *</Label>
         <Textarea 
           id="description" 
-          placeholder="Product description..." 
+          placeholder="Detailed product description..." 
           rows={3} 
           value={productForm.description}
           onChange={(e) => setProductForm(prev => ({ ...prev, description: e.target.value }))}
         />
       </div>
+
+      {/* Row 6: Thumbnail */}
       <div className="space-y-2">
-        <Label htmlFor="image">Product Image</Label>
+        <Label htmlFor="thumbnail">Thumbnail Image (URL)</Label>
         <div className="flex gap-2">
           <Input 
-            id="image" 
-            placeholder="Image URL" 
+            id="thumbnail" 
+            placeholder="https://example.com/image.jpg" 
             className="flex-1" 
-            value={productForm.image}
-            onChange={(e) => setProductForm(prev => ({ ...prev, image: e.target.value }))}
+            value={productForm.thumbnail}
+            onChange={(e) => setProductForm(prev => ({ ...prev, thumbnail: e.target.value }))}
           />
           <Button type="button" variant="outline" size="icon">
             <ImagePlus className="w-4 h-4" />
           </Button>
         </div>
-        {productForm.image && (
-          <div className="mt-2">
-            <img 
-              src={productForm.image} 
-              alt="Preview" 
-              className="w-20 h-20 object-cover rounded-lg border"
-              onError={(e) => {
-                (e.target as HTMLImageElement).style.display = 'none';
-              }}
-            />
-          </div>
+        {productForm.thumbnail && (
+          <img 
+            src={productForm.thumbnail} 
+            alt="Preview" 
+            className="w-20 h-20 object-cover rounded-lg border mt-2"
+            onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+          />
         )}
+      </div>
+
+      {/* Row 7: Additional Images */}
+      <div className="space-y-2">
+        <Label htmlFor="images">Additional Images (URLs, comma-separated)</Label>
+        <Input 
+          id="images" 
+          placeholder="https://example.com/img1.jpg, https://example.com/img2.jpg" 
+          value={productForm.images}
+          onChange={(e) => setProductForm(prev => ({ ...prev, images: e.target.value }))}
+        />
+      </div>
+
+      {/* Row 8: Certifications */}
+      <div className="space-y-2">
+        <Label>Certifications</Label>
+        <div className="flex flex-wrap gap-2">
+          {CERTIFICATIONS.map(cert => (
+            <Badge
+              key={cert}
+              variant={productForm.certifications.includes(cert) ? 'default' : 'outline'}
+              className="cursor-pointer"
+              onClick={() => {
+                setProductForm(prev => ({
+                  ...prev,
+                  certifications: prev.certifications.includes(cert)
+                    ? prev.certifications.filter(c => c !== cert)
+                    : [...prev.certifications, cert]
+                }));
+              }}
+            >
+              {cert}
+            </Badge>
+          ))}
+        </div>
+      </div>
+
+      {/* Row 9: Nutrition Info */}
+      <div className="space-y-2">
+        <Label>Nutrition Information (per 100g)</Label>
+        <div className="grid grid-cols-5 gap-2">
+          <Input 
+            placeholder="Calories" 
+            type="number"
+            value={productForm.nutritionInfo.calories}
+            onChange={(e) => setProductForm(prev => ({ 
+              ...prev, 
+              nutritionInfo: { ...prev.nutritionInfo, calories: e.target.value }
+            }))}
+          />
+          <Input 
+            placeholder="Protein (g)" 
+            type="number"
+            value={productForm.nutritionInfo.protein}
+            onChange={(e) => setProductForm(prev => ({ 
+              ...prev, 
+              nutritionInfo: { ...prev.nutritionInfo, protein: e.target.value }
+            }))}
+          />
+          <Input 
+            placeholder="Carbs (g)" 
+            type="number"
+            value={productForm.nutritionInfo.carbs}
+            onChange={(e) => setProductForm(prev => ({ 
+              ...prev, 
+              nutritionInfo: { ...prev.nutritionInfo, carbs: e.target.value }
+            }))}
+          />
+          <Input 
+            placeholder="Fat (g)" 
+            type="number"
+            value={productForm.nutritionInfo.fat}
+            onChange={(e) => setProductForm(prev => ({ 
+              ...prev, 
+              nutritionInfo: { ...prev.nutritionInfo, fat: e.target.value }
+            }))}
+          />
+          <Input 
+            placeholder="Fiber (g)" 
+            type="number"
+            value={productForm.nutritionInfo.fiber}
+            onChange={(e) => setProductForm(prev => ({ 
+              ...prev, 
+              nutritionInfo: { ...prev.nutritionInfo, fiber: e.target.value }
+            }))}
+          />
+        </div>
+      </div>
+
+      {/* Row 10: Tags */}
+      <div className="space-y-2">
+        <Label htmlFor="tags">Tags (comma-separated)</Label>
+        <Input 
+          id="tags" 
+          placeholder="organic, fresh, vegetables" 
+          value={productForm.tags}
+          onChange={(e) => setProductForm(prev => ({ ...prev, tags: e.target.value }))}
+        />
+      </div>
+
+      {/* Row 11: Switches */}
+      <div className="flex items-center gap-6">
+        <div className="flex items-center space-x-2">
+          <Switch
+            id="isOrganic"
+            checked={productForm.isOrganic}
+            onCheckedChange={(checked) => setProductForm(prev => ({ ...prev, isOrganic: checked }))}
+          />
+          <Label htmlFor="isOrganic">Organic Product</Label>
+        </div>
+        <div className="flex items-center space-x-2">
+          <Switch
+            id="isFeatured"
+            checked={productForm.isFeatured}
+            onCheckedChange={(checked) => setProductForm(prev => ({ ...prev, isFeatured: checked }))}
+          />
+          <Label htmlFor="isFeatured">Featured Product</Label>
+        </div>
       </div>
     </div>
   );
@@ -375,8 +619,31 @@ export default function ManagerProductManagement() {
           <p className="text-muted-foreground mt-1">Manage your organic produce inventory</p>
         </div>
         
-        {/* ADD PRODUCT DIALOG */}
-        <Dialog open={isAddProductOpen} onOpenChange={(open) => {
+        <div className="flex items-center gap-3">
+          {/* REFRESH BUTTON */}
+          <Button 
+            variant="outline" 
+            onClick={() => {
+              const params: any = { page: currentPage, limit: 10 };
+              if (searchQuery) params.search = searchQuery;
+              if (categoryFilter !== 'all') params.category = categoryFilter;
+              if (statusFilter !== 'all') {
+                if (statusFilter === 'active') params.isActive = true;
+                else if (statusFilter === 'inactive') params.isActive = false;
+                else if (statusFilter === 'out_of_stock') params.stockStatus = 'out_of_stock';
+                else if (statusFilter === 'low_stock') params.stockStatus = 'low_stock';
+              }
+              fetchProducts(params);
+            }}
+            disabled={loading}
+            className="gap-2"
+          >
+            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+            Refresh
+          </Button>
+
+          {/* ADD PRODUCT DIALOG */}
+          <Dialog open={isAddProductOpen} onOpenChange={(open) => {
           setIsAddProductOpen(open);
           if (!open) resetForm();
         }}>
@@ -389,7 +656,7 @@ export default function ManagerProductManagement() {
           <DialogContent className="max-w-2xl">
             <DialogHeader>
               <DialogTitle className="text-xl">Add New Product</DialogTitle>
-              <DialogDescription>Create a new organic product listing</DialogDescription>
+              <DialogDescription>Create a new organic produce product</DialogDescription>
             </DialogHeader>
             {renderFormFields()}
             <DialogFooter className="gap-3">
@@ -400,10 +667,10 @@ export default function ManagerProductManagement() {
               <Button 
                 className="bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white"
                 onClick={handleAddProduct}
-                disabled={isLoading}
+                disabled={isSubmitting || !validateForm()}
               >
-                {isLoading ? (
-                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />
+                {isSubmitting ? (
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                 ) : (
                   <Save className="w-4 h-4 mr-2" />
                 )}
@@ -412,6 +679,7 @@ export default function ManagerProductManagement() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+        </div>
       </div>
 
       {/* EDIT PRODUCT DIALOG */}
@@ -426,17 +694,17 @@ export default function ManagerProductManagement() {
           </DialogHeader>
           {renderFormFields()}
           <DialogFooter className="gap-3">
-            <Button variant="outline" onClick={() => setIsEditProductOpen(false)}>
+            <Button variant="outline" onClick={() => setIsEditProductOpen(false)} disabled={isSubmitting}>
               <X className="w-4 h-4 mr-2" />
               Cancel
             </Button>
             <Button 
               className="bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white"
               onClick={handleUpdateProduct}
-              disabled={isLoading}
+              disabled={isSubmitting}
             >
-              {isLoading ? (
-                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />
+              {isSubmitting ? (
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
               ) : (
                 <Save className="w-4 h-4 mr-2" />
               )}
@@ -448,61 +716,139 @@ export default function ManagerProductManagement() {
 
       {/* VIEW PRODUCT DIALOG */}
       <Dialog open={isViewProductOpen} onOpenChange={setIsViewProductOpen}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="max-w-xl">
           <DialogHeader>
-            <DialogTitle className="text-xl">Product Details</DialogTitle>
-            <DialogDescription>View detailed product information</DialogDescription>
+            <DialogTitle className="text-lg font-semibold">Product Details</DialogTitle>
+            <DialogDescription className="text-sm">View detailed product information</DialogDescription>
           </DialogHeader>
           {selectedProduct && (
-            <div className="py-4">
-              <div className="flex gap-6">
-                <img 
-                  src={selectedProduct.image} 
-                  alt={selectedProduct.name}
-                  className="w-32 h-32 object-cover rounded-xl border shadow-sm"
-                />
-                <div className="flex-1 space-y-3">
-                  <div>
-                    <h3 className="text-2xl font-bold text-foreground">{selectedProduct.name}</h3>
-                    <Badge variant="outline" className="mt-1">{selectedProduct.category}</Badge>
+            <div className="py-4 space-y-5">
+              {/* Header with image and basic info */}
+              <div className="flex gap-5 items-start">
+                {/* Product Image */}
+                <div className="shrink-0">
+                  <img 
+                    src={selectedProduct.thumbnail || selectedProduct.images?.[0] || 'https://via.placeholder.com/120'} 
+                    alt={selectedProduct.name}
+                    className="w-28 h-28 object-cover rounded-xl border-2 border-gray-100 shadow-sm"
+                  />
+                  {selectedProduct.images && selectedProduct.images.length > 1 && (
+                    <div className="flex gap-1 mt-2">
+                      {selectedProduct.images.slice(1, 4).map((url, index) => (
+                        <img 
+                          key={index}
+                          src={url} 
+                          alt={`${selectedProduct.name} - ${index + 2}`}
+                          className="w-8 h-8 object-cover rounded border"
+                        />
+                      ))}
+                      {selectedProduct.images.length > 4 && (
+                        <div className="w-8 h-8 rounded border bg-gray-100 flex items-center justify-center text-xs text-gray-500">
+                          +{selectedProduct.images.length - 4}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+                
+                {/* Product Info */}
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-xl font-bold text-foreground truncate">{selectedProduct.name}</h3>
+                    {selectedProduct.isOrganic && (
+                      <Badge className="bg-green-100 text-green-700 text-xs">Organic</Badge>
+                    )}
+                    {selectedProduct.isFeatured && (
+                      <Star className="w-4 h-4 text-yellow-500 fill-yellow-500" />
+                    )}
                   </div>
-                  <Badge {...getStockBadge(selectedProduct.status)}>{selectedProduct.status}</Badge>
+                  <div className="flex flex-wrap gap-2 mt-2">
+                    <Badge variant="outline" className="text-xs">{selectedProduct.category}</Badge>
+                    {selectedProduct.certifications && selectedProduct.certifications.length > 0 && (
+                      selectedProduct.certifications.map((cert, idx) => (
+                        <Badge key={idx} className="bg-emerald-100 text-emerald-700 hover:bg-emerald-100 text-xs">
+                          {cert}
+                        </Badge>
+                      ))
+                    )}
+                    <Badge {...getStockBadge(selectedProduct)} className="text-xs">
+                      {selectedProduct.stock > 10 ? 'In Stock' : selectedProduct.stock > 0 ? 'Low Stock' : 'Out of Stock'}
+                    </Badge>
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-2">
+                    Created: {formatDate(selectedProduct.createdAt)}
+                  </p>
                 </div>
               </div>
               
-              <div className="grid grid-cols-2 gap-4 mt-6">
-                <Card className="bg-green-50 border-green-200">
-                  <CardContent className="pt-4">
-                    <p className="text-sm text-green-600 font-medium">Price</p>
-                    <p className="text-2xl font-bold text-green-700">${selectedProduct.price}</p>
+              {/* Stats Cards - 2x2 Grid */}
+              <div className="grid grid-cols-4 gap-2">
+                <Card className="bg-green-50 border-green-100">
+                  <CardContent className="p-3 text-center">
+                    <p className="text-[10px] text-green-600 font-medium uppercase tracking-wide">Price</p>
+                    <p className="text-lg font-bold text-green-700">${selectedProduct.price?.toLocaleString()}</p>
+                    {selectedProduct.originalPrice && selectedProduct.originalPrice > selectedProduct.price && (
+                      <p className="text-[10px] text-gray-400 line-through">${selectedProduct.originalPrice?.toLocaleString()}</p>
+                    )}
                   </CardContent>
                 </Card>
-                <Card className="bg-blue-50 border-blue-200">
-                  <CardContent className="pt-4">
-                    <p className="text-sm text-blue-600 font-medium">Stock</p>
-                    <p className="text-2xl font-bold text-blue-700">{selectedProduct.stock} units</p>
+                <Card className="bg-blue-50 border-blue-100">
+                  <CardContent className="p-3 text-center">
+                    <p className="text-[10px] text-blue-600 font-medium uppercase tracking-wide">Stock</p>
+                    <p className="text-lg font-bold text-blue-700">{selectedProduct.stock}</p>
+                    <p className="text-[10px] text-blue-500">{selectedProduct.unit}</p>
                   </CardContent>
                 </Card>
-                <Card className="bg-purple-50 border-purple-200">
-                  <CardContent className="pt-4">
-                    <p className="text-sm text-purple-600 font-medium">Sold</p>
-                    <p className="text-2xl font-bold text-purple-700">{selectedProduct.sales}</p>
+                <Card className="bg-purple-50 border-purple-100">
+                  <CardContent className="p-3 text-center">
+                    <p className="text-[10px] text-purple-600 font-medium uppercase tracking-wide">Sold</p>
+                    <p className="text-lg font-bold text-purple-700">{selectedProduct.soldCount || 0}</p>
                   </CardContent>
                 </Card>
-                <Card className="bg-amber-50 border-amber-200">
-                  <CardContent className="pt-4">
-                    <p className="text-sm text-amber-600 font-medium">Revenue</p>
-                    <p className="text-2xl font-bold text-amber-700">${selectedProduct.revenue.toFixed(2)}</p>
+                <Card className="bg-amber-50 border-amber-100">
+                  <CardContent className="p-3 text-center">
+                    <p className="text-[10px] text-amber-600 font-medium uppercase tracking-wide">Rating</p>
+                    <p className="text-lg font-bold text-amber-700">{selectedProduct.rating?.toFixed(1) || 'N/A'}</p>
+                    <p className="text-[10px] text-amber-500">({selectedProduct.reviewCount || 0} reviews)</p>
                   </CardContent>
                 </Card>
               </div>
 
-              {selectedProduct.description && (
-                <div className="mt-6">
-                  <h4 className="font-semibold text-foreground mb-2">Description</h4>
-                  <p className="text-muted-foreground">{selectedProduct.description}</p>
+              {/* Origin */}
+              {selectedProduct.origin && (
+                <div className="bg-gray-50 px-4 py-3 rounded-lg border border-gray-100">
+                  <p className="text-xs text-muted-foreground font-medium mb-1">Origin</p>
+                  <p className="text-sm font-medium text-foreground">{selectedProduct.origin}</p>
                 </div>
               )}
+
+              {/* Description */}
+              {selectedProduct.description && (
+                <div>
+                  <h4 className="text-sm font-semibold text-foreground mb-1.5">Description</h4>
+                  <p className="text-sm text-muted-foreground leading-relaxed">{selectedProduct.description}</p>
+                </div>
+              )}
+
+              {/* Nutrition Info */}
+              {selectedProduct.nutritionInfo && (
+                <div className="bg-blue-50 px-4 py-3 rounded-lg border border-blue-100">
+                  <h4 className="text-sm font-semibold text-blue-800 mb-1">Nutrition Information</h4>
+                  <div className="grid grid-cols-2 gap-2 text-sm text-blue-700">
+                    {selectedProduct.nutritionInfo.calories && <span>Calories: {selectedProduct.nutritionInfo.calories}</span>}
+                    {selectedProduct.nutritionInfo.protein && <span>Protein: {selectedProduct.nutritionInfo.protein}</span>}
+                    {selectedProduct.nutritionInfo.carbs && <span>Carbs: {selectedProduct.nutritionInfo.carbs}</span>}
+                    {selectedProduct.nutritionInfo.fat && <span>Fat: {selectedProduct.nutritionInfo.fat}</span>}
+                    {selectedProduct.nutritionInfo.fiber && <span>Fiber: {selectedProduct.nutritionInfo.fiber}</span>}
+                  </div>
+                </div>
+              )}
+
+              {/* Additional Info - Footer */}
+              <div className="flex items-center justify-between pt-2 border-t text-xs text-muted-foreground">
+                <span>SKU: <span className="font-medium text-foreground">{selectedProduct.sku || 'N/A'}</span></span>
+                <span>Status: <span className="font-medium text-foreground">{selectedProduct.isActive ? 'Active' : 'Inactive'}</span></span>
+              </div>
             </div>
           )}
           <DialogFooter>
@@ -537,14 +883,14 @@ export default function ManagerProductManagement() {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel disabled={isSubmitting}>Cancel</AlertDialogCancel>
             <AlertDialogAction 
               className="bg-red-600 hover:bg-red-700 text-white"
               onClick={handleDeleteProduct}
-              disabled={isLoading}
+              disabled={isSubmitting}
             >
-              {isLoading ? (
-                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />
+              {isSubmitting ? (
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
               ) : (
                 <Trash2 className="w-4 h-4 mr-2" />
               )}
@@ -573,10 +919,9 @@ export default function ManagerProductManagement() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Categories</SelectItem>
-                <SelectItem value="Fruits">Fruits</SelectItem>
-                <SelectItem value="Vegetables">Vegetables</SelectItem>
-                <SelectItem value="Herbs">Herbs</SelectItem>
-                <SelectItem value="Mushrooms">Mushrooms</SelectItem>
+                {CATEGORIES.map((cat) => (
+                  <SelectItem key={cat.value} value={cat.value}>{cat.label}</SelectItem>
+                ))}
               </SelectContent>
             </Select>
             <Select value={statusFilter} onValueChange={setStatusFilter}>
@@ -584,7 +929,7 @@ export default function ManagerProductManagement() {
                 <SelectValue placeholder="Status" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All</SelectItem>
+                <SelectItem value="all">All Status</SelectItem>
                 <SelectItem value="In Stock">In Stock</SelectItem>
                 <SelectItem value="Low Stock">Low Stock</SelectItem>
                 <SelectItem value="Out of Stock">Out of Stock</SelectItem>
@@ -605,10 +950,24 @@ export default function ManagerProductManagement() {
       {/* Products Table */}
       <Card className="shadow-sm">
         <CardContent className="p-0">
-          {filteredProducts.length === 0 ? (
+          {loading ? (
+            <div className="flex items-center justify-center py-12">
+              <Loader2 className="w-8 h-8 animate-spin text-green-600" />
+              <span className="ml-2 text-muted-foreground">Loading products...</span>
+            </div>
+          ) : error ? (
+            <div className="text-center py-12">
+              <AlertTriangle className="w-16 h-16 text-red-300 mx-auto mb-3" />
+              <h3 className="text-lg font-semibold text-foreground mb-1">Error Loading Data</h3>
+              <p className="text-sm text-muted-foreground mb-4">{error}</p>
+              <Button onClick={() => fetchProducts()} variant="outline">
+                Retry
+              </Button>
+            </div>
+          ) : filteredProducts.length === 0 ? (
             <div className="text-center py-12">
               <Package className="w-16 h-16 text-gray-300 mx-auto mb-3" />
-              <h3 className="text-lg font-semibold text-foreground mb-1">No products found</h3>
+              <h3 className="text-lg font-semibold text-foreground mb-1">No Products Found</h3>
               <p className="text-sm text-muted-foreground mb-4">
                 {products.length === 0 
                   ? 'Get started by adding your first product' 
@@ -628,25 +987,38 @@ export default function ManagerProductManagement() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="w-[300px]">Product</TableHead>
+                  <TableHead className="w-[250px]">Product</TableHead>
                   <TableHead>Category</TableHead>
+                  <TableHead>Origin</TableHead>
                   <TableHead>Price</TableHead>
                   <TableHead>Stock</TableHead>
+                  <TableHead>Certifications</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {filteredProducts.map((product) => (
-                  <TableRow key={product.id} className="hover:bg-gray-50">
+                  <TableRow key={product._id} className="hover:bg-gray-50">
                     <TableCell>
                       <div className="flex items-center gap-3">
                         <img 
-                          src={product.image} 
+                          src={product.thumbnail || product.images?.[0] || 'https://via.placeholder.com/100'} 
                           alt={product.name} 
                           className="w-12 h-12 rounded-lg object-cover border border-gray-200" 
                         />
-                        <span className="font-medium text-gray-900">{product.name}</span>
+                        <div>
+                          <div className="flex items-center gap-1">
+                            <span className="font-medium text-gray-900 block">{product.name}</span>
+                            {product.isOrganic && (
+                              <Badge className="bg-green-100 text-green-700 text-[10px] px-1">Organic</Badge>
+                            )}
+                            {product.isFeatured && (
+                              <Star className="w-3 h-3 text-yellow-500 fill-yellow-500" />
+                            )}
+                          </div>
+                          <span className="text-xs text-muted-foreground">SKU: {product.sku || 'N/A'}</span>
+                        </div>
                       </div>
                     </TableCell>
                     <TableCell>
@@ -654,11 +1026,26 @@ export default function ManagerProductManagement() {
                         {product.category}
                       </Badge>
                     </TableCell>
-                    <TableCell className="font-semibold text-gray-900">${product.price}</TableCell>
-                    <TableCell className="text-gray-700">{product.stock} units</TableCell>
+                    <TableCell className="text-gray-700 text-sm">{product.origin || '-'}</TableCell>
+                    <TableCell className="font-semibold text-gray-900">${product.price?.toLocaleString()}</TableCell>
+                    <TableCell className="text-gray-700">{product.stock} {product.unit}</TableCell>
                     <TableCell>
-                      <Badge {...getStockBadge(product.status)}>
-                        {product.status}
+                      {product.certifications && product.certifications.length > 0 ? (
+                        <div className="flex flex-wrap gap-1">
+                          {product.certifications.slice(0, 2).map((cert, idx) => (
+                            <Badge key={idx} variant="secondary" className="bg-emerald-50 text-emerald-700 text-xs">
+                              {cert}
+                            </Badge>
+                          ))}
+                          {product.certifications.length > 2 && (
+                            <Badge variant="secondary" className="text-xs">+{product.certifications.length - 2}</Badge>
+                          )}
+                        </div>
+                      ) : '-'}
+                    </TableCell>
+                    <TableCell>
+                      <Badge {...getStockBadge(product)}>
+                        {product.stock > 10 ? 'In Stock' : product.stock > 0 ? 'Low Stock' : 'Out of Stock'}
                       </Badge>
                     </TableCell>
                     <TableCell>
@@ -704,22 +1091,118 @@ export default function ManagerProductManagement() {
       {products.length > 0 && (
         <div className="flex items-center justify-between text-sm text-muted-foreground">
           <span>
-            Showing {filteredProducts.length} / {products.length} products
+            Showing {filteredProducts.length} of {pagination?.totalProducts || products.length} products
+            {pagination && ` (Page ${pagination.currentPage} of ${pagination.totalPages})`}
           </span>
           <div className="flex gap-4">
             <span className="flex items-center gap-1">
               <div className="w-2 h-2 rounded-full bg-green-500"></div>
-              In Stock: {products.filter(p => p.status === 'In Stock').length}
+              In Stock: {products.filter(p => p.stock > 10).length}
             </span>
             <span className="flex items-center gap-1">
               <div className="w-2 h-2 rounded-full bg-yellow-500"></div>
-              Low Stock: {products.filter(p => p.status === 'Low Stock').length}
+              Low Stock: {products.filter(p => p.stock > 0 && p.stock <= 10).length}
             </span>
             <span className="flex items-center gap-1">
               <div className="w-2 h-2 rounded-full bg-red-500"></div>
-              Out of Stock: {products.filter(p => p.status === 'Out of Stock').length}
+              Out of Stock: {products.filter(p => p.stock === 0).length}
             </span>
           </div>
+        </div>
+      )}
+
+      {/* Pagination */}
+      {pagination && pagination.totalPages > 1 && (
+        <div className="flex items-center justify-center gap-2 mt-4">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setCurrentPage(1)}
+            disabled={!pagination.hasPrev}
+            className="hidden sm:flex"
+          >
+            First
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+            disabled={!pagination.hasPrev}
+          >
+            Previous
+          </Button>
+          
+          {/* Page Numbers */}
+          <div className="flex items-center gap-1">
+            {(() => {
+              const pages: (number | string)[] = [];
+              const totalPages = pagination.totalPages;
+              const current = pagination.currentPage;
+              
+              if (totalPages <= 7) {
+                // Show all pages if 7 or less
+                for (let i = 1; i <= totalPages; i++) {
+                  pages.push(i);
+                }
+              } else {
+                // Always show first page
+                pages.push(1);
+                
+                if (current > 3) {
+                  pages.push('...');
+                }
+                
+                // Show pages around current
+                const start = Math.max(2, current - 1);
+                const end = Math.min(totalPages - 1, current + 1);
+                
+                for (let i = start; i <= end; i++) {
+                  pages.push(i);
+                }
+                
+                if (current < totalPages - 2) {
+                  pages.push('...');
+                }
+                
+                // Always show last page
+                pages.push(totalPages);
+              }
+              
+              return pages.map((page, index) => (
+                typeof page === 'number' ? (
+                  <Button
+                    key={index}
+                    variant={page === current ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => setCurrentPage(page)}
+                    className={page === current ? 'bg-green-600 hover:bg-green-700' : ''}
+                  >
+                    {page}
+                  </Button>
+                ) : (
+                  <span key={index} className="px-2 text-muted-foreground">...</span>
+                )
+              ));
+            })()}
+          </div>
+          
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setCurrentPage(prev => Math.min(pagination.totalPages, prev + 1))}
+            disabled={!pagination.hasNext}
+          >
+            Next
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setCurrentPage(pagination.totalPages)}
+            disabled={!pagination.hasNext}
+            className="hidden sm:flex"
+          >
+            Last
+          </Button>
         </div>
       )}
     </div>

@@ -3,6 +3,7 @@ import { Toaster } from 'sonner';
 import { CartProvider } from './context/CartContext';
 import { AuthProvider } from './context/AuthContext';
 import { ProtectedRoute, CustomerRoute, AdminRoute, ManagerRoute } from './components/ProtectedRoute';
+import MiniCart from './components/MiniCart';
 import HomePage from './pages/HomePage/Home';
 import CartPage from './pages/HomePage/CartPage';
 import CheckoutPage from './pages/HomePage/CheckoutPage';
@@ -20,6 +21,8 @@ import AboutUs from './pages/HomePage/AboutUs';
 import Profile from './pages/Customer/Profile';
 import AdminDashboard from './pages/Admin/AdminDashboard';
 import ManagerDashboard from './pages/Manager/ManagerDashboard';
+import ProductsPage from './pages/HomePage/ProductsPage';
+import ProductDetailPage from './pages/HomePage/ProductDetailPage';
 
 export default function App() {
   return (
@@ -27,6 +30,7 @@ export default function App() {
       <CartProvider>
         <BrowserRouter>
           <Toaster position="top-right" richColors />
+          <MiniCart />
           <Routes>
             {/* Public routes */}
             <Route path="/" element={<HomePage />} />
@@ -40,6 +44,9 @@ export default function App() {
             <Route path="/blogs/green-living" element={<FarmStories />} />
             <Route path="/blogs/news-offers" element={<MarketNewsTips />} />
             <Route path="/about" element={<AboutUs />} />
+            <Route path="/products" element={<ProductsPage />} />
+            <Route path="/products/:category" element={<ProductsPage />} />
+            <Route path="/product/:id" element={<ProductDetailPage />} />
 
             {/* Protected routes - require authentication */}
             <Route path="/cart" element={<ProtectedRoute><CartPage /></ProtectedRoute>} />

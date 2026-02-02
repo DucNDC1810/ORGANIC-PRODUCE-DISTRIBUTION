@@ -30,13 +30,40 @@ api.interceptors.request.use(
 api.interceptors.response.use(
   (response) => response.data,
   (error) => {
+    // Handle token expiration or authentication errors
     if (error.response?.status === 401) {
-      localStorage.removeItem('token');
-      localStorage.removeItem('user');
-      if (window.location.pathname !== '/login') {
+      const errorMessage = error.response?.data?.message || 'Authentication failed';
+      
+      // Check if it's a token expiration error
+      if (errorMessage.includes('expired') || errorMessage.includes('Invalid token')) {
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        
+        // Show toast notification before redirect
+        if (typeof window !== 'undefined' && window.location.pathname !== '/login') {
+          // Import toast dynamically to avoid circular dependency
+          import('sonner').then(({ toast }) => {
+            toast.error('Your session has expired. Please login again.');
+          });
+          
+          // Delay redirect to show toast
+          setTimeout(() => {
+            window.location.href = '/login';
+          }, 1000);
+        }
+      } else if (window.location.pathname !== '/login') {
+        // For other 401 errors (wrong credentials, etc.)
         window.location.href = '/login';
       }
     }
+    
+    // Handle forbidden errors (403)
+    if (error.response?.status === 403) {
+      import('sonner').then(({ toast }) => {
+        toast.error(error.response?.data?.message || 'Access denied');
+      });
+    }
+    
     return Promise.reject(error);
   }
 );
@@ -54,6 +81,8 @@ export interface User {
   phone?: string;
   address?: string;
   avatar?: string;
+  dateOfBirth?: string;
+  gender?: 'male' | 'female' | 'other';
   isActive: boolean;
   isEmailVerified: boolean;
   createdAt: string;
@@ -401,6 +430,111 @@ export const productAPI = {
    */
   deleteProduct: async (id: string): Promise<void> => {
     await api.delete(`/products/${id}`);
+  },
+};
+
+// ========================
+// CART API ENDPOINTS
+// ========================
+
+export interface CartItem {
+  product: {
+    _id: string;
+    name: string;
+    price: number;
+    images?: string[];
+    thumbnail?: string;
+    stock: number;
+    isActive: boolean;
+  };
+  quantity: number;
+  price: number;
+  name: string;
+  image: string;
+}
+
+export interface Cart {
+  _id: string;
+  user: string;
+  items: CartItem[];
+  totalItems: number;
+  totalPrice: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface AddToCartData {
+  productId: string;
+  quantity?: number;
+}
+
+export interface UpdateCartItemData {
+  quantity: number;
+}
+
+export interface SyncCartData {
+  items: {
+    product: string;
+    quantity: number;
+    price: number;
+    name: string;
+    image: string;
+  }[];
+}
+
+export const cartAPI = {
+  /**
+   * Get current user's cart
+   * GET /api/cart
+   */
+  getCart: async (): Promise<Cart> => {
+    const response: any = await api.get('/cart');
+    return response.data;
+  },
+
+  /**
+   * Add item to cart
+   * POST /api/cart/add
+   */
+  addToCart: async (data: AddToCartData): Promise<Cart> => {
+    const response: any = await api.post('/cart/add', data);
+    return response.data;
+  },
+
+  /**
+   * Update cart item quantity
+   * PUT /api/cart/item/:productId
+   */
+  updateCartItem: async (productId: string, data: UpdateCartItemData): Promise<Cart> => {
+    const response: any = await api.put(`/cart/item/${productId}`, data);
+    return response.data;
+  },
+
+  /**
+   * Remove item from cart
+   * DELETE /api/cart/item/:productId
+   */
+  removeFromCart: async (productId: string): Promise<Cart> => {
+    const response: any = await api.delete(`/cart/item/${productId}`);
+    return response.data;
+  },
+
+  /**
+   * Clear entire cart
+   * DELETE /api/cart/clear
+   */
+  clearCart: async (): Promise<Cart> => {
+    const response: any = await api.delete('/cart/clear');
+    return response.data;
+  },
+
+  /**
+   * Sync local cart with database
+   * POST /api/cart/sync
+   */
+  syncCart: async (data: SyncCartData): Promise<Cart> => {
+    const response: any = await api.post('/cart/sync', data);
+    return response.data;
   },
 };
 

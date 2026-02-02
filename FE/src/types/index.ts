@@ -5,15 +5,59 @@ export interface ApiResponse<T = any> {
   error?: string;
 }
 
+export interface Review {
+  _id: string;
+  user: {
+    _id: string;
+    name: string;
+    email: string;
+    avatar?: string;
+  };
+  product: string;
+  rating: number;
+  comment: string;
+  images?: string[];
+  isVerifiedPurchase: boolean;
+  helpfulCount: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface RatingStats {
+  averageRating: number;
+  totalReviews: number;
+  ratingDistribution: {
+    5: number;
+    4: number;
+    3: number;
+    2: number;
+    1: number;
+  };
+}
+
 export interface Product {
   _id: string;
+  product_id?: number;
   name: string;
   description: string;
   price: number;
-  category: string;
-  image: string;
-  stock: number;
-  farmerId: string;
+  stockQuantity: number;
+  certification?: string;
+  originFarm?: string;
+  nutritionInfo?: string;
+  imageUrls: string[];
+  status: 'In Stock' | 'Low Stock' | 'Out of Stock' | 'Discontinued';
+  categoryId: number;
+  category?: string;
+  createdAt: string;
+  // Review fields
+  rating?: number;
+  reviewCount?: number;
+  reviews?: Review[];
+  // Legacy fields for backward compatibility
+  image?: string;
+  stock?: number;
+  farmerId?: string;
 }
 
 export interface Order {
