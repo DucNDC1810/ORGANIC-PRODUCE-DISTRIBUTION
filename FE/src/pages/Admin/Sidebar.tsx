@@ -244,10 +244,10 @@ const Sidebar = ({
         aria-label="Điều hướng chính"
         onKeyDown={handleKeyDown}
         className={cn(
-          "fixed lg:sticky top-16 left-0 h-[calc(100vh-4rem)] bg-gradient-to-b from-white to-gray-50/50",
-          "border-r border-gray-200/80 transition-all duration-300 ease-in-out z-30",
-          "shadow-[4px_0_24px_-2px_rgba(0,0,0,0.08)] lg:shadow-none w-72",
-          isOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
+          "fixed lg:fixed top-16 left-0 h-[calc(100vh-4rem)] bg-gradient-to-b from-white to-gray-50/50",
+          "border-r border-gray-200/80 transition-all duration-500 ease-[cubic-bezier(0.34,1.56,0.64,1)] z-30",
+          "shadow-[4px_0_24px_-2px_rgba(0,0,0,0.08)] w-72",
+          isOpen ? "translate-x-0 opacity-100" : "-translate-x-full opacity-0"
         )}
       >
         {/* Navigation Menu */}
