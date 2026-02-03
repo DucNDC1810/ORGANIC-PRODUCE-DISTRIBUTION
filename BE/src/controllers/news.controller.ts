@@ -1,16 +1,9 @@
 import { Request, Response } from 'express';
 import newsService from '../services/news.service';
 
-/**
- * News Controller
- * Handles news-related API endpoints
- */
+
 class NewsController {
-  /**
-   * Get agriculture-related news
-   * @route GET /api/news/agriculture
-   * @access Public
-   */
+
   async getAgricultureNews(req: Request, res: Response): Promise<void> {
     try {
       // Get optional max results from query params (default: 10)

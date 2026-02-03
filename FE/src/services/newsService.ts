@@ -21,10 +21,24 @@ interface NewsResponse {
 export const fetchAgricultureNews = async (maxResults: number = 10): Promise<NewsArticle[]> => {
   try {
     const response = await api.get<NewsResponse>(`/news/agriculture?max=${maxResults}`);
-    return response.data.data;
+    
+    // Check if response itself has the structure (due to axios interceptor)
+    if ((response as any).success && Array.isArray(response.data)) {
+      return response.data as NewsArticle[];
+    }
+    
+    // Standard axios response structure
+    if (response.data.success && Array.isArray(response.data.data)) {
+      return response.data.data;
+    }
+    
+    // Return empty array if unexpected response format
+    return [];
   } catch (error: any) {
     console.error('Error fetching agriculture news:', error);
-    throw new Error(error.response?.data?.message || 'Failed to fetch news');
+    
+    // Return empty array instead of throwing to avoid breaking the UI
+    return [];
   }
 };
 

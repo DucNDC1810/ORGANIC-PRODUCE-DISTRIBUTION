@@ -1,4 +1,4 @@
-import { Calendar, User, ArrowRight } from 'lucide-react';
+import { Calendar, User, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import Header from '../../components/Header';
 import { ImageWithFallback } from '../../components/figma/ImageWithFallback';
@@ -8,7 +8,8 @@ import { toast } from 'sonner';
 export default function FarmStories() {
   const [stories, setStories] = useState<NewsArticle[]>([]);
   const [loading, setLoading] = useState(true);
-  const [visibleCount, setVisibleCount] = useState(6);
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 6;
 
   useEffect(() => {
     loadNews();
@@ -28,10 +29,6 @@ export default function FarmStories() {
     }
   };
 
-  const loadMore = () => {
-    setVisibleCount(prev => prev + 6);
-  };
-
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
     return date.toLocaleDateString('en-US', { 
@@ -41,7 +38,29 @@ export default function FarmStories() {
     });
   };
 
-  const visibleStories = stories.slice(0, visibleCount);
+  // Calculate pagination
+  const totalPages = Math.ceil(stories.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const currentStories = stories.slice(startIndex, endIndex);
+
+  const goToPage = (page: number) => {
+    setCurrentPage(page);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const nextPage = () => {
+    if (currentPage < totalPages) {
+      goToPage(currentPage + 1);
+    }
+  };
+
+  const prevPage = () => {
+    if (currentPage > 1) {
+      goToPage(currentPage - 1);
+    }
+  };
+  
   return (
     <div className="min-h-screen bg-gradient-to-b from-[#FAF7F2] to-white">
       <Header />
@@ -72,85 +91,105 @@ export default function FarmStories() {
         </div>
       </section>
 
-      {/* Main Content - Editorial Layout */}
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
+      {/* Main Content - Grid Layout */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
         {loading ? (
           <div className="flex justify-center items-center py-20">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
           </div>
-        ) : visibleStories.length === 0 ? (
+        ) : currentStories.length === 0 ? (
           <div className="text-center py-20">
             <p className="text-lg text-muted-foreground">No news articles available at the moment.</p>
           </div>
         ) : (
-          <div className="space-y-20">
-            {visibleStories.map((story, index) => (
-              <article key={index} className="group">
-                {/* Image */}
-                <div className="relative overflow-hidden rounded-2xl mb-8 shadow-lg">
-                  <ImageWithFallback
-                    src={story.image}
-                    alt={story.title}
-                    className="w-full h-[500px] object-cover group-hover:scale-105 transition-transform duration-700"
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-                </div>
-
-                {/* Content */}
-                <div className="space-y-6">
-                  {/* Meta Info */}
-                  <div className="flex flex-wrap items-center gap-6 text-sm text-[#8B7355]">
-                    <div className="flex items-center gap-2">
-                      <User className="w-4 h-4" />
-                      <span className="font-medium">{story.source}</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Calendar className="w-4 h-4" />
-                      <span>{formatDate(story.publishedAt)}</span>
-                    </div>
+          <>
+            {/* News Grid - 3 columns */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+              {currentStories.map((story, index) => (
+                <a
+                  key={index}
+                  href={story.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  title={story.url}
+                  className="group bg-white rounded-xl overflow-hidden shadow-md hover:shadow-xl transition-all duration-300 cursor-pointer block"
+                >
+                  {/* Image */}
+                  <div className="relative overflow-hidden h-56">
+                    <ImageWithFallback
+                      src={story.image}
+                      alt={story.title}
+                      className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                    />
                   </div>
 
-                  {/* Title */}
-                  <h2 className="text-4xl font-serif font-bold text-[#2C2416] leading-tight group-hover:text-primary transition-colors">
-                    {story.title}
-                  </h2>
+                  {/* Content */}
+                  <div className="p-6 space-y-4">
+                    {/* Meta Info */}
+                    <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                      <div className="flex items-center gap-1">
+                        <User className="w-3 h-3" />
+                        <span className="font-medium">{story.source}</span>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <Calendar className="w-3 h-3" />
+                        <span>{new Date(story.publishedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
+                      </div>
+                    </div>
 
-                  {/* Excerpt */}
-                  <p className="text-lg text-[#5C5041] leading-relaxed font-light">
-                    {story.description}
-                  </p>
+                    {/* Title */}
+                    <h3 className="text-xl font-bold text-foreground leading-tight group-hover:text-primary transition-colors line-clamp-2">
+                      {story.title}
+                    </h3>
 
-                  {/* Read More Link */}
-                  <a 
-                    href={story.url} 
-                    target="_blank" 
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-2 text-primary hover:text-primary-dark font-semibold group/button transition-colors"
-                  >
-                    <span>Read Full Story</span>
-                    <ArrowRight className="w-5 h-5 group-hover/button:translate-x-1 transition-transform" />
-                  </a>
+                    {/* Description */}
+                    <p className="text-sm text-muted-foreground line-clamp-3 leading-relaxed">
+                      {story.description}
+                    </p>
+                  </div>
+                </a>
+              ))}
+            </div>
+
+            {/* Pagination */}
+            {totalPages > 1 && (
+              <div className="mt-12 flex justify-center items-center gap-2">
+                <button
+                  onClick={prevPage}
+                  disabled={currentPage === 1}
+                  className="px-4 py-2 rounded-lg border border-border hover:bg-accent disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  aria-label="Previous page"
+                >
+                  <ChevronLeft className="w-5 h-5" />
+                </button>
+
+                <div className="flex gap-2">
+                  {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                    <button
+                      key={page}
+                      onClick={() => goToPage(page)}
+                      className={`px-4 py-2 rounded-lg font-semibold transition-colors ${
+                        currentPage === page
+                          ? 'bg-primary text-white'
+                          : 'border border-border hover:bg-accent'
+                      }`}
+                    >
+                      {page}
+                    </button>
+                  ))}
                 </div>
 
-                {/* Divider (except for last item) */}
-                {index < visibleStories.length - 1 && (
-                  <div className="mt-20 pt-20 border-t border-[#E6DED1]" />
-                )}
-              </article>
-            ))}
-          </div>
-        )}
-
-        {/* Load More Section */}
-        {!loading && visibleCount < stories.length && (
-          <div className="mt-20 text-center">
-            <button 
-              onClick={loadMore}
-              className="px-10 py-4 bg-primary hover:bg-primary-dark text-white rounded-lg font-semibold shadow-md hover:shadow-lg transition-all"
-            >
-              Load More Stories
-            </button>
-          </div>
+                <button
+                  onClick={nextPage}
+                  disabled={currentPage === totalPages}
+                  className="px-4 py-2 rounded-lg border border-border hover:bg-accent disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  aria-label="Next page"
+                >
+                  <ChevronRight className="w-5 h-5" />
+                </button>
+              </div>
+            )}
+          </>
         )}
       </div>
 
