@@ -283,15 +283,6 @@ export function CartProvider({ children }: { children: ReactNode }) {
         openCart,
         closeCart,
         refreshCart,
-        updateQuantity,
-        clearCart,
-        clearLocalCart,
-        getTotalItems,
-        getTotalPrice,
-        isCartOpen,
-        openCart,
-        closeCart,
-        refreshCart,
       }}
     >
       {children}
