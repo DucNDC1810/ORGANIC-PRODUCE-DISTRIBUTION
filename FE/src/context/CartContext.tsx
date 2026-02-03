@@ -77,7 +77,6 @@ export function CartProvider({ children }: { children: ReactNode }) {
         const localCart = apiCart.items
           .map(convertAPICartItemToLocal)
           .filter((item): item is CartItem => item !== null);
-        console.log('Loaded cart items:', localCart);
         setCart(localCart);
       } else {
         setCart([]);
