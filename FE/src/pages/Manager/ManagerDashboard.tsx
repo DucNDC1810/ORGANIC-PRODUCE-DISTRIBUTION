@@ -16,6 +16,7 @@ import {
   ChevronDown,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
+import { useCart } from '../../context/CartContext';
 import { toast } from 'sonner';
 import ManagerOverview from './ManagerOverview';
 import ManagerProductManagement from './ProductManagement';
@@ -29,6 +30,7 @@ export default function ManagerDashboard() {
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const { user, logout } = useAuth();
+  const { clearLocalCart } = useCart();
   const navigate = useNavigate();
 
   // Close dropdown when clicking outside
@@ -44,8 +46,9 @@ export default function ManagerDashboard() {
   }, []);
 
   const handleLogout = () => {
+    clearLocalCart();
     logout();
-    toast.success('Đăng xuất thành công!');
+    toast.success('Logged out successfully!');
     navigate('/login');
   };
 

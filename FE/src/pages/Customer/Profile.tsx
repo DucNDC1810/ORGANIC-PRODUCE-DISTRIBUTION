@@ -2,12 +2,14 @@ import { useState, useEffect, useRef } from 'react';
 import { User, ShoppingBag, LogOut, Phone, Mail, Home, Edit2, Save, X, Camera } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
+import { useCart } from '../../context/CartContext';
 import Header from '../../components/Header';
 import { userAPI } from '../Axios/Axios';
 import { toast } from 'sonner';
 
 export default function Profile() {
   const { user, logout, setUser } = useAuth();
+  const { clearLocalCart } = useCart();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<'account' | 'orders'>('account');
   const [isEditing, setIsEditing] = useState(false);
@@ -46,6 +48,7 @@ export default function Profile() {
   }, [user]);
 
   const handleLogout = () => {
+    clearLocalCart();
     logout();
     navigate('/');
   };
@@ -82,10 +85,10 @@ export default function Profile() {
       // Update localStorage
       localStorage.setItem('user', JSON.stringify(updatedUser));
       
-      toast.success('Cập nhật thông tin thành công!');
+      toast.success('Profile updated successfully!');
       setIsEditing(false);
     } catch (error: any) {
-      toast.error(error.response?.data?.message || 'Lỗi khi cập nhật thông tin');
+      toast.error(error.response?.data?.message || 'Failed to update profile');
     } finally {
       setLoading(false);
     }

@@ -26,6 +26,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const logout = useCallback(() => {
     authAPI.logout();
     setUser(null);
+    // Clear cart from localStorage when logging out
+    localStorage.removeItem('cart');
     if (inactivityTimerRef.current) {
       clearTimeout(inactivityTimerRef.current);
       inactivityTimerRef.current = null;
@@ -41,7 +43,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     // Only set timer if user is logged in
     if (user) {
       inactivityTimerRef.current = setTimeout(() => {
-        toast.error('Phiên đăng nhập đã hết hạn do không hoạt động. Vui lòng đăng nhập lại.');
+        toast.error('Your session has expired due to inactivity. Please log in again..');
         logout();
         window.location.href = '/login';
       }, INACTIVITY_TIMEOUT);
@@ -52,7 +54,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     // Setup callback for token expiration from api interceptor
     setTokenExpiredCallback(() => {
       setUser(null);
-      toast.error('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.');
+      toast.error('Your session has expired. Please log in again.');
       // Redirect to login page
       window.location.href = '/login';
     });
