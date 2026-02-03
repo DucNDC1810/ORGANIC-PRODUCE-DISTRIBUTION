@@ -15,10 +15,10 @@ import { cn } from '../../components/ui/utils';
 
 // Lazy load components for better performance
 const Overview = lazy(() => import('./Overview'));
-const ProductManagement = lazy(() => import('../Manager/ProductManagement'));
+const ProductManagement = lazy(() => import('./ProductManagement'));
 const OrderManagement = lazy(() => import('./OrderManagement'));
 const CustomerManagement = lazy(() => import('./CustomerManagement'));
-const ProductCategories = lazy(() => import('../Manager/CategoryManagement'));
+const ProductCategories = lazy(() => import('./CategoryManagement'));
 const ReportsAnalytics = lazy(() => import('./ReportsAnalytics'));
 
 export default function AdminDashboard() {
