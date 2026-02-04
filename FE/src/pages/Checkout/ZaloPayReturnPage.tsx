@@ -29,6 +29,17 @@ export default function ZaloPayReturnPage() {
 
         console.log("Verifying payment for order:", orderId, "appTransId:", appTransId);
 
+        // In development/sandbox, simulate successful payment
+        if (import.meta.env.DEV) {
+          console.log("🧪 Development mode: Simulating successful payment callback");
+          try {
+            await zalopayService.testCallback(appTransId);
+            console.log("✅ Test callback completed");
+          } catch (testError) {
+            console.warn("Test callback failed, continuing with normal verification:", testError);
+          }
+        }
+
         // Call verify-return endpoint to check and update payment status
         const response = await zalopayService.verifyReturn(orderId, appTransId);
         console.log("Verify return response:", response);

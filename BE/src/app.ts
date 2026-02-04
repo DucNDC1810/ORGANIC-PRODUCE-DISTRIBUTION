@@ -37,6 +37,16 @@ app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use(passport.initialize());
 
+// Log all incoming requests (for debugging ngrok/ZaloPay)
+app.use((req, res, next) => {
+  console.log(`📨 ${req.method} ${req.path}`);
+  if (req.path.includes('zalopay')) {
+    console.log('Headers:', req.headers);
+    console.log('Body:', req.body);
+  }
+  next();
+});
+
 // Routes
 app.get('/api/health', (req: Request, res: Response) => {
   res.json({ status: 'OK', message: 'Server is running' });

@@ -1,6 +1,6 @@
-import axios from 'axios';
-import * as crypto from 'crypto';
-import { AppError } from '../utils/AppError';
+import axios from "axios";
+import * as crypto from "crypto";
+import { AppError } from "../utils/AppError";
 
 // ===== INTERFACES =====
 
@@ -84,18 +84,20 @@ export interface ZaloPayRefundPayload {
 
 class ZaloPayService {
   private config: ZaloPayConfig;
-  private readonly API_BASE_URL = 'https://sandbox.zalopay.com.vn/v001/tpe';
+  private readonly API_BASE_URL = "https://sandbox.zalopay.com.vn/v001/tpe";
 
   constructor() {
     this.config = {
-      appId: parseInt(process.env.ZALOPAY_APP_ID || '0'),
-      key1: process.env.ZALOPAY_KEY1 || '',
-      key2: process.env.ZALOPAY_KEY2 || '',
+      appId: parseInt(process.env.ZALOPAY_APP_ID || "0"),
+      key1: process.env.ZALOPAY_KEY1 || "",
+      key2: process.env.ZALOPAY_KEY2 || "",
       baseUrl: process.env.ZALOPAY_BASE_URL || this.API_BASE_URL,
     };
 
     if (!this.config.appId || !this.config.key1 || !this.config.key2) {
-      console.warn('⚠️ ZaloPay configuration is incomplete. Please set ZALOPAY_APP_ID, ZALOPAY_KEY1, and ZALOPAY_KEY2 in .env');
+      console.warn(
+        "⚠️ ZaloPay configuration is incomplete. Please set ZALOPAY_APP_ID, ZALOPAY_KEY1, and ZALOPAY_KEY2 in .env",
+      );
     }
   }
 
@@ -103,7 +105,7 @@ class ZaloPayService {
    * Generate HMAC SHA256 signature
    */
   private generateMac(data: string, key: string): string {
-    return crypto.createHmac('sha256', key).update(data).digest('hex');
+    return crypto.createHmac("sha256", key).update(data).digest("hex");
   }
 
   /**
@@ -111,8 +113,10 @@ class ZaloPayService {
    */
   private generateTransactionId(): string {
     const now = new Date();
-    const yymmdd = now.toISOString().slice(2, 10).replace(/-/g, '');
-    const random = Math.floor(Math.random() * 1000000).toString().padStart(6, '0');
+    const yymmdd = now.toISOString().slice(2, 10).replace(/-/g, "");
+    const random = Math.floor(Math.random() * 1000000)
+      .toString()
+      .padStart(6, "0");
     return `${yymmdd}_${random}`;
   }
 
@@ -124,14 +128,14 @@ class ZaloPayService {
     amount: number,
     description: string,
     userId: string,
-    callbackUrl: string
+    callbackUrl: string,
   ): Promise<ZaloPayInitResponse> {
     try {
       const appTransId = this.generateTransactionId();
       const appTime = Date.now(); // milliseconds, not seconds!
 
       const embedData = JSON.stringify({
-        merchantinfo: 'organica',
+        merchantinfo: "organica",
       });
 
       const items = [
@@ -144,18 +148,28 @@ class ZaloPayService {
       ];
 
       const item = JSON.stringify(items);
-      
+
       // Build MAC data according to ZaloPay format
       // appid|apptransid|appuser|amount|apptime|embeddata|item
       const dataToMac = `${this.config.appId}|${appTransId}|${userId}|${amount}|${appTime}|${embedData}|${item}`;
       const mac = this.generateMac(dataToMac, this.config.key1);
 
-      console.log('ZaloPay MAC data:', dataToMac);
-      console.log('ZaloPay MAC signature:', mac);
+      console.log("ZaloPay MAC data:", dataToMac);
+      console.log("ZaloPay MAC signature:", mac);
 
       // Build payload with correct field names
+      // Get frontend base URL from environment
+      const getFrontendUrl = () => {
+        // Use FRONTEND_URL from .env
+        const feUrl = process.env.FRONTEND_URL;
+        if (feUrl) return feUrl;
+
+        // Fallback to localhost for development
+        return "http://localhost:5173";
+      };
+
       const payload = {
-        appid: String(this.config.appId),
+        appid: this.config.appId,
         apptransid: appTransId,
         appuser: userId,
         amount,
@@ -163,44 +177,51 @@ class ZaloPayService {
         embeddata: embedData,
         item,
         description,
-        bankcode: 'zalopayapp',
-        callback_url: callbackUrl,
-        returnurl: `${process.env.API_BASE_URL || 'http://localhost:5000'}/checkout/zalopay-return`,
+        // bankcode: "", // Leave empty or omit to show all payment methods
+        callbackurl: callbackUrl,
+        returnurl: `${getFrontendUrl()}/checkout/zalopay-return`,
         mac,
       };
 
-      console.log('ZaloPay request payload:', payload);
+      console.log("ZaloPay request payload:", payload);
+      console.log("Return URL:", `${getFrontendUrl()}/checkout/zalopay-return`);
 
       // Send as params (query string), not JSON body!
       const response = await axios.post<ZaloPayInitResponse>(
         `${this.config.baseUrl}/createorder`,
         null,
-        { params: payload }
+        { params: payload },
       );
 
-      console.log('ZaloPay response:', response.data);
+      console.log("ZaloPay response:", response.data);
 
       if (response.data.returncode !== 1) {
         throw new AppError(
-          `ZaloPay init failed: ${response.data.returnmessage || 'Unknown error'}`,
-          400
+          `ZaloPay init failed: ${response.data.returnmessage || "Unknown error"}`,
+          400,
         );
       }
 
-      return response.data;
+      // Add appTransId to response data for tracking
+      return {
+        ...response.data,
+        apptransid: appTransId, // Include appTransId for frontend reference
+      };
     } catch (error: any) {
-      console.error('ZaloPay init error details:', {
+      console.error("ZaloPay init error details:", {
         message: error.message,
         response: error.response?.data,
         status: error.response?.status,
         config: {
           appId: this.config.appId,
           baseUrl: this.config.baseUrl,
-        }
+        },
       });
       throw new AppError(
-        error.response?.data?.return_message || error.message || 'Failed to initialize ZaloPay payment',
-        500
+        error.response?.data?.return_message ||
+          error.message ||
+          "Failed to initialize ZaloPay payment",
+        500,
       );
     }
   }
@@ -208,9 +229,7 @@ class ZaloPayService {
   /**
    * Check payment status
    */
-  async checkPaymentStatus(
-    appTransId: string
-  ): Promise<ZaloPayStatusResponse> {
+  async checkPaymentStatus(appTransId: string): Promise<ZaloPayStatusResponse> {
     try {
       const appTime = Math.floor(new Date().getTime() / 1000);
       const dataToMac = `${this.config.appId}|${appTransId}|${appTime}`;
@@ -224,22 +243,23 @@ class ZaloPayService {
 
       const response = await axios.post<ZaloPayStatusResponse>(
         `${this.config.baseUrl}/query`,
-        payload
+        payload,
       );
 
       if (response.data.return_code !== 1) {
         throw new AppError(
           `Payment check failed: ${response.data.return_message}`,
-          400
+          400,
         );
       }
 
       return response.data;
     } catch (error: any) {
-      console.error('ZaloPay check status error:', error);
+      console.error("ZaloPay check status error:", error);
       throw new AppError(
-        error.response?.data?.return_message || 'Failed to check payment status',
-        500
+        error.response?.data?.return_message ||
+          "Failed to check payment status",
+        500,
       );
     }
   }
@@ -250,7 +270,7 @@ class ZaloPayService {
   async refundPayment(
     zaloTransId: number,
     amount: number,
-    description?: string
+    description?: string,
   ): Promise<any> {
     try {
       const mRefundId = this.generateTransactionId();
@@ -265,27 +285,27 @@ class ZaloPayService {
         amount,
         app_time: appTime,
         mac,
-        description: description || 'Refund',
+        description: description || "Refund",
       };
 
       const response = await axios.post(
         `${this.config.baseUrl}/refund`,
-        payload
+        payload,
       );
 
       if (response.data.return_code !== 1) {
         throw new AppError(
           `Refund failed: ${response.data.return_message}`,
-          400
+          400,
         );
       }
 
       return response.data;
     } catch (error: any) {
-      console.error('ZaloPay refund error:', error);
+      console.error("ZaloPay refund error:", error);
       throw new AppError(
-        error.response?.data?.return_message || 'Failed to refund payment',
-        500
+        error.response?.data?.return_message || "Failed to refund payment",
+        500,
       );
     }
   }
@@ -299,7 +319,7 @@ class ZaloPayService {
       const expectedMac = this.generateMac(dataToMac, this.config.key2);
       return expectedMac === receivedMac;
     } catch (error) {
-      console.error('MAC verification error:', error);
+      console.error("MAC verification error:", error);
       return false;
     }
   }

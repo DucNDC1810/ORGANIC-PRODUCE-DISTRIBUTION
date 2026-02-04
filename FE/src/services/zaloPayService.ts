@@ -91,6 +91,12 @@ export const zalopayService = {
     api.post<ZaloPayPaymentResponse>('/zalopay/cancel', {
       transactionId,
     }),
+
+  // Test callback for sandbox/development
+  testCallback: (appTransId: string) =>
+    api.post<any>('/zalopay/test-callback', {
+      appTransId,
+    }),
 };
 
 export default zalopayService;

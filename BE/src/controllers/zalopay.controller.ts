@@ -56,7 +56,7 @@ export class ZaloPayController {
 
       // Generate callback URL
       const callbackUrl = `${process.env.API_BASE_URL || 'http://localhost:5000'}/api/zalopay/callback`;
-
+      const returnUrl = `${process.env.FRONTEND_BASE_URL}/zalopay-return`; 
       // Initialize payment with ZaloPay
       const zaloPayResponse = await zalopayService.initPayment(
         finalOrderId,
@@ -69,8 +69,11 @@ export class ZaloPayController {
       console.log('ZaloPayResponse received in controller:', zaloPayResponse);
 
       // Create payment record
-      const paymentStatus = zaloPayResponse.returncode === 1 ? 'paid' : 'pending';
-      
+      // returncode = 1 means ZaloPay order created successfully, NOT that payment is complete
+      // Payment is only confirmed when ZaloPay callback is received
+      type PaymentStatus = "pending" | "paid" | "failed" | "refunded" | "cancelled";
+      const paymentStatus: PaymentStatus = 'pending'; // Always pending until callback confirmation
+
       const payment = await Payment.create({
         orderId: finalOrderId,
         paymentMethod: 'zalopay',
@@ -87,24 +90,13 @@ export class ZaloPayController {
         paymentDate: new Date(),
       });
 
-      // If payment is successful, update order status
-      if (paymentStatus === 'paid') {
-        const order = await Order.findByIdAndUpdate(
-          finalOrderId,
-          { 
-            status: 'confirmed',
-            paymentStatus: 'paid'
-          },
-          { new: true }
-        );
-        
-        console.log('✅ PAYMENT SUCCESSFUL - Payment Status Updated to PAID');
-        console.log('Order ID:', finalOrderId);
-        console.log('Payment ID:', payment._id);
-        console.log('Transaction Token:', zaloPayResponse.zptranstoken);
-        console.log('Amount:', amount, 'VND');
-        console.log('Order Status Updated to: confirmed');
-      }
+      // Order status remains 'pending' until payment callback confirms success
+      console.log('📝 ZaloPay order created (awaiting payment confirmation)');
+      console.log('Order ID:', finalOrderId);
+      console.log('Payment ID:', payment._id);
+      console.log('App Trans ID:', zaloPayResponse.apptransid);
+      console.log('Amount:', amount, 'VND');
+      console.log('Status: pending (awaiting ZaloPay callback)');
 
       const responseData = {
         success: true,
@@ -114,12 +106,14 @@ export class ZaloPayController {
           orderId: finalOrderId,
           orderUrl: zaloPayResponse.orderurl,
           transactionId: zaloPayResponse.zptranstoken,
+          appTransId: zaloPayResponse.apptransid, // Add appTransId for test-callback
           checkoutUrl: zaloPayResponse.orderurl, // For frontend
         },
       };
 
       console.log('Final response being sent to frontend:', responseData);
       console.log('checkoutUrl value:', zaloPayResponse.orderurl);
+      console.log('appTransId:', zaloPayResponse.apptransid);
       console.log('Full zaloPayResponse:', JSON.stringify(zaloPayResponse, null, 2));
 
       res.status(200).json(responseData);
@@ -219,24 +213,44 @@ export class ZaloPayController {
    */
   handleCallback = async (req: any, res: Response, next: NextFunction): Promise<void> => {
     try {
+      console.log('🔔 ZALOPAY CALLBACK RECEIVED');
+      console.log('Request body:', JSON.stringify(req.body, null, 2));
+      console.log('Request headers:', req.headers);
+
       const { data, mac } = req.body;
 
       if (!data || !mac) {
+        console.log('❌ Missing data or mac in callback');
         throw new AppError('Invalid callback payload', 400);
       }
 
+      console.log('Callback data:', data);
+      console.log('Callback mac:', mac);
+
       // Verify MAC signature
       const isValidMac = zalopayService.verifyCallbackMac(data, mac);
+      console.log('MAC verification result:', isValidMac);
+      
       if (!isValidMac) {
+        console.log('❌ Invalid MAC signature');
         throw new AppError('Invalid signature', 400);
       }
 
       const { apptransid, zaloTransId, amount, status } = data;
+      console.log('Parsed callback data:', { apptransid, zaloTransId, amount, status });
 
       // Find payment by app transaction ID
       const payment = await Payment.findOne({
         'metadata.appTransId': apptransid,
       }).populate('orderId');
+
+      if (!payment) {
+        console.log('❌ Payment not found for appTransId:', apptransid);
+        res.json({ return_code: 1, return_message: 'Invalid transaction' });
+        return;
+      }
+
+      console.log('Found payment:', payment._id);
 
       if (!payment) {
         res.json({ return_code: 1, return_message: 'Invalid transaction' });
@@ -260,6 +274,18 @@ export class ZaloPayController {
           order.status = 'confirmed';
           await order.save();
         }
+
+        // Log successful payment
+        console.log('✅ THANH TOÁN ZALOPAY THÀNH CÔNG');
+        console.log('═'.repeat(50));
+        console.log('Order ID:', payment.orderId);
+        console.log('Payment ID:', payment._id);
+        console.log('App Transaction ID:', apptransid);
+        console.log('ZaloTransId:', zaloTransId);
+        console.log('Amount:', amount, 'VND');
+        console.log('Status: PAID');
+        console.log('Time:', new Date().toLocaleString('vi-VN'));
+        console.log('═'.repeat(50));
       } else {
         // Payment failed
         payment.paymentStatus = 'failed';
@@ -269,6 +295,10 @@ export class ZaloPayController {
           callbackTime: new Date(),
         } as any;
         await payment.save();
+
+        console.log('❌ THANH TOÁN ZALOPAY THẤT BẠI');
+        console.log('Order ID:', payment.orderId);
+        console.log('Status Code:', status);
       }
 
       res.json({ return_code: 1, return_message: 'Success' });
@@ -542,6 +572,76 @@ export class ZaloPayController {
       next(error);
     }
   };
+
+  /**
+   * Test callback for sandbox - Simulate successful payment
+   * POST /api/zalopay/test-callback
+   * Body: { appTransId: "260204_781012" }
+   */
+  testCallback = async (req: any, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const { appTransId } = req.body;
+
+      if (!appTransId) {
+        throw new AppError('appTransId is required', 400);
+      }
+
+      // Find payment by app transaction ID
+      const payment = await Payment.findOne({
+        'metadata.appTransId': appTransId,
+      }).populate('orderId');
+
+      if (!payment) {
+        res.status(404).json({ 
+          success: false,
+          message: 'Payment not found for appTransId: ' + appTransId 
+        });
+        return;
+      }
+
+      // Simulate successful payment
+      payment.paymentStatus = 'paid';
+      payment.metadata = {
+        ...(payment.metadata || {}),
+        zaloTransId: Math.floor(Math.random() * 1000000000),
+        callbackTime: new Date(),
+        testMode: true,
+      } as any;
+      await payment.save();
+
+      // Update order status
+      const order = await Order.findById(payment.orderId);
+      if (order) {
+        order.status = 'confirmed';
+        order.paymentStatus = 'paid';
+        await order.save();
+      }
+
+      // Log successful test payment
+      console.log('✅ TEST PAYMENT SUCCESSFUL (SANDBOX)');
+      console.log('═'.repeat(50));
+      console.log('Order ID:', payment.orderId);
+      console.log('Payment ID:', payment._id);
+      console.log('App Transaction ID:', appTransId);
+      console.log('Amount:', payment.amount, 'VND');
+      console.log('Status: PAID (TEST MODE)');
+      console.log('═'.repeat(50));
+
+      res.json({ 
+        success: true,
+        message: 'Test payment completed successfully',
+        data: {
+          orderId: payment.orderId,
+          paymentId: payment._id,
+          status: 'paid'
+        }
+      });
+    } catch (error) {
+      console.error('Test callback error:', error);
+      next(error);
+    }
+  };
 }
 
 export default new ZaloPayController();
+

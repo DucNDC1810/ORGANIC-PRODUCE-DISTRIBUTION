@@ -172,14 +172,18 @@ export default function CheckoutPage() {
         if (zaloPayResponse.success && zaloPayResponse.data?.checkoutUrl) {
           const checkoutUrl = zaloPayResponse.data.checkoutUrl;
           console.log('Redirecting to ZaloPay:', checkoutUrl);
+          console.log('Order ID:', zaloPayResponse.data.orderId);
+          console.log('Payment ID:', zaloPayResponse.data.paymentId);
           
           // Lưu order data để xử lý khi quay về
+          // Cần lấy appTransId từ backend response
           localStorage.setItem(
             "pendingZaloPayOrder",
             JSON.stringify({
               orderData,
-              paymentId: zaloPayResponse.data.orderUrl,
-              appTransId: zaloPayResponse.data.transactionId,
+              orderId: zaloPayResponse.data.orderId,
+              paymentId: zaloPayResponse.data.paymentId,
+              appTransId: zaloPayResponse.data.appTransId || zaloPayResponse.data.orderId, // Use appTransId if available
             })
           );
 

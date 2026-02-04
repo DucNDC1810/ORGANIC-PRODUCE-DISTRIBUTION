@@ -75,4 +75,13 @@ router.get(
   ZaloPayController.getPaymentByTransactionId as any
 );
 
+/**
+ * @route   POST /api/zalopay/test-callback
+ * @desc    Test callback for sandbox (simulate successful payment)
+ * @access  Public (only in development)
+ */
+if (process.env.NODE_ENV === 'development') {
+  router.post('/test-callback', ZaloPayController.testCallback as any);
+}
+
 export default router;
