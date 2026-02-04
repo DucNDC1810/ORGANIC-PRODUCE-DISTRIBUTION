@@ -38,7 +38,7 @@ export const SubscriptionItem = mongoose.model<ISubscriptionItem>('SubscriptionI
 
 export interface ISubscription extends Document {
   userId: mongoose.Types.ObjectId;
-  addressId: mongoose.Types.ObjectId;
+  addressId?: mongoose.Types.ObjectId;
   frequency: 'weekly' | 'monthly';
   nextDeliveryDate: Date;
   status: 'active' | 'paused' | 'cancelled';
@@ -63,7 +63,7 @@ const subscriptionSchema = new Schema<ISubscription>(
     addressId: {
       type: Schema.Types.ObjectId,
       ref: 'Address',
-      required: [true, 'Address ID is required']
+      default: null
     },
     frequency: {
       type: String,

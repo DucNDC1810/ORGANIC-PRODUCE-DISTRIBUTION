@@ -10,15 +10,15 @@ export class OrderController {
    */
   createOrder = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
     try {
-      const { addressId, voucherId, items, paymentMethod, notes } = req.body;
+      const { addressId, deliveryInfo, voucherId, items, paymentMethod, notes } = req.body;
       const userId = req.user?.id;
 
       if (!userId) {
         throw new AppError('User not authenticated', 401);
       }
 
-      if (!addressId || !items || items.length === 0) {
-        throw new AppError('Address and items are required', 400);
+      if (!items || items.length === 0) {
+        throw new AppError('Items are required', 400);
       }
 
       // Calculate totals
@@ -29,7 +29,8 @@ export class OrderController {
 
       const order = await Order.create({
         userId,
-        addressId,
+        addressId: addressId || null,
+        deliveryInfo: deliveryInfo || {},
         voucherId: voucherId || null,
         items,
         paymentMethod: paymentMethod || 'credit_card',

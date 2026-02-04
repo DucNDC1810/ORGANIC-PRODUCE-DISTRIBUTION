@@ -2,7 +2,7 @@ import mongoose, { Document, Schema } from 'mongoose';
 
 export interface IOrder extends Document {
   userId: mongoose.Types.ObjectId;
-  addressId: mongoose.Types.ObjectId;
+  addressId?: mongoose.Types.ObjectId;
   voucherId?: mongoose.Types.ObjectId;
   groupBuyId?: mongoose.Types.ObjectId;
   subscriptionId?: mongoose.Types.ObjectId;
@@ -15,6 +15,13 @@ export interface IOrder extends Document {
     price: number;
     subtotal: number;
   }>;
+  deliveryInfo?: {
+    fullName?: string;
+    phone?: string;
+    email?: string;
+    address?: string;
+    type?: 'delivery' | 'pickup';
+  };
   paymentMethod?: string;
   paymentStatus?: 'pending' | 'paid' | 'failed';
   shippingCost?: number;
@@ -38,7 +45,7 @@ const orderSchema = new Schema<IOrder>(
     addressId: {
       type: Schema.Types.ObjectId,
       ref: 'Address',
-      required: [true, 'Address ID is required']
+      default: null
     },
     voucherId: {
       type: Schema.Types.ObjectId,
@@ -95,13 +102,36 @@ const orderSchema = new Schema<IOrder>(
     ],
     paymentMethod: {
       type: String,
-      enum: ['credit_card', 'debit_card', 'cash', 'bank_transfer', 'e_wallet'],
+      enum: ['credit_card', 'debit_card', 'cash', 'bank_transfer', 'e_wallet', 'zalopay'],
       default: 'credit_card'
     },
     paymentStatus: {
       type: String,
       enum: ['pending', 'paid', 'failed'],
       default: 'pending'
+    },
+    deliveryInfo: {
+      fullName: {
+        type: String,
+        trim: true
+      },
+      phone: {
+        type: String,
+        trim: true
+      },
+      email: {
+        type: String,
+        trim: true
+      },
+      address: {
+        type: String,
+        trim: true
+      },
+      type: {
+        type: String,
+        enum: ['delivery', 'pickup'],
+        default: 'delivery'
+      }
     },
     shippingCost: {
       type: Number,

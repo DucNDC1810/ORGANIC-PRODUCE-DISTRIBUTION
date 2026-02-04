@@ -13,13 +13,11 @@ import {
 import { useCart } from "../../context/CartContext";
 import { useAuth } from "../../context/AuthContext";
 import Header from "../../components/Header";
-import orderService from "../../services/orderService";
-import paymentService from "../../services/paymentService";
+import zalopayService from "../../services/zaloPayService";
 import voucherService from "../../services/voucherService";
-import subscriptionService from "../../services/subscriptionService";
 
 export default function CheckoutPage() {
-  const { cart, getTotalPrice, clearCart } = useCart();
+  const { cart, getTotalPrice } = useCart();
   const { user } = useAuth();
   const navigate = useNavigate();
 
@@ -123,72 +121,95 @@ export default function CheckoutPage() {
       return;
     }
 
-    setLoading(true);
-    try {
-      // 1. Create order
-      const orderResponse = await orderService.createOrder({
-        addressId: "temp-address-id",
-        items: cart.map((item) => ({
-          productId: item.id,
-          quantity: item.quantity,
-          price: item.price,
-          subtotal: item.price * item.quantity,
-        })),
-        notes: formData.notes,
-      });
-
-      const orderId = orderResponse.data.data._id;
-
-      // 2. Create payment
-      const paymentResponse = await paymentService.createPayment({
-        orderId,
-        paymentMethod: formData.paymentMethod.toLowerCase().replace(" ", "_"),
-        amount: total,
-      });
-
-      // 3. Apply voucher if provided
-      if (appliedVoucher) {
-        try {
-          await voucherService.applyVoucher(appliedVoucher);
-        } catch (err) {
-          console.error("Failed to apply voucher:", err);
-        }
-      }
-
-      // 4. Create subscription if recurring order
-      if (isRecurringOrder) {
-        await subscriptionService.createSubscription({
-          addressId: "temp-address-id",
+    // Nếu thanh toán ZaloPay, redirect trực tiếp không tạo order trước
+    if (formData.paymentMethod === "ZaloPay") {
+      setLoading(true);
+      try {
+        // Gọi API zalopay/init để tạo order + khởi tạo thanh toán ZaloPay
+        const orderData = {
+          deliveryInfo: {
+            fullName: formData.fullName,
+            phone: formData.phone,
+            email: formData.email,
+            address: deliveryType === "delivery" ? "Delivery address" : "Store pickup",
+            type: deliveryType,
+          },
           items: cart.map((item) => ({
             productId: item.id,
             quantity: item.quantity,
+            price: item.price,
+            subtotal: item.price * item.quantity,
           })),
-          frequency: formData.recurringFrequency as "weekly" | "monthly",
-          nextDeliveryDate: formData.recurringStartDate,
-          notes: formData.recurringDuration
-            ? `Duration: ${formData.recurringDuration} months`
-            : undefined,
+          notes: formData.notes,
+          paymentMethod: "zalopay",
+          amount: total,
+          description: `Thanh toán đơn hàng từ Organica - ${formData.fullName}`,
+        };
+
+        const response = await zalopayService.initPayment({
+          orderId: "temp", // Sẽ được tạo trên backend
+          amount: total,
+          description: orderData.description,
+          returnUrl: `${window.location.origin}/checkout/zalopay-return`,
+          notifyUrl: `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/zalopay/callback`,
+          deliveryInfo: {
+            fullName: formData.fullName,
+            phone: formData.phone,
+            email: formData.email,
+            address: deliveryType === "delivery" ? "Delivery address" : "Store pickup",
+            type: deliveryType,
+          },
         });
-      }
 
-      // 5. Create group buy event if group order
-      if (isGroupOrder) {
-        // This would typically be created by admin/manager
-        // Just log the group info to order notes
-        const groupInfo = `Group: ${formData.groupName}, Members: ${formData.groupMembers}, Address: ${formData.groupAddress}`;
-        console.log("Group Order Info:", groupInfo);
-      }
+        // Response interceptor unwraps response.data, so response is the data object directly
+        const zaloPayResponse = response as any;
+        console.log('ZaloPay Response:', zaloPayResponse);
+        console.log('ZaloPay Response type:', typeof zaloPayResponse);
+        console.log('ZaloPay Response keys:', Object.keys(zaloPayResponse));
+        console.log('ZaloPay Response.data:', zaloPayResponse.data);
+        console.log('ZaloPay Response.success:', zaloPayResponse.success);
 
-      clearCart();
-      navigate(
-        `/order-success?orderId=${orderId}&paymentId=${paymentResponse.data.data._id}`,
-      );
-    } catch (err: any) {
-      setError(err.response?.data?.message || "Có lỗi xảy ra khi đặt hàng");
-      console.error("Order placement error:", err);
-    } finally {
-      setLoading(false);
+        if (zaloPayResponse.success && zaloPayResponse.data?.checkoutUrl) {
+          const checkoutUrl = zaloPayResponse.data.checkoutUrl;
+          console.log('Redirecting to ZaloPay:', checkoutUrl);
+          
+          // Lưu order data để xử lý khi quay về
+          localStorage.setItem(
+            "pendingZaloPayOrder",
+            JSON.stringify({
+              orderData,
+              paymentId: zaloPayResponse.data.orderUrl,
+              appTransId: zaloPayResponse.data.transactionId,
+            })
+          );
+
+          // Redirect sang ZaloPay payment page
+          window.location.href = checkoutUrl;
+        } else {
+          console.error('Invalid ZaloPay response:', zaloPayResponse);
+          console.error('Expected checkoutUrl but got:', zaloPayResponse.data?.checkoutUrl);
+          throw new Error(
+            zaloPayResponse.message || "Không thể khởi tạo thanh toán ZaloPay"
+          );
+        }
+      } catch (err: any) {
+        console.error("Full ZaloPay error object:", err);
+        console.error("Error response:", err.response);
+        console.error("Error response data:", err.response?.data);
+        console.error("Error message:", err.message);
+        
+        setError(
+          err.response?.data?.message || err.message || "Lỗi khi khởi tạo thanh toán ZaloPay"
+        );
+        console.error("ZaloPay init error:", err);
+        setLoading(false);
+      }
+      return; // Dừng ở đây, không tiếp tục với phương thức thanh toán khác
     }
+
+    // Nếu không phải ZaloPay, hiển thị lỗi (chỉ hỗ trợ ZaloPay)
+    setError("Hiện tại chỉ hỗ trợ thanh toán bằng ZaloPay");
+    setLoading(false);
   };
 
   const handleInputChange = (

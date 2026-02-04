@@ -7,7 +7,8 @@ import MiniCart from './components/MiniCart';
 import HomePage from './pages/HomePage/Home';
 import CartPage from './pages/HomePage/CartPage';
 import CheckoutPage from './pages/Checkout/CheckoutPage';
-import OrderSuccessPage from './pages/HomePage/OrderSuccessPage';
+import ZaloPayReturnPage from './pages/Checkout/ZaloPayReturnPage';
+import OrderSuccessPage from './pages/Checkout/OrderSuccessPage';
 import LoginPage from './pages/HomePage/LoginPage';
 import SignUpPage from './pages/HomePage/SignUpPage';
 import ForgotPasswordPage from './pages/HomePage/ForgotPasswordPage';
@@ -51,6 +52,7 @@ export default function App() {
             {/* Protected routes - require authentication */}
             <Route path="/cart" element={<ProtectedRoute><CartPage /></ProtectedRoute>} />
             <Route path="/checkout" element={<ProtectedRoute><CheckoutPage /></ProtectedRoute>} />
+            <Route path="/checkout/zalopay-return" element={<ProtectedRoute><ZaloPayReturnPage /></ProtectedRoute>} />
             <Route path="/order-success" element={<ProtectedRoute><OrderSuccessPage /></ProtectedRoute>} />
             {/* Customer-only routes */}
             <Route path="/profile" element={<CustomerRoute> <Profile /></CustomerRoute>} />

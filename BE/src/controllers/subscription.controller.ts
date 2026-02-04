@@ -17,8 +17,8 @@ export class SubscriptionController {
         throw new AppError('User not authenticated', 401);
       }
 
-      if (!addressId || !frequency || !nextDeliveryDate) {
-        throw new AppError('Address, frequency, and next delivery date are required', 400);
+      if (!frequency || !nextDeliveryDate) {
+        throw new AppError('Frequency and next delivery date are required', 400);
       }
 
       if (!['weekly', 'monthly'].includes(frequency)) {
@@ -32,7 +32,7 @@ export class SubscriptionController {
       // Create subscription
       const subscription = await Subscription.create({
         userId,
-        addressId,
+        addressId: addressId || null,
         frequency,
         nextDeliveryDate: new Date(nextDeliveryDate),
         status: 'active',
