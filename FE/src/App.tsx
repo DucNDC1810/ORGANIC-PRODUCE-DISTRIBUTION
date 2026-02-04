@@ -6,7 +6,7 @@ import { ProtectedRoute, CustomerRoute, AdminRoute, ManagerRoute } from './compo
 import MiniCart from './components/MiniCart';
 import HomePage from './pages/HomePage/Home';
 import CartPage from './pages/HomePage/CartPage';
-import CheckoutPage from './pages/HomePage/CheckoutPage';
+import CheckoutPage from './pages/Checkout/CheckoutPage';
 import OrderSuccessPage from './pages/HomePage/OrderSuccessPage';
 import LoginPage from './pages/HomePage/LoginPage';
 import SignUpPage from './pages/HomePage/SignUpPage';

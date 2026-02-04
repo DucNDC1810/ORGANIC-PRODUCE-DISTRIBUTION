@@ -13,6 +13,11 @@ import productRoutes from './routes/product.routes';
 import categoryRoutes from './routes/category.routes';
 import cartRoutes from './routes/cart.routes';
 import reviewRoutes from './routes/review.routes';
+import orderRoutes from './routes/order.routes';
+import paymentRoutes from './routes/payment.routes';
+import subscriptionRoutes from './routes/subscription.routes';
+import groupbuyRoutes from './routes/groupbuy.routes';
+import voucherRoutes from './routes/voucher.routes';
 // import exampleRoutes from './routes/example.routes'; // Uncomment để test
 import { configurePassport } from './config/passport';
 
@@ -43,6 +48,11 @@ app.use('/api/products', productRoutes);
 app.use('/api/categories', categoryRoutes);
 app.use('/api/cart', cartRoutes);
 app.use('/api/reviews', reviewRoutes);
+app.use('/api/orders', orderRoutes);
+app.use('/api/payments', paymentRoutes);
+app.use('/api/subscriptions', subscriptionRoutes);
+app.use('/api/group-buy-events', groupbuyRoutes);
+app.use('/api/vouchers', voucherRoutes);
 // app.use('/api/example', exampleRoutes); // Uncomment để test authentication
 
 // 404 Handler - Must be after all routes

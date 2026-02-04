@@ -1,0 +1,147 @@
+import mongoose, { Document, Schema } from 'mongoose';
+
+export interface IOrder extends Document {
+  userId: mongoose.Types.ObjectId;
+  addressId: mongoose.Types.ObjectId;
+  voucherId?: mongoose.Types.ObjectId;
+  groupBuyId?: mongoose.Types.ObjectId;
+  subscriptionId?: mongoose.Types.ObjectId;
+  orderDate: Date;
+  totalAmount: number;
+  status: 'pending' | 'confirmed' | 'processing' | 'shipped' | 'delivered' | 'cancelled' | 'refunded';
+  items: Array<{
+    productId: mongoose.Types.ObjectId;
+    quantity: number;
+    price: number;
+    subtotal: number;
+  }>;
+  paymentMethod?: string;
+  paymentStatus?: 'pending' | 'paid' | 'failed';
+  shippingCost?: number;
+  discountAmount?: number;
+  taxAmount?: number;
+  notes?: string;
+  cancelReason?: string;
+  cancelledAt?: Date;
+  deliveredAt?: Date;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+const orderSchema = new Schema<IOrder>(
+  {
+    userId: {
+      type: Schema.Types.ObjectId,
+      ref: 'User',
+      required: [true, 'User ID is required']
+    },
+    addressId: {
+      type: Schema.Types.ObjectId,
+      ref: 'Address',
+      required: [true, 'Address ID is required']
+    },
+    voucherId: {
+      type: Schema.Types.ObjectId,
+      ref: 'Voucher',
+      default: null
+    },
+    groupBuyId: {
+      type: Schema.Types.ObjectId,
+      ref: 'GroupBuy',
+      default: null
+    },
+    subscriptionId: {
+      type: Schema.Types.ObjectId,
+      ref: 'Subscription',
+      default: null
+    },
+    orderDate: {
+      type: Date,
+      default: Date.now
+    },
+    totalAmount: {
+      type: Number,
+      required: [true, 'Total amount is required'],
+      min: 0
+    },
+    status: {
+      type: String,
+      enum: ['pending', 'confirmed', 'processing', 'shipped', 'delivered', 'cancelled', 'refunded'],
+      default: 'pending'
+    },
+    items: [
+      {
+        productId: {
+          type: Schema.Types.ObjectId,
+          ref: 'Product',
+          required: true
+        },
+        quantity: {
+          type: Number,
+          required: true,
+          min: 1
+        },
+        price: {
+          type: Number,
+          required: true,
+          min: 0
+        },
+        subtotal: {
+          type: Number,
+          required: true,
+          min: 0
+        }
+      }
+    ],
+    paymentMethod: {
+      type: String,
+      enum: ['credit_card', 'debit_card', 'cash', 'bank_transfer', 'e_wallet'],
+      default: 'credit_card'
+    },
+    paymentStatus: {
+      type: String,
+      enum: ['pending', 'paid', 'failed'],
+      default: 'pending'
+    },
+    shippingCost: {
+      type: Number,
+      default: 0,
+      min: 0
+    },
+    discountAmount: {
+      type: Number,
+      default: 0,
+      min: 0
+    },
+    taxAmount: {
+      type: Number,
+      default: 0,
+      min: 0
+    },
+    notes: {
+      type: String,
+      trim: true
+    },
+    cancelReason: {
+      type: String,
+      trim: true
+    },
+    cancelledAt: {
+      type: Date
+    },
+    deliveredAt: {
+      type: Date
+    }
+  },
+  {
+    timestamps: true
+  }
+);
+
+// Index for common queries
+orderSchema.index({ userId: 1, createdAt: -1 });
+orderSchema.index({ status: 1 });
+orderSchema.index({ orderDate: -1 });
+orderSchema.index({ 'items.productId': 1 });
+
+export const Order = mongoose.model<IOrder>('Order', orderSchema);
