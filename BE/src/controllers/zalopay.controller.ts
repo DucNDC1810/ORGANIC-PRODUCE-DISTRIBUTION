@@ -69,6 +69,8 @@ export class ZaloPayController {
       console.log('ZaloPayResponse received in controller:', zaloPayResponse);
 
       // Create payment record
+      const paymentStatus = zaloPayResponse.returncode === 1 ? 'paid' : 'pending';
+      
       const payment = await Payment.create({
         orderId: finalOrderId,
         paymentMethod: 'zalopay',
@@ -79,10 +81,30 @@ export class ZaloPayController {
           zaloTransId: zaloPayResponse.zaloTransId,
           zptranstoken: zaloPayResponse.zptranstoken,
           provider: 'zalopay',
+          returncode: zaloPayResponse.returncode,
         },
-        paymentStatus: 'pending',
+        paymentStatus: paymentStatus,
         paymentDate: new Date(),
       });
+
+      // If payment is successful, update order status
+      if (paymentStatus === 'paid') {
+        const order = await Order.findByIdAndUpdate(
+          finalOrderId,
+          { 
+            status: 'confirmed',
+            paymentStatus: 'paid'
+          },
+          { new: true }
+        );
+        
+        console.log('✅ PAYMENT SUCCESSFUL - Payment Status Updated to PAID');
+        console.log('Order ID:', finalOrderId);
+        console.log('Payment ID:', payment._id);
+        console.log('Transaction Token:', zaloPayResponse.zptranstoken);
+        console.log('Amount:', amount, 'VND');
+        console.log('Order Status Updated to: confirmed');
+      }
 
       const responseData = {
         success: true,
