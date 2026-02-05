@@ -8,29 +8,67 @@ import {
   Phone,
   Mail,
   Clock,
-  ArrowRight
+  ArrowRight,
+  Loader,
+  AlertCircle
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import Header from '../../components/Header';
+import zalopayService from "../../services/zaloPayService";
 
 export default function OrderSuccessPage() {
   const location = useLocation();
   const [orderData, setOrderData] = useState<any>(null);
+  const [verificationStatus, setVerificationStatus] = useState<"idle" | "verifying" | "verified">("idle");
   const orderId = location.state?.orderId;
+  
+  // Check if coming from ZaloPay return (either from state or localStorage)
+  const searchParams = new URLSearchParams(location.search);
+  const isZaloPayReturn = !!searchParams.toString() || location.state?.fromZaloPay;
 
   useEffect(() => {
-    // Get pending order data from localStorage if exists
-    const pendingOrderData = localStorage.getItem("pendingZaloPayOrder");
-    if (pendingOrderData) {
+    const verifyAndLoadOrder = async () => {
       try {
-        const { orderData } = JSON.parse(pendingOrderData);
-        setOrderData(orderData);
-        localStorage.removeItem("pendingZaloPayOrder");
+        // Get pending order data from localStorage if exists
+        const pendingOrderData = localStorage.getItem("pendingZaloPayOrder");
+        if (pendingOrderData) {
+          const { orderData: data, appTransId } = JSON.parse(pendingOrderData);
+          setOrderData(data);
+
+          // If coming from ZaloPay return, verify payment status
+          if (isZaloPayReturn && appTransId) {
+            setVerificationStatus("verifying");
+            
+            // In dev mode, simulate callback
+            if (import.meta.env.DEV) {
+              try {
+                await zalopayService.testCallback(appTransId);
+              } catch (e) {
+                console.warn("Test callback failed, continuing:", e);
+              }
+            }
+
+            // Verify payment status with backend
+            try {
+              const response = await zalopayService.verifyReturn(data?.orderId || appTransId, appTransId);
+              const paymentStatus = (response as any).data?.status;
+              if (paymentStatus === "paid") {
+                setVerificationStatus("verified");
+              }
+            } catch (error) {
+              console.error("Payment verification error:", error);
+            }
+          }
+
+          localStorage.removeItem("pendingZaloPayOrder");
+        }
       } catch (error) {
-        console.error("Error parsing order data:", error);
+        console.error("Error loading order data:", error);
       }
-    }
-  }, []);
+    };
+
+    verifyAndLoadOrder();
+  }, [isZaloPayReturn]);
 
   const getEstimatedDeliveryDate = () => {
     const deliveryDate = new Date();
@@ -66,6 +104,16 @@ export default function OrderSuccessPage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-primary/5 to-transparent">
       <Header />
+
+      {/* ZaloPay verification overlay */}
+      {isZaloPayReturn && verificationStatus === "verifying" && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl p-8 text-center shadow-lg">
+            <Loader className="w-12 h-12 text-primary animate-spin mx-auto mb-4" />
+            <p className="text-lg text-gray-600">Đang xác nhận thanh toán...</p>
+          </div>
+        </div>
+      )}
 
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         <motion.div

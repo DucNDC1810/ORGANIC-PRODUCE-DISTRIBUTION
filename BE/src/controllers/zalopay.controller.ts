@@ -1,20 +1,28 @@
 import { Response, NextFunction } from 'express';
 import { Payment } from '../models/Payment.model';
 import { Order } from '../models/Order.model';
-import zalopayService from '../services/zalopay.service';
+import zalopayService, { ZaloPayItem } from '../services/zalopay.service';
 import { AuthRequest } from '../middlewares/auth.middleware';
 import { AppError } from '../utils/AppError';
 
 export class ZaloPayController {
   /**
-   * Initialize ZaloPay payment
-   * POST /api/zalopay/init
+   * Tạo đơn hàng ZaloPay
+   * POST /api/zalopay/create-order
+   * Body: {
+   *   orderId: "string", // Order ID từ database, hoặc "temp" để tạo mới
+   *   amount: number,
+   *   description: string,
+   *   items: Array<{itemid, itemname, itemprice, itemquantity}>,
+   *   deliveryInfo: {...} // (optional) chỉ cần khi orderId = "temp"
+   * }
    */
-  initPayment = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
+  createOrder = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
     try {
-      const { orderId, amount, description, deliveryInfo } = req.body;
+      const { orderId, amount, description, items, deliveryInfo } = req.body;
       const userId = req.user?.id;
 
+      // Validate required fields
       if (!amount || !description) {
         throw new AppError('Amount and description are required', 400);
       }
@@ -23,57 +31,79 @@ export class ZaloPayController {
         throw new AppError('User not authenticated', 401);
       }
 
+      // Xử lý order
       let finalOrderId = orderId;
+      let finalItems: ZaloPayItem[] = items || [];
 
-      // Nếu orderId là "temp", tạo order mới trước
-      if (orderId === "temp" || !orderId) {
+      if (!orderId || orderId === 'temp') {
+        // Tạo order mới nếu không có orderId
         if (!deliveryInfo) {
           throw new AppError('Delivery info is required for new orders', 400);
         }
+
+        // Nếu không có items, tạo item mặc định từ description
+        if (!finalItems || finalItems.length === 0) {
+          finalItems = [
+            {
+              itemid: 'order_item',
+              itemname: description,
+              itemprice: Math.floor(amount),
+              itemquantity: 1,
+            },
+          ];
+        }
+
+        // Tạo items theo schema Order
+        const itemPrice = Math.floor(amount / (finalItems.length || 1));
+        const orderItems = finalItems.map((item: any, index: number) => ({
+          productId: new (require('mongoose')).Types.ObjectId(), // Tạo temp ObjectId
+          quantity: item.itemquantity || 1,
+          price: item.itemprice || itemPrice,
+          subtotal: (item.itemprice || itemPrice) * (item.itemquantity || 1),
+        }));
 
         const newOrder = await Order.create({
           userId,
           deliveryInfo,
           paymentMethod: 'zalopay',
-          items: [],
+          items: orderItems,
           totalAmount: amount,
           status: 'pending',
         });
 
         finalOrderId = newOrder._id.toString();
       } else {
-        // Verify order exists
+        // Kiểm tra order tồn tại
         const order = await Order.findById(orderId);
         if (!order) {
           throw new AppError('Order not found', 404);
         }
 
-        // Verify user is order owner
+        // Kiểm tra quyền
         if (req.user?.id !== order.userId.toString() && req.user?.role !== 'admin') {
           throw new AppError('You do not have permission to pay for this order', 403);
         }
+
+        // Lấy items từ order nếu không được cung cấp
+        if (!finalItems || finalItems.length === 0) {
+          finalItems = (order.items as any[]).map((item: any, index: number) => ({
+            itemid: item.productId?.toString() || `item_${index}`,
+            itemname: item.productId ? `Product ${index + 1}` : 'Order Item',
+            itemprice: Math.floor(amount / (order.items?.length || 1)),
+            itemquantity: item.quantity || 1,
+          }));
+        }
       }
 
-      // Generate callback URL
-      const callbackUrl = `${process.env.API_BASE_URL || 'http://localhost:5000'}/api/zalopay/callback`;
-      const returnUrl = `${process.env.FRONTEND_BASE_URL}/zalopay-return`; 
-      // Initialize payment with ZaloPay
-      const zaloPayResponse = await zalopayService.initPayment(
-        finalOrderId,
-        Math.floor(amount), // ZaloPay requires integer amount in VND
+      // Gọi ZaloPay service để tạo đơn hàng
+      const zaloPayResponse = await zalopayService.createOrder(
+        userId, // appuser
+        Math.floor(amount), // amount must be integer
         description,
-        userId,
-        callbackUrl
+        finalItems
       );
 
-      console.log('ZaloPayResponse received in controller:', zaloPayResponse);
-
-      // Create payment record
-      // returncode = 1 means ZaloPay order created successfully, NOT that payment is complete
-      // Payment is only confirmed when ZaloPay callback is received
-      type PaymentStatus = "pending" | "paid" | "failed" | "refunded" | "cancelled";
-      const paymentStatus: PaymentStatus = 'pending'; // Always pending until callback confirmation
-
+      // Tạo payment record
       const payment = await Payment.create({
         orderId: finalOrderId,
         paymentMethod: 'zalopay',
@@ -81,563 +111,320 @@ export class ZaloPayController {
         transactionId: zaloPayResponse.zptranstoken || zaloPayResponse.apptransid || '',
         metadata: {
           appTransId: zaloPayResponse.apptransid,
-          zaloTransId: zaloPayResponse.zaloTransId,
           zptranstoken: zaloPayResponse.zptranstoken,
           provider: 'zalopay',
           returncode: zaloPayResponse.returncode,
         },
-        paymentStatus: paymentStatus,
+        paymentStatus: 'pending',
         paymentDate: new Date(),
       });
 
-      // Order status remains 'pending' until payment callback confirms success
-      console.log('📝 ZaloPay order created (awaiting payment confirmation)');
-      console.log('Order ID:', finalOrderId);
-      console.log('Payment ID:', payment._id);
-      console.log('App Trans ID:', zaloPayResponse.apptransid);
-      console.log('Amount:', amount, 'VND');
-      console.log('Status: pending (awaiting ZaloPay callback)');
+      console.log('✅ ZaloPay order created successfully');
+      console.log('  OrderId:', finalOrderId);
+      console.log('  PaymentId:', payment._id);
+      console.log('  AppTransId:', zaloPayResponse.apptransid);
+      console.log('  Amount:', amount, 'VND');
 
-      const responseData = {
+      res.status(200).json({
         success: true,
-        message: 'ZaloPay payment initialized',
+        message: 'ZaloPay order created successfully',
         data: {
           paymentId: payment._id,
           orderId: finalOrderId,
           orderUrl: zaloPayResponse.orderurl,
-          transactionId: zaloPayResponse.zptranstoken,
-          appTransId: zaloPayResponse.apptransid, // Add appTransId for test-callback
-          checkoutUrl: zaloPayResponse.orderurl, // For frontend
-        },
-      };
-
-      console.log('Final response being sent to frontend:', responseData);
-      console.log('checkoutUrl value:', zaloPayResponse.orderurl);
-      console.log('appTransId:', zaloPayResponse.apptransid);
-      console.log('Full zaloPayResponse:', JSON.stringify(zaloPayResponse, null, 2));
-
-      res.status(200).json(responseData);
-    } catch (error) {
-      next(error);
-    }
-  };
-
-  /**
-   * Check ZaloPay payment status
-   * POST /api/zalopay/check-status
-   */
-  checkPaymentStatus = async (
-    req: AuthRequest,
-    res: Response,
-    next: NextFunction
-  ): Promise<void> => {
-    try {
-      const { orderId, transactionId } = req.body;
-      const userId = req.user?.id;
-
-      if (!orderId && !transactionId) {
-        throw new AppError('Order ID or transaction ID is required', 400);
-      }
-
-      if (!userId) {
-        throw new AppError('User not authenticated', 401);
-      }
-
-      // Get payment by orderId or transactionId
-      const payment = await Payment.findOne({
-        $or: [{ orderId }, { transactionId }],
-      }).populate('orderId');
-
-      if (!payment) {
-        throw new AppError('Payment not found', 404);
-      }
-
-      // Verify user is owner or admin
-      const order = await Order.findById(payment.orderId);
-      if (req.user?.id !== order?.userId.toString() && req.user?.role !== 'admin') {
-        throw new AppError('You do not have permission to check this payment', 403);
-      }
-
-      // Check status with ZaloPay
-      const appTransId = (payment.metadata as any)?.appTransId;
-      if (!appTransId) {
-        throw new AppError('Invalid transaction ID', 400);
-      }
-
-      const zaloPayStatus = await zalopayService.checkPaymentStatus(appTransId);
-
-      // Update payment status based on ZaloPay response
-      let paymentStatus: 'pending' | 'paid' | 'failed' | 'refunded' | 'cancelled' = 'pending';
-      if (zaloPayStatus.sub_return_code === 0) {
-        paymentStatus = 'paid';
-      } else if (zaloPayStatus.sub_return_code === -1) {
-        paymentStatus = 'failed';
-      }
-
-      if (paymentStatus === 'paid' && payment.paymentStatus !== 'paid') {
-        payment.paymentStatus = 'paid';
-        payment.metadata = {
-          ...(payment.metadata || {}),
-          zaloTransId: zaloPayStatus.zalo_trans_id,
-          finishTime: zaloPayStatus.finish_time,
-        } as any;
-        await payment.save();
-
-        // Update order status
-        if (order) {
-          order.status = 'confirmed';
-          await order.save();
-        }
-      }
-
-      res.status(200).json({
-        success: true,
-        message: 'Payment status checked',
-        data: {
-          status: paymentStatus,
-          transactionId: payment.transactionId,
-          amount: payment.amount,
-          zaloTransId: zaloPayStatus.zalo_trans_id,
-          returnCode: zaloPayStatus.return_code,
-          returnMessage: zaloPayStatus.return_message,
+          apptransid: zaloPayResponse.apptransid,
+          amount: amount,
         },
       });
     } catch (error) {
+      console.error('❌ Create order error:', error);
       next(error);
     }
   };
 
   /**
-   * ZaloPay webhook callback
+   * ZaloPay callback handler
    * POST /api/zalopay/callback
+   * Xử lý callback từ ZaloPay server khi khách hàng thanh toán thành công
    */
   handleCallback = async (req: any, res: Response, next: NextFunction): Promise<void> => {
+    const result: { returncode: number; returnmessage: string } = {
+      returncode: 0,
+      returnmessage: 'exception',
+    };
+
     try {
       console.log('🔔 ZALOPAY CALLBACK RECEIVED');
-      console.log('Request body:', JSON.stringify(req.body, null, 2));
-      console.log('Request headers:', req.headers);
+      console.log('Full Body:', JSON.stringify(req.body, null, 2));
+      console.log('Headers:', JSON.stringify(req.headers, null, 2));
 
-      const { data, mac } = req.body;
+      const dataStr: string = req.body?.data;
+      const reqMac: string = req.body?.mac;
 
-      if (!data || !mac) {
-        console.log('❌ Missing data or mac in callback');
-        throw new AppError('Invalid callback payload', 400);
+      console.log('📝 Extract data:');
+      console.log('  dataStr:', dataStr ? dataStr.substring(0, 100) + '...' : 'missing');
+      console.log('  reqMac:', reqMac ? reqMac.substring(0, 20) + '...' : 'missing');
+
+      // Kiểm tra dữ liệu callback
+      if (!dataStr || !reqMac) {
+        console.error('❌ Missing data or mac in callback');
+        result.returncode = -1;
+        result.returnmessage = 'missing data/mac';
+        return void res.json(result);
       }
 
-      console.log('Callback data:', data);
-      console.log('Callback mac:', mac);
-
-      // Verify MAC signature
-      const isValidMac = zalopayService.verifyCallbackMac(data, mac);
-      console.log('MAC verification result:', isValidMac);
+      // Verify MAC theo cách của ZaloPay: MAC = HmacSHA256(dataStr, key2)
+      console.log('🔐 Verifying MAC...');
+      const isValidMac = zalopayService.verifyCallbackMac(dataStr, reqMac);
+      console.log('MAC Valid:', isValidMac);
       
       if (!isValidMac) {
-        console.log('❌ Invalid MAC signature');
-        throw new AppError('Invalid signature', 400);
+        console.error('❌ MAC verification failed');
+        console.error('Expected MAC:', zalopayService.calculateMac(dataStr));
+        console.error('Received MAC:', reqMac);
+        result.returncode = -1;
+        result.returnmessage = 'mac not equal';
+        return void res.json(result);
       }
 
-      const { apptransid, zaloTransId, amount, status } = data;
-      console.log('Parsed callback data:', { apptransid, zaloTransId, amount, status });
+      console.log('✅ MAC verified successfully');
 
-      // Find payment by app transaction ID
-      const payment = await Payment.findOne({
-        'metadata.appTransId': apptransid,
-      }).populate('orderId');
+      // Parse callback data
+      const dataJson = zalopayService.parseCallbackData(dataStr);
+      const apptransid: string = dataJson.apptransid;
+      const zaloTransId: number = dataJson.zptransid;
+      const amount: number = dataJson.amount;
+
+      console.log('📊 Callback data:');
+      console.log('  AppTransId:', apptransid);
+      console.log('  ZaloTransId:', zaloTransId);
+      console.log('  Amount:', amount);
+
+      if (!apptransid) {
+        result.returncode = -1;
+        result.returnmessage = 'missing apptransid';
+        return void res.json(result);
+      }
+
+      // Tìm payment từ appTransId
+      const payment = await Payment.findOne({ 'metadata.appTransId': apptransid });
 
       if (!payment) {
-        console.log('❌ Payment not found for appTransId:', apptransid);
-        res.json({ return_code: 1, return_message: 'Invalid transaction' });
-        return;
+        console.log('⚠️ Payment not found for apptransid:', apptransid);
+        // Vẫn trả về success để ZaloPay không retry nữa
+        result.returncode = 1;
+        result.returnmessage = 'success';
+        return void res.json(result);
       }
 
-      console.log('Found payment:', payment._id);
-
-      if (!payment) {
-        res.json({ return_code: 1, return_message: 'Invalid transaction' });
-        return;
-      }
-
-      // Update payment status based on ZaloPay status
-      if (status === 1) {
-        // Payment successful
+      // Cập nhật payment status (idempotent - nếu đã thanh toán rồi thì không cập nhật lại)
+      if (payment.paymentStatus !== 'paid') {
         payment.paymentStatus = 'paid';
         payment.metadata = {
           ...(payment.metadata || {}),
           zaloTransId,
           callbackTime: new Date(),
+          callbackData: dataJson,
         } as any;
         await payment.save();
 
-        // Update order status
-        const order = await Order.findById(payment.orderId);
-        if (order) {
-          order.status = 'confirmed';
-          await order.save();
-        }
+        // Cập nhật order status
+        await Order.findByIdAndUpdate(payment.orderId, {
+          status: 'confirmed',
+          paymentStatus: 'paid',
+        });
 
-        // Log successful payment
-        console.log('✅ THANH TOÁN ZALOPAY THÀNH CÔNG');
-        console.log('═'.repeat(50));
-        console.log('Order ID:', payment.orderId);
-        console.log('Payment ID:', payment._id);
-        console.log('App Transaction ID:', apptransid);
-        console.log('ZaloTransId:', zaloTransId);
-        console.log('Amount:', amount, 'VND');
-        console.log('Status: PAID');
-        console.log('Time:', new Date().toLocaleString('vi-VN'));
-        console.log('═'.repeat(50));
+        console.log('✅ PAYMENT UPDATED TO PAID');
+        console.log('  PaymentId:', payment._id);
+        console.log('  OrderId:', payment.orderId);
+        console.log('  AppTransId:', apptransid);
       } else {
-        // Payment failed
-        payment.paymentStatus = 'failed';
-        payment.metadata = {
-          ...(payment.metadata || {}),
-          callbackStatus: status,
-          callbackTime: new Date(),
-        } as any;
-        await payment.save();
-
-        console.log('❌ THANH TOÁN ZALOPAY THẤT BẠI');
-        console.log('Order ID:', payment.orderId);
-        console.log('Status Code:', status);
+        console.log('ℹ️ Payment already paid (idempotent):', payment._id);
       }
 
-      res.json({ return_code: 1, return_message: 'Success' });
-    } catch (error) {
-      console.error('ZaloPay callback error:', error);
-      res.json({ return_code: 0, return_message: 'Error' });
+      // Thông báo thành công cho ZaloPay
+      result.returncode = 1;
+      result.returnmessage = 'success';
+      return void res.json(result);
+    } catch (error: any) {
+      console.error('❌ Callback exception:', error);
+      
+      // returncode = 0 -> ZaloPay sẽ retry callback (tối đa 3 lần)
+      result.returncode = 0;
+      result.returnmessage = error?.message || 'exception';
+      return void res.json(result);
     }
   };
 
-  verifyReturn = async (req: any, res: Response, next: NextFunction): Promise<void> => {
+  /**
+   * Test callback - Simulate ZaloPay callback (for testing purposes)
+   * POST /api/zalopay/test-callback
+   * Body: { apptransid: "string" }
+   */
+  testCallback = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
     try {
-      const { orderId, appTransId } = req.body;
+      const { apptransid } = req.body;
 
-      if (!orderId && !appTransId) {
-        throw new AppError('Order ID or app transaction ID is required', 400);
+      if (!apptransid) {
+        throw new AppError('apptransid is required', 400);
       }
 
-      // Find payment
-      const query: any = {};
-      if (orderId) query.orderId = orderId;
-      if (appTransId) query['metadata.appTransId'] = appTransId;
+      console.log('🧪 TEST CALLBACK - Simulating ZaloPay callback');
+      console.log('  AppTransId:', apptransid);
 
-      const payment = await Payment.findOne(query).populate('orderId');
+      // Tìm payment
+      const payment = await Payment.findOne({ 'metadata.appTransId': apptransid });
+
       if (!payment) {
-        throw new AppError('Payment not found', 404);
+        throw new AppError(`Payment not found for apptransid: ${apptransid}`, 404);
       }
 
-      // If already paid, return current status
-      if (payment.paymentStatus === 'paid') {
-        res.status(200).json({
-          success: true,
-          message: 'Payment already confirmed',
-          data: {
-            status: 'paid',
-            orderId: payment.orderId,
-            amount: payment.amount,
-            paymentDate: payment.paymentDate,
-          },
-        });
-        return;
-      }
+      console.log('✅ Payment found:', payment._id);
 
-      // Check status with ZaloPay
-      const transactionId = (payment.metadata as any)?.appTransId;
-      if (!transactionId) {
-        throw new AppError('Invalid transaction ID', 400);
-      }
-
-      let zaloPayStatus: any = null;
-      let retries = 0;
-      const maxRetries = 3;
-
-      // Retry logic for checking status (as per ZaloPay docs)
-      while (retries < maxRetries) {
-        try {
-          zaloPayStatus = await zalopayService.checkPaymentStatus(transactionId);
-          
-          // If processing, retry after delay
-          if ((zaloPayStatus as any).isprocessing === true) {
-            retries++;
-            if (retries < maxRetries) {
-              await new Promise(resolve => setTimeout(resolve, 1000)); // Wait 1 second
-              continue;
-            }
-          }
-          break;
-        } catch (error: any) {
-          retries++;
-          if (retries >= maxRetries) {
-            throw error;
-          }
-          await new Promise(resolve => setTimeout(resolve, 1000)); // Wait before retry
-        }
-      }
-
-      if (!zaloPayStatus) {
-        throw new AppError('Failed to verify payment status', 500);
-      }
-
-      console.log('ZaloPay status response:', zaloPayStatus);
-
-      // Update payment status based on ZaloPay response
-      let paymentStatus: 'pending' | 'paid' | 'failed' = 'pending';
-      
-      if (zaloPayStatus.return_code === 1 && zaloPayStatus.sub_return_code === 0) {
-        // Payment successful
-        paymentStatus = 'paid';
-      } else if (zaloPayStatus.return_code === -49) {
-        // Payment not completed yet
-        paymentStatus = 'pending';
-      } else {
-        // Payment failed
-        paymentStatus = 'failed';
-      }
-
-      // Update payment if status changed to paid
-      if (paymentStatus === 'paid' && (payment.paymentStatus as any) !== 'paid') {
+      // Update payment status
+      if (payment.paymentStatus !== 'paid') {
         payment.paymentStatus = 'paid';
         payment.metadata = {
           ...(payment.metadata || {}),
-          zaloTransId: zaloPayStatus.zalo_trans_id,
-          finishTime: zaloPayStatus.finish_time,
-          verifyReturnTime: new Date(),
+          zaloTransId: 999999999,
+          callbackTime: new Date(),
+          testMode: true,
         } as any;
         await payment.save();
 
         // Update order status
-        const order = await Order.findById(payment.orderId);
-        if (order && order.status === 'pending') {
-          order.status = 'confirmed';
-          await order.save();
-        }
-      }
+        const order = await Order.findByIdAndUpdate(
+          payment.orderId,
+          {
+            status: 'confirmed',
+            paymentStatus: 'paid',
+          },
+          { new: true }
+        );
 
-      res.status(200).json({
-        success: true,
-        message: 'Payment status verified',
-        data: {
-          status: paymentStatus,
-          orderId: payment.orderId,
-          amount: payment.amount,
-          transactionId: payment.transactionId,
-          zaloTransId: zaloPayStatus.zalo_trans_id,
-          returnCode: zaloPayStatus.return_code,
-          returnMessage: zaloPayStatus.return_message,
-        },
-      });
-    } catch (error) {
-      console.error('ZaloPay verify return error:', error);
-      next(error);
-    }
-  };
+        console.log('✅ TEST - Payment and Order updated to PAID');
+        console.log('  PaymentId:', payment._id);
+        console.log('  OrderId:', order?._id);
 
-  /**
-   * Refund ZaloPay payment
-   * POST /api/zalopay/refund
-   */
-  refundPayment = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
-    try {
-      const { transactionId, amount } = req.body;
-      const userId = req.user?.id;
-
-      if (!transactionId || !amount) {
-        throw new AppError('Transaction ID and amount are required', 400);
-      }
-
-      if (!userId) {
-        throw new AppError('User not authenticated', 401);
-      }
-
-      // Only admin can refund
-      if (req.user?.role !== 'admin') {
-        throw new AppError('Only admin can refund payments', 403);
-      }
-
-      // Find payment
-      const payment = await Payment.findOne({ transactionId }).populate('orderId');
-      if (!payment) {
-        throw new AppError('Payment not found', 404);
-      }
-
-      if (payment.paymentStatus !== 'paid') {
-        throw new AppError('Only paid payments can be refunded', 400);
-      }
-
-      // Request refund from ZaloPay
-      const zaloTransId = (payment.metadata as any)?.zaloTransId;
-      if (!zaloTransId) {
-        throw new AppError('Invalid ZaloPay transaction ID', 400);
-      }
-
-      const refundResponse = await zalopayService.refundPayment(
-        zaloTransId,
-        Math.floor(amount),
-        `Refund for order ${payment.orderId}`
-      );
-
-      // Update payment
-      payment.paymentStatus = 'refunded';
-      payment.refundAmount = amount;
-      payment.refundedAt = new Date();
-      await payment.save();
-
-      res.status(200).json({
-        success: true,
-        message: 'Refund processed successfully',
-        data: {
-          paymentId: payment._id,
-          refundAmount: amount,
-          refundedAt: payment.refundedAt,
-        },
-      });
-    } catch (error) {
-      next(error);
-    }
-  };
-
-  /**
-   * Cancel ZaloPay payment
-   * POST /api/zalopay/cancel
-   */
-  cancelPayment = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
-    try {
-      const { orderId } = req.body;
-      const userId = req.user?.id;
-
-      if (!orderId) {
-        throw new AppError('Order ID is required', 400);
-      }
-
-      if (!userId) {
-        throw new AppError('User not authenticated', 401);
-      }
-
-      // Find payment
-      const payment = await Payment.findOne({ orderId }).populate('orderId');
-      if (!payment) {
-        throw new AppError('Payment not found', 404);
-      }
-
-      // Verify user is owner or admin
-      const order = await Order.findById(orderId);
-      if (req.user?.id !== order?.userId.toString() && req.user?.role !== 'admin') {
-        throw new AppError('You do not have permission to cancel this payment', 403);
-      }
-
-      // Only cancel pending or failed payments
-      if (payment.paymentStatus !== 'pending' && payment.paymentStatus !== 'failed') {
-        throw new AppError('Only pending or failed payments can be cancelled', 400);
-      }
-
-      // Update payment status
-      payment.paymentStatus = 'cancelled';
-      await payment.save();
-
-      res.status(200).json({
-        success: true,
-        message: 'Payment cancelled successfully',
-        data: {
-          paymentId: payment._id,
-          status: 'cancelled',
-        },
-      });
-    } catch (error) {
-      next(error);
-    }
-  };
-
-  /**
-   * Get payment status by transaction ID
-   * GET /api/zalopay/payment/:transactionId
-   */
-  getPaymentByTransactionId = async (
-    req: AuthRequest,
-    res: Response,
-    next: NextFunction
-  ): Promise<void> => {
-    try {
-      const { transactionId } = req.params;
-
-      const payment = await Payment.findOne({ transactionId }).populate('orderId');
-      if (!payment) {
-        throw new AppError('Payment not found', 404);
-      }
-
-      res.status(200).json({
-        success: true,
-        data: payment,
-      });
-    } catch (error) {
-      next(error);
-    }
-  };
-
-  /**
-   * Test callback for sandbox - Simulate successful payment
-   * POST /api/zalopay/test-callback
-   * Body: { appTransId: "260204_781012" }
-   */
-  testCallback = async (req: any, res: Response, next: NextFunction): Promise<void> => {
-    try {
-      const { appTransId } = req.body;
-
-      if (!appTransId) {
-        throw new AppError('appTransId is required', 400);
-      }
-
-      // Find payment by app transaction ID
-      const payment = await Payment.findOne({
-        'metadata.appTransId': appTransId,
-      }).populate('orderId');
-
-      if (!payment) {
-        res.status(404).json({ 
-          success: false,
-          message: 'Payment not found for appTransId: ' + appTransId 
+        res.status(200).json({
+          success: true,
+          message: 'Test callback successful - Payment status updated to PAID',
+          data: {
+            paymentId: payment._id,
+            orderId: order?._id,
+            paymentStatus: 'paid',
+            orderStatus: order?.status,
+          },
         });
-        return;
+      } else {
+        res.status(200).json({
+          success: true,
+          message: 'Payment already paid',
+          data: {
+            paymentId: payment._id,
+            paymentStatus: 'paid',
+          },
+        });
+      }
+    } catch (error) {
+      console.error('❌ Test callback error:', error);
+      next(error);
+    }
+  };
+
+  /**
+   * Kiểm tra trạng thái đơn hàng
+   * POST /api/zalopay/check-order-status
+   * Body: { apptransid: "string" }
+   */
+  checkOrderStatus = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const { apptransid } = req.body;
+
+      if (!apptransid) {
+        throw new AppError('App Transaction ID (apptransid) is required', 400);
       }
 
-      // Simulate successful payment
-      payment.paymentStatus = 'paid';
-      payment.metadata = {
-        ...(payment.metadata || {}),
-        zaloTransId: Math.floor(Math.random() * 1000000000),
-        callbackTime: new Date(),
-        testMode: true,
-      } as any;
-      await payment.save();
+      // Gửi ZaloPay service để lấy trạng thái
+      const statusResponse = await zalopayService.getOrderStatus(apptransid);
 
-      // Update order status
-      const order = await Order.findById(payment.orderId);
-      if (order) {
-        order.status = 'confirmed';
-        order.paymentStatus = 'paid';
-        await order.save();
+      // Phân tích trạng thái
+      let orderStatus = 'pending';
+      let paymentStatus = 'pending';
+
+      // Theo docs ZaloPay:
+      // returncode = 1: success (payment completed)
+      // returncode = -49: chưa thanh toán (not yet paid)
+      // returncode = -117: nhập sai mật khẩu ZaloPay
+      // isprocessing = true: giao dịch đang xử lý
+      // isprocessing = false: giao dịch đã kết thúc
+
+      if (statusResponse.returncode === 1) {
+        // Thanh toán thành công
+        orderStatus = 'confirmed';
+        paymentStatus = 'paid';
+      } else if (statusResponse.returncode === -49) {
+        // Chưa thanh toán
+        orderStatus = 'pending';
+        paymentStatus = 'pending';
+      } else if (statusResponse.returncode === -117) {
+        // Nhập sai mật khẩu ZaloPay
+        orderStatus = 'failed';
+        paymentStatus = 'failed';
+      } else if (statusResponse.isprocessing === true) {
+        // Giao dịch đang xử lý
+        orderStatus = 'pending';
+        paymentStatus = 'pending';
+      } else {
+        // Các trường hợp lỗi khác
+        orderStatus = 'failed';
+        paymentStatus = 'failed';
       }
 
-      // Log successful test payment
-      console.log('✅ TEST PAYMENT SUCCESSFUL (SANDBOX)');
-      console.log('═'.repeat(50));
-      console.log('Order ID:', payment.orderId);
-      console.log('Payment ID:', payment._id);
-      console.log('App Transaction ID:', appTransId);
-      console.log('Amount:', payment.amount, 'VND');
-      console.log('Status: PAID (TEST MODE)');
-      console.log('═'.repeat(50));
+      // Cập nhật payment status nếu thanh toán thành công
+      if (paymentStatus === 'paid') {
+        const payment = await Payment.findOne({ 'metadata.appTransId': apptransid });
+        if (payment && payment.paymentStatus !== 'paid') {
+          payment.paymentStatus = 'paid';
+          payment.metadata = {
+            ...(payment.metadata || {}),
+            zaloTransId: statusResponse.zalo_trans_id,
+            finishTime: statusResponse.finish_time,
+            statusCheckTime: new Date(),
+          } as any;
+          await payment.save();
 
-      res.json({ 
-        success: true,
-        message: 'Test payment completed successfully',
-        data: {
-          orderId: payment.orderId,
-          paymentId: payment._id,
-          status: 'paid'
+          // Cập nhật order status
+          const order = await Order.findById(payment.orderId);
+          if (order && order.status === 'pending') {
+            order.status = 'confirmed';
+            order.paymentStatus = 'paid';
+            await order.save();
+          }
+
+          console.log('✅ Order status updated to PAID via check-order-status');
+          console.log('  OrderId:', payment.orderId);
+          console.log('  AppTransId:', apptransid);
         }
+      }
+
+      res.status(200).json({
+        success: true,
+        message: 'Order status checked successfully',
+        data: {
+          apptransid,
+          orderStatus,
+          paymentStatus,
+          amount: statusResponse.amount,
+          zaloTransId: statusResponse.zalo_trans_id,
+          isProcessing: statusResponse.isprocessing,
+          returnCode: statusResponse.returncode,
+          returnMessage: statusResponse.returnmessage,
+          serverTime: statusResponse.server_time,
+        },
       });
     } catch (error) {
-      console.error('Test callback error:', error);
+      console.error('❌ Check order status error:', error);
       next(error);
     }
   };

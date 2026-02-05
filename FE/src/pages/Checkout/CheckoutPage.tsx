@@ -150,7 +150,7 @@ export default function CheckoutPage() {
           orderId: "temp", // Sẽ được tạo trên backend
           amount: total,
           description: orderData.description,
-          returnUrl: `${window.location.origin}/checkout/zalopay-return`,
+          returnUrl: `${window.location.origin}/order-success`,
           notifyUrl: `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/zalopay/callback`,
           deliveryInfo: {
             fullName: formData.fullName,
@@ -168,30 +168,34 @@ export default function CheckoutPage() {
         console.log('ZaloPay Response keys:', Object.keys(zaloPayResponse));
         console.log('ZaloPay Response.data:', zaloPayResponse.data);
         console.log('ZaloPay Response.success:', zaloPayResponse.success);
+        console.log('🔗 Order URL received:', zaloPayResponse.data?.orderUrl);
+        console.log('📋 Full response data:', JSON.stringify(zaloPayResponse.data, null, 2));
 
-        if (zaloPayResponse.success && zaloPayResponse.data?.checkoutUrl) {
-          const checkoutUrl = zaloPayResponse.data.checkoutUrl;
-          console.log('Redirecting to ZaloPay:', checkoutUrl);
+        // Lấy orderUrl từ response (có thể là orderUrl hoặc checkoutUrl)
+        const orderUrl = zaloPayResponse.data?.orderUrl || zaloPayResponse.data?.checkoutUrl;
+
+        if (zaloPayResponse.success && orderUrl) {
+          console.log('✅ Redirecting to ZaloPay:', orderUrl);
           console.log('Order ID:', zaloPayResponse.data.orderId);
           console.log('Payment ID:', zaloPayResponse.data.paymentId);
+          console.log('AppTransId:', zaloPayResponse.data.apptransid);
           
           // Lưu order data để xử lý khi quay về
-          // Cần lấy appTransId từ backend response
           localStorage.setItem(
             "pendingZaloPayOrder",
             JSON.stringify({
               orderData,
               orderId: zaloPayResponse.data.orderId,
               paymentId: zaloPayResponse.data.paymentId,
-              appTransId: zaloPayResponse.data.appTransId || zaloPayResponse.data.orderId, // Use appTransId if available
+              apptransid: zaloPayResponse.data.apptransid,
             })
           );
 
-          // Redirect sang ZaloPay payment page
-          window.location.href = checkoutUrl;
+          // ✅ Redirect sang ZaloPay payment page
+          window.location.href = orderUrl;
         } else {
           console.error('Invalid ZaloPay response:', zaloPayResponse);
-          console.error('Expected checkoutUrl but got:', zaloPayResponse.data?.checkoutUrl);
+          console.error('Expected orderUrl but got:', orderUrl);
           throw new Error(
             zaloPayResponse.message || "Không thể khởi tạo thanh toán ZaloPay"
           );
