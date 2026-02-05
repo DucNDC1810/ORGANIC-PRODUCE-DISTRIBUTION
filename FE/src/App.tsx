@@ -8,7 +8,6 @@ import HomePage from './pages/HomePage/Home';
 import CartPage from './pages/HomePage/CartPage';
 import CheckoutPage from './pages/Checkout/CheckoutPage';
 import OrderSuccessPage from './pages/Checkout/OrderSuccessPage';
-import PaymentResultPage from './pages/Checkout/PaymentResultPage';
 import LoginPage from './pages/HomePage/LoginPage';
 import SignUpPage from './pages/HomePage/SignUpPage';
 import ForgotPasswordPage from './pages/HomePage/ForgotPasswordPage';
@@ -53,8 +52,6 @@ export default function App() {
             <Route path="/cart" element={<ProtectedRoute><CartPage /></ProtectedRoute>} />
             <Route path="/checkout" element={<ProtectedRoute><CheckoutPage /></ProtectedRoute>} />
             <Route path="/order-success" element={<ProtectedRoute><OrderSuccessPage /></ProtectedRoute>} />
-            {/* Payment result is public (callback from payment gateway) */}
-            <Route path="/payment-result" element={<PaymentResultPage />} />
             {/* Customer-only routes */}
             <Route path="/profile" element={<CustomerRoute> <Profile /></CustomerRoute>} />
 

@@ -18,7 +18,7 @@ import momoService from "../../services/momoService";
 import voucherService from "../../services/voucherService";
 
 export default function CheckoutPage() {
-  const { cart, getTotalPrice } = useCart();
+  const { cart, getTotalPrice, removeFromCart, updateQuantity } = useCart();
   const { user } = useAuth();
   const navigate = useNavigate();
 
@@ -264,7 +264,7 @@ export default function CheckoutPage() {
           console.log('MoMo Order ID:', momoResponse.data.momoOrderId);
           
           // Lưu order data để xử lý khi quay về
-          localStorage.setItem(
+          sessionStorage.setItem(
             "pendingMoMoOrder",
             JSON.stringify({
               orderData,
@@ -272,6 +272,7 @@ export default function CheckoutPage() {
               paymentId: momoResponse.data.paymentId,
               momoOrderId: momoResponse.data.momoOrderId,
               requestId: momoResponse.data.requestId,
+              fromMoMo: true,
             })
           );
 
@@ -308,6 +309,22 @@ export default function CheckoutPage() {
       [e.target.name]: e.target.value,
     });
     setError("");
+  };
+
+  const handleRemoveItem = async (productId: string) => {
+    try {
+      await removeFromCart(productId);
+    } catch (error) {
+      console.error('Error removing item:', error);
+    }
+  };
+
+  const handleUpdateQuantity = async (productId: string, newQuantity: number) => {
+    try {
+      await updateQuantity(productId, newQuantity);
+    } catch (error) {
+      console.error('Error updating quantity:', error);
+    }
   };
 
   if (!user) {
@@ -766,7 +783,11 @@ export default function CheckoutPage() {
                       <div className="flex-1 min-w-0">
                         <div className="flex items-start justify-between mb-1">
                           <p className="text-xs text-gray-500">{item.name}</p>
-                          <button className="text-gray-400 hover:text-red-500">
+                          <button 
+                            onClick={() => handleRemoveItem(item.id)}
+                            className="text-gray-400 hover:text-red-500 transition-colors"
+                            title="Xóa sản phẩm"
+                          >
                             <Trash2 className="w-4 h-4" />
                           </button>
                         </div>
@@ -779,13 +800,22 @@ export default function CheckoutPage() {
                             {item.price.toLocaleString("vi-VN")}₫
                           </p>
                           <div className="flex items-center gap-1 border border-gray-300 rounded">
-                            <button className="w-6 h-6 flex items-center justify-center hover:bg-gray-50">
+                            <button 
+                              onClick={() => handleUpdateQuantity(item.id, item.quantity - 1)}
+                              className="w-6 h-6 flex items-center justify-center hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                              title="Giảm số lượng"
+                              disabled={item.quantity <= 1}
+                            >
                               <Minus className="w-3 h-3" />
                             </button>
                             <span className="text-xs font-medium px-2">
                               {item.quantity}
                             </span>
-                            <button className="w-6 h-6 flex items-center justify-center hover:bg-gray-50">
+                            <button 
+                              onClick={() => handleUpdateQuantity(item.id, item.quantity + 1)}
+                              className="w-6 h-6 flex items-center justify-center hover:bg-gray-50 transition-colors"
+                              title="Tăng số lượng"
+                            >
                               <Plus className="w-3 h-3" />
                             </button>
                           </div>

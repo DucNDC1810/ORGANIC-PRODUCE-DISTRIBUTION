@@ -21,19 +21,48 @@ export default function OrderSuccessPage() {
   const [orderData, setOrderData] = useState<any>(null);
   const [verificationStatus, setVerificationStatus] = useState<"idle" | "verifying" | "verified">("idle");
   const orderId = location.state?.orderId;
+  const [paymentType, setPaymentType] = useState<"zalopay" | "momo" | null>(null);
   
   // Check if coming from ZaloPay return (either from state or localStorage)
   const searchParams = new URLSearchParams(location.search);
   const isZaloPayReturn = !!searchParams.toString() || location.state?.fromZaloPay;
+  const isMoMoReturn = !!searchParams.get('resultCode') || !!sessionStorage.getItem('pendingMoMoOrder');
 
   useEffect(() => {
     const verifyAndLoadOrder = async () => {
       try {
-        // Get pending order data from localStorage if exists
+        // Check for MoMo payment first
+        const pendingMoMoOrder = sessionStorage.getItem("pendingMoMoOrder");
+        const momoResultCode = searchParams.get('resultCode');
+
+        if (pendingMoMoOrder) {
+          console.log('🔵 Processing MoMo payment...');
+          const { orderData: data, orderId: momoOrderId } = JSON.parse(pendingMoMoOrder);
+          setOrderData(data);
+          setPaymentType('momo');
+
+          // Check result code
+          if (momoResultCode === '0') {
+            console.log('✅ MoMo payment successful');
+            setVerificationStatus("verified");
+          } else if (momoResultCode) {
+            console.log('❌ MoMo payment failed with code:', momoResultCode);
+            setVerificationStatus("verified");
+          } else {
+            // Still processing
+            setVerificationStatus("verifying");
+          }
+
+          sessionStorage.removeItem("pendingMoMoOrder");
+          return;
+        }
+
+        // Get pending order data from localStorage if exists (ZaloPay)
         const pendingOrderData = localStorage.getItem("pendingZaloPayOrder");
         if (pendingOrderData) {
           const { orderData: data, appTransId } = JSON.parse(pendingOrderData);
           setOrderData(data);
+          setPaymentType('zalopay');
 
           // If coming from ZaloPay return, verify payment status
           if (isZaloPayReturn && appTransId) {
@@ -105,12 +134,12 @@ export default function OrderSuccessPage() {
     <div className="min-h-screen bg-gradient-to-br from-primary/5 to-transparent">
       <Header />
 
-      {/* ZaloPay verification overlay */}
-      {isZaloPayReturn && verificationStatus === "verifying" && (
+      {/* Payment verification overlay */}
+      {(isZaloPayReturn || isMoMoReturn) && verificationStatus === "verifying" && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
           <div className="bg-white rounded-xl p-8 text-center shadow-lg">
             <Loader className="w-12 h-12 text-primary animate-spin mx-auto mb-4" />
-            <p className="text-lg text-gray-600">Đang xác nhận thanh toán...</p>
+            <p className="text-lg text-gray-600">Đang xác nhận thanh toán {paymentType === 'momo' ? 'MoMo' : 'ZaloPay'}...</p>
           </div>
         </div>
       )}
@@ -240,7 +269,9 @@ export default function OrderSuccessPage() {
                     <h3 className="font-semibold text-foreground">Phương Thức Thanh Toán</h3>
                     <div className="bg-primary/5 rounded-lg p-4 border border-primary/20">
                       <div className="flex items-center justify-between">
-                        <span className="text-foreground font-medium">ZaloPay</span>
+                        <span className="text-foreground font-medium">
+                          {paymentType === 'momo' ? 'MoMo' : paymentType === 'zalopay' ? 'ZaloPay' : 'Chưa xác định'}
+                        </span>
                         <span className="inline-flex items-center gap-1 text-sm font-medium text-primary bg-primary/10 px-3 py-1 rounded-full">
                           ✓ Đã Thanh Toán
                         </span>

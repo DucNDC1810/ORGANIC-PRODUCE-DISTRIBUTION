@@ -65,7 +65,7 @@ export class MoMoController {
       // Tạo redirect URL (return after payment)
       // Ưu tiên sử dụng domain từ request, fallback sang FE_BASE_URL
       const feOrigin = req.headers.origin || process.env.FE_BASE_URL || 'http://localhost:5173';
-      const redirectUrl = `${feOrigin}/payment-result`;
+      const redirectUrl = `${feOrigin}/order-success`;
 
       console.log('🔗 Redirect URL Configuration:');
       console.log('  req.headers.origin:', req.headers.origin);
