@@ -14,6 +14,7 @@ import { useCart } from "../../context/CartContext";
 import { useAuth } from "../../context/AuthContext";
 import Header from "../../components/Header";
 import zalopayService from "../../services/zaloPayService";
+import momoService from "../../services/momoService";
 import voucherService from "../../services/voucherService";
 
 export default function CheckoutPage() {
@@ -215,8 +216,85 @@ export default function CheckoutPage() {
       return; // Dừng ở đây, không tiếp tục với phương thức thanh toán khác
     }
 
-    // Nếu không phải ZaloPay, hiển thị lỗi (chỉ hỗ trợ ZaloPay)
-    setError("Hiện tại chỉ hỗ trợ thanh toán bằng ZaloPay");
+    // Nếu thanh toán MoMo
+    if (formData.paymentMethod === "Momo") {
+      setLoading(true);
+      try {
+        const orderData = {
+          deliveryInfo: {
+            fullName: formData.fullName,
+            phone: formData.phone,
+            email: formData.email,
+            address: deliveryType === "delivery" ? "Delivery address" : "Store pickup",
+            type: deliveryType,
+          },
+          items: cart.map((item) => ({
+            productId: item.id,
+            quantity: item.quantity,
+            price: item.price,
+            subtotal: item.price * item.quantity,
+          })),
+          notes: formData.notes,
+          paymentMethod: "momo",
+          amount: total,
+          description: `Thanh toán đơn hàng từ Organica - ${formData.fullName}`,
+        };
+
+        const response = await momoService.createPayment({
+          orderId: "temp",
+          amount: total,
+          description: orderData.description,
+          deliveryInfo: {
+            fullName: formData.fullName,
+            phone: formData.phone,
+            email: formData.email,
+            address: deliveryType === "delivery" ? "Delivery address" : "Store pickup",
+            type: deliveryType,
+          },
+        });
+
+        const momoResponse = response as any;
+        console.log('MoMo Response:', momoResponse);
+        console.log('🔗 Pay URL received:', momoResponse.data?.payUrl);
+
+        if (momoResponse.success && momoResponse.data?.payUrl) {
+          console.log('✅ Redirecting to MoMo:', momoResponse.data.payUrl);
+          console.log('Order ID:', momoResponse.data.orderId);
+          console.log('Payment ID:', momoResponse.data.paymentId);
+          console.log('MoMo Order ID:', momoResponse.data.momoOrderId);
+          
+          // Lưu order data để xử lý khi quay về
+          localStorage.setItem(
+            "pendingMoMoOrder",
+            JSON.stringify({
+              orderData,
+              orderId: momoResponse.data.orderId,
+              paymentId: momoResponse.data.paymentId,
+              momoOrderId: momoResponse.data.momoOrderId,
+              requestId: momoResponse.data.requestId,
+            })
+          );
+
+          // ✅ Redirect sang MoMo payment page
+          window.location.href = momoResponse.data.payUrl;
+        } else {
+          console.error('Invalid MoMo response:', momoResponse);
+          throw new Error(
+            momoResponse.message || "Không thể khởi tạo thanh toán MoMo"
+          );
+        }
+      } catch (err: any) {
+        console.error("MoMo error:", err);
+        setError(
+          err.response?.data?.message || err.message || "Lỗi khi khởi tạo thanh toán MoMo"
+        );
+        setLoading(false);
+      }
+      return;
+    }
+
+    // Nếu không phải ZaloPay hay MoMo, hiển thị lỗi
+    setError("Hiện tại chỉ hỗ trợ thanh toán bằng ZaloPay hoặc MoMo");
     setLoading(false);
   };
 
