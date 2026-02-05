@@ -22,7 +22,8 @@ interface CartContextType {
   addToCart: (product: Product) => Promise<void>;
   removeFromCart: (productId: string) => Promise<void>;
   updateQuantity: (productId: string, quantity: number) => Promise<void>;
-  clearCart: () => Promise<void>;
+  clearCart: (silent?: boolean) => Promise<void>;
+  clearLocalCart: () => void;
   getTotalItems: () => number;
   getTotalPrice: () => number;
   isCartOpen: boolean;
@@ -63,8 +64,8 @@ export function CartProvider({ children }: { children: ReactNode }) {
     if (isAuthenticated && user) {
       loadCart();
     } else {
-      // Load from localStorage if not authenticated
-      loadLocalCart();
+      // Clear cart when user logs out
+      setCart([]);
     }
   }, [isAuthenticated, user]);
 
@@ -76,7 +77,6 @@ export function CartProvider({ children }: { children: ReactNode }) {
         const localCart = apiCart.items
           .map(convertAPICartItemToLocal)
           .filter((item): item is CartItem => item !== null);
-        console.log('Loaded cart items:', localCart);
         setCart(localCart);
       } else {
         setCart([]);
@@ -125,7 +125,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
           console.log('Local cart after mapping:', localCart);
           setCart(localCart);
         }
-        toast.success('Đã thêm vào giỏ hàng');
+        toast.success('Added to cart');
       } else {
         // Add to local cart
         setCart((prevCart) => {
@@ -143,11 +143,11 @@ export function CartProvider({ children }: { children: ReactNode }) {
           saveLocalCart(newCart);
           return newCart;
         });
-        toast.success('Đã thêm vào giỏ hàng');
+        toast.success('Added to cart');
       }
       setIsCartOpen(true);
     } catch (error: any) {
-      toast.error(error.response?.data?.message || 'Lỗi khi thêm vào giỏ hàng');
+      toast.error(error.response?.data?.message || 'Failed to add to cart');
       console.error('Error adding to cart:', error);
     } finally {
       setLoading(false);
@@ -165,17 +165,17 @@ export function CartProvider({ children }: { children: ReactNode }) {
             .filter((item): item is CartItem => item !== null);
           setCart(localCart);
         }
-        toast.success('Đã xóa khỏi giỏ hàng');
+        toast.success('Removed from cart');
       } else {
         setCart((prevCart) => {
           const newCart = prevCart.filter((item) => item.id !== productId);
           saveLocalCart(newCart);
           return newCart;
         });
-        toast.success('Đã xóa khỏi giỏ hàng');
+        toast.success('Removed from cart');
       }
     } catch (error: any) {
-      toast.error(error.response?.data?.message || 'Lỗi khi xóa khỏi giỏ hàng');
+      toast.error(error.response?.data?.message || 'Failed to remove from cart');
       console.error('Error removing from cart:', error);
     } finally {
       setLoading(false);
@@ -208,31 +208,43 @@ export function CartProvider({ children }: { children: ReactNode }) {
         });
       }
     } catch (error: any) {
-      toast.error(error.response?.data?.message || 'Lỗi khi cập nhật giỏ hàng');
+      toast.error(error.response?.data?.message || 'Failed to update cart');
       console.error('Error updating quantity:', error);
     } finally {
       setLoading(false);
     }
   };
 
-  const clearCart = async () => {
+  const clearCart = async (silent: boolean = false) => {
     try {
       if (isAuthenticated) {
         setLoading(true);
         await cartService.clearCart();
         setCart([]);
-        toast.success('Đã xóa toàn bộ giỏ hàng');
+        if (!silent) {
+          toast.success('Cart cleared successfully');
+        }
       } else {
         setCart([]);
         saveLocalCart([]);
-        toast.success('Đã xóa toàn bộ giỏ hàng');
+        if (!silent) {
+          toast.success('Cart cleared successfully');
+        }
       }
     } catch (error: any) {
-      toast.error(error.response?.data?.message || 'Lỗi khi xóa giỏ hàng');
+      if (!silent) {
+        toast.error(error.response?.data?.message || 'Failed to clear cart');
+      }
       console.error('Error clearing cart:', error);
     } finally {
       setLoading(false);
     }
+  };
+
+  // Clear only local cart without calling API (used for logout)
+  const clearLocalCart = () => {
+    setCart([]);
+    localStorage.removeItem('cart');
   };
 
   const refreshCart = async () => {
@@ -263,6 +275,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
         removeFromCart,
         updateQuantity,
         clearCart,
+        clearLocalCart,
         getTotalItems,
         getTotalPrice,
         isCartOpen,

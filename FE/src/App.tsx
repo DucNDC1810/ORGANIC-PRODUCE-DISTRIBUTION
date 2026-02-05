@@ -30,7 +30,7 @@ export default function App() {
     <AuthProvider>
       <CartProvider>
         <BrowserRouter>
-          <Toaster position="top-right" richColors />
+          <Toaster position="bottom-right" richColors />
           <MiniCart />
           <Routes>
             {/* Public routes */}

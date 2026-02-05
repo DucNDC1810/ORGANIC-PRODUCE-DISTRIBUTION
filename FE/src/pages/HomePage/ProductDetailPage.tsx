@@ -11,7 +11,6 @@ import {
   Truck,
   Shield,
   RotateCcw,
-  Star,
   Check,
   Leaf
 } from 'lucide-react';

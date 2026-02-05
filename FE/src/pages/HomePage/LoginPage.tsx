@@ -31,7 +31,7 @@ export default function LoginPage() {
         const user = JSON.parse(userStr);
         
         // Redirect based on user role
-        toast.success('Đăng nhập thành công! Chào mừng bạn trở lại!');
+        toast.success('Login successful! Welcome back!');
         switch (user.role) {
           case 'admin':
             navigate('/admin');

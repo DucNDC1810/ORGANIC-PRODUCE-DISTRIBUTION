@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Star, ThumbsUp, Image as ImageIcon } from 'lucide-react';
+import { Star, ThumbsUp } from 'lucide-react';
 import { Review, RatingStats } from '../types';
 import { reviewService } from '../services/reviewService';
 import { useAuth } from '../context/AuthContext';

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Search, ShoppingCart, Leaf, Apple, Carrot, Beef, Fish, Wheat, Milk, Cookie, Coffee, Nut, BookOpen, Lightbulb, Gift, User, LogOut, Settings } from 'lucide-react';
+import { Search, ShoppingCart, Leaf, Apple, Carrot, Wheat, Milk, BookOpen, Lightbulb, Gift, User, LogOut, Settings } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
@@ -63,13 +63,14 @@ function DropdownMenu({ items, isOpen }: DropdownMenuProps) {
 }
 
 export default function Header() {
-  const { getTotalItems, openCart } = useCart();
+  const { getTotalItems, openCart, clearLocalCart } = useCart();
   const { user, isAuthenticated, logout } = useAuth();
   const navigate = useNavigate();
   const [productsOpen, setProductsOpen] = useState(false);
   const [blogsOpen, setBlogsOpen] = useState(false);
 
   const handleLogout = () => {
+    clearLocalCart();
     logout();
     navigate('/');
   };
@@ -120,7 +121,7 @@ export default function Header() {
               onMouseLeave={() => setBlogsOpen(false)}
             >
               <button className="text-foreground hover:text-emerald-600 transition-colors font-medium">
-                Blogs
+                News
               </button>
               <DropdownMenu items={blogsDropdown} isOpen={blogsOpen} />
             </div>
