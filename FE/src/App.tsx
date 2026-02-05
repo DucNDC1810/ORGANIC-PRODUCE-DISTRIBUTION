@@ -53,7 +53,8 @@ export default function App() {
             <Route path="/cart" element={<ProtectedRoute><CartPage /></ProtectedRoute>} />
             <Route path="/checkout" element={<ProtectedRoute><CheckoutPage /></ProtectedRoute>} />
             <Route path="/order-success" element={<ProtectedRoute><OrderSuccessPage /></ProtectedRoute>} />
-            <Route path="/payment-result" element={<ProtectedRoute><PaymentResultPage /></ProtectedRoute>} />
+            {/* Payment result is public (callback from payment gateway) */}
+            <Route path="/payment-result" element={<PaymentResultPage />} />
             {/* Customer-only routes */}
             <Route path="/profile" element={<CustomerRoute> <Profile /></CustomerRoute>} />
 

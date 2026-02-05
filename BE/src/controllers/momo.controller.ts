@@ -63,7 +63,14 @@ export class MoMoController {
       }
 
       // Tạo redirect URL (return after payment)
-      const redirectUrl = `${process.env.FE_BASE_URL || 'http://localhost:5173'}/payment-result`;
+      // Ưu tiên sử dụng domain từ request, fallback sang FE_BASE_URL
+      const feOrigin = req.headers.origin || process.env.FE_BASE_URL || 'http://localhost:5173';
+      const redirectUrl = `${feOrigin}/payment-result`;
+
+      console.log('🔗 Redirect URL Configuration:');
+      console.log('  req.headers.origin:', req.headers.origin);
+      console.log('  process.env.FE_BASE_URL:', process.env.FE_BASE_URL);
+      console.log('  Final redirectUrl:', redirectUrl);
 
       // Gọi MoMo service để tạo link thanh toán
       const momoResponse = await momoService.createPayment(
@@ -166,6 +173,29 @@ export class MoMoController {
       // Kiểm tra resultCode (0 = success, khác = failed)
       if (resultCode !== 0) {
         console.log('⚠️ MoMo payment failed with resultCode:', resultCode);
+        
+        // Cập nhật trạng thái thanh toán và đơn hàng thành "failed"
+        const payment = await Payment.findOne({ 'metadata.momoOrderId': orderId });
+        
+        if (payment) {
+          await Payment.findOneAndUpdate(
+            { 'metadata.momoOrderId': orderId },
+            { $set: { paymentStatus: 'failed' } },
+            { new: true }
+          );
+
+          await Order.findByIdAndUpdate(
+            payment.orderId,
+            { status: 'failed', paymentStatus: 'failed' },
+            { new: true }
+          );
+
+          console.log('✅ PAYMENT AND ORDER UPDATED TO FAILED');
+          console.log('  PaymentId:', payment._id);
+          console.log('  OrderId:', payment.orderId);
+          console.log('  MoMo OrderId:', orderId);
+        }
+
         // Vẫn trả về success để MoMo không retry nữa
         result.resultCode = 0;
         result.message = 'success';
@@ -199,7 +229,7 @@ export class MoMoController {
         } as any;
         await payment.save();
 
-        // Cập nhật order status
+        // Cập nhật order status thành "confirmed"
         await Order.findByIdAndUpdate(payment.orderId, {
           status: 'confirmed',
           paymentStatus: 'paid',

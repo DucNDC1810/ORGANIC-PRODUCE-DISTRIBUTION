@@ -161,6 +161,7 @@ class MoMoService {
           headers: {
             'Content-Type': 'application/json',
           },
+          timeout: 30000, // 30 second timeout to prevent hanging requests
         }
       );
 
@@ -260,6 +261,7 @@ class MoMoService {
           headers: {
             'Content-Type': 'application/json',
           },
+          timeout: 30000, // 30 second timeout
         }
       );
 

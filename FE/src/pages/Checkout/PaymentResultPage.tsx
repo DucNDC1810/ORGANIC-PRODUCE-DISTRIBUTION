@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Check, X, Loader } from 'lucide-react';
+import { Check, X, Loader, AlertCircle } from 'lucide-react';
 import Header from '../../components/Header';
 import zalopayService from '../../services/zaloPayService';
 
@@ -12,6 +12,7 @@ export default function PaymentResultPage() {
   const [status, setStatus] = useState<PaymentStatus>('loading');
   const [paymentInfo, setPaymentInfo] = useState<any>(null);
   const [error, setError] = useState('');
+  const [showHint, setShowHint] = useState(false);
 
   useEffect(() => {
     const checkPaymentStatus = async () => {
@@ -19,6 +20,11 @@ export default function PaymentResultPage() {
         // Check if this is ZaloPay or MoMo payment
         const pendingZaloPayOrder = localStorage.getItem('pendingZaloPayOrder');
         const pendingMoMoOrder = localStorage.getItem('pendingMoMoOrder');
+
+        console.log('🔍 Checking payment status...');
+        console.log('  pendingZaloPayOrder:', !!pendingZaloPayOrder);
+        console.log('  pendingMoMoOrder:', !!pendingMoMoOrder);
+        console.log('  URL params:', Object.fromEntries(searchParams));
 
         if (pendingZaloPayOrder) {
           // Handle ZaloPay payment result
@@ -72,6 +78,10 @@ export default function PaymentResultPage() {
           const orderData = JSON.parse(pendingMoMoOrder);
           const resultCode = searchParams.get('resultCode');
 
+          console.log('💳 MoMo Payment Processing...');
+          console.log('  ResultCode from URL:', resultCode);
+          console.log('  Order data:', orderData);
+
           // resultCode: 0 = success, otherwise = failed
           if (resultCode === '0') {
             setStatus('success');
@@ -87,20 +97,57 @@ export default function PaymentResultPage() {
             localStorage.removeItem('pendingMoMoOrder');
           } else if (resultCode === null) {
             // Still processing - MoMo hasn't returned yet
+            // Verify payment status from backend
+            try {
+              console.log('⏳ Pending - checking backend status...');
+              setStatus('pending');
+              setPaymentInfo({
+                type: 'MoMo',
+                orderId: orderData.orderId,
+                amount: orderData.orderData.amount,
+                momoOrderId: orderData.momoOrderId,
+              });
+            } catch (error) {
+              console.error('Status check error:', error);
+              setStatus('pending');
+              setPaymentInfo({
+                type: 'MoMo',
+                orderId: orderData.orderId,
+                amount: orderData.orderData.amount,
+                momoOrderId: orderData.momoOrderId,
+              });
+            }
+          } else {
+            setStatus('failed');
+            setError(`Thanh toán MoMo thất bại. Mã lỗi: ${resultCode}`);
+          }
+        } else {
+          // No pending order found in localStorage
+          // Check if we have URL params from payment gateway
+          const resultCode = searchParams.get('resultCode');
+          const transId = searchParams.get('transId');
+          const momoOrderId = searchParams.get('orderId');
+
+          console.log('⚠️ No pending order in localStorage');
+          console.log('  resultCode:', resultCode);
+          console.log('  transId:', transId);
+          console.log('  momoOrderId:', momoOrderId);
+
+          if (resultCode !== null || transId !== null || momoOrderId !== null) {
+            // We have URL params, likely from MoMo callback
+            console.log('�3️⃣ Detected MoMo callback params, waiting for backend callback...');
             setStatus('pending');
             setPaymentInfo({
               type: 'MoMo',
-              orderId: orderData.orderId,
-              amount: orderData.orderData.amount,
-              momoOrderId: orderData.momoOrderId,
+              momoOrderId,
+              resultCode,
+              transId,
             });
+            setError('Đang chờ xác nhận thanh toán từ hệ thống...');
           } else {
             setStatus('failed');
-            setError(`MoMo thanh toán thất bại. Mã lỗi: ${resultCode}`);
+            setError('Không tìm thấy thông tin đơn hàng thanh toán. Vui lòng thử lại hoặc quay lại trang thanh toán.');
           }
-        } else {
-          setStatus('failed');
-          setError('Không tìm thấy đơn hàng đang chờ xử lý');
         }
       } catch (err: any) {
         console.error('Payment status check error:', err);
@@ -109,8 +156,23 @@ export default function PaymentResultPage() {
       }
     };
 
-    checkPaymentStatus();
+    // Đợi một chút để đảm bảo localStorage đã được cập nhật
+    const timer = setTimeout(() => {
+      checkPaymentStatus();
+    }, 500);
+
+    return () => clearTimeout(timer);
   }, [searchParams]);
+
+  // Show helpful hint if still loading after 5 seconds
+  useEffect(() => {
+    if (status === 'loading') {
+      const hintTimer = setTimeout(() => {
+        setShowHint(true);
+      }, 5000);
+      return () => clearTimeout(hintTimer);
+    }
+  }, [status]);
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -123,8 +185,56 @@ export default function PaymentResultPage() {
             <h1 className="text-2xl font-bold text-gray-800 mb-2">
               Đang xử lý thanh toán
             </h1>
-            <p className="text-gray-600">
+            <p className="text-gray-600 mb-4">
               Vui lòng chờ, chúng tôi đang kiểm tra trạng thái giao dịch của bạn...
+            </p>
+            {showHint && (
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+                <div className="flex gap-3 items-start">
+                  <AlertCircle className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
+                  <div className="text-left">
+                    <p className="text-blue-800 font-medium text-sm mb-2">Mất quá lâu?</p>
+                    <p className="text-blue-700 text-sm mb-3">
+                      Nếu trang này không thay đổi, có thể quá trình thanh toán đã hoàn tất. Hãy thử:
+                    </p>
+                    <ul className="text-blue-700 text-sm space-y-1 list-disc list-inside mb-3">
+                      <li>Làm mới trang (F5)</li>
+                      <li>Quay lại trang thanh toán</li>
+                      <li>Kiểm tra lịch sử đơn hàng</li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+            )}
+            <p className="text-sm text-gray-500">
+              {showHint ? (
+                <span>
+                  Nếu vấn đề vẫn tiếp tục, vui lòng{' '}
+                  <button
+                    onClick={() => navigate('/checkout')}
+                    className="text-primary underline hover:text-primary-dark"
+                  >
+                    quay lại checkout
+                  </button>
+                </span>
+              ) : (
+                <span>
+                  Nếu trang này không thay đổi sau 10 giây, vui lòng:{' '}
+                  <button
+                    onClick={() => window.location.reload()}
+                    className="text-primary underline hover:text-primary-dark"
+                  >
+                    làm mới trang
+                  </button>
+                  {' '}hoặc{' '}
+                  <button
+                    onClick={() => navigate('/checkout')}
+                    className="text-primary underline hover:text-primary-dark"
+                  >
+                    quay lại checkout
+                  </button>
+                </span>
+              )}
             </p>
           </div>
         )}
