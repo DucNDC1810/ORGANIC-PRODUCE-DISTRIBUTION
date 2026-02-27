@@ -23,6 +23,8 @@ import voucherRoutes from './routes/voucher.routes';
 import newsRoutes from './routes/news.routes';
 // import exampleRoutes from './routes/example.routes'; // Uncomment để test
 import { configurePassport } from './config/passport';
+// Register models that are referenced via populate but may not be auto-imported
+import './models/Address.model';
 
 const app: Application = express();
 
