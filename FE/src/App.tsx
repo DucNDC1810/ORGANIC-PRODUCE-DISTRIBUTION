@@ -23,6 +23,7 @@ import AdminDashboard from './pages/Admin/AdminDashboard';
 import ManagerDashboard from './pages/Manager/ManagerDashboard';
 import ProductsPage from './pages/HomePage/ProductsPage';
 import ProductDetailPage from './pages/HomePage/ProductDetailPage';
+import ChatWidget from './components/ChatWidget';
 
 export default function App() {
   return (
@@ -60,6 +61,7 @@ export default function App() {
             {/* Manager-only routes */}
             <Route path="/manager" element={<ManagerRoute><ManagerDashboard /></ManagerRoute>} />
           </Routes>
+          <ChatWidget />
         </BrowserRouter>
       </CartProvider>
     </AuthProvider>

@@ -21,6 +21,7 @@ import subscriptionRoutes from './routes/subscription.routes';
 import groupbuyRoutes from './routes/groupbuy.routes';
 import voucherRoutes from './routes/voucher.routes';
 import newsRoutes from './routes/news.routes';
+import chatRoutes from './routes/chat.routes';
 // import exampleRoutes from './routes/example.routes'; // Uncomment để test
 import { configurePassport } from './config/passport';
 // Register models that are referenced via populate but may not be auto-imported
@@ -61,6 +62,7 @@ app.use('/api/subscriptions', subscriptionRoutes);
 app.use('/api/group-buy-events', groupbuyRoutes);
 app.use('/api/vouchers', voucherRoutes);
 app.use('/api/news', newsRoutes);
+app.use('/api/chat', chatRoutes);
 // app.use('/api/example', exampleRoutes); // Uncomment để test authentication
 
 // 404 Handler - Must be after all routes

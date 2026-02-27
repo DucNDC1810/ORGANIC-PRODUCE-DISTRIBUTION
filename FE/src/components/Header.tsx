@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Search, ShoppingCart, Leaf, Apple, Carrot, Wheat, Milk, BookOpen, Lightbulb, Gift, User, LogOut, Settings } from 'lucide-react';
+import { useState, useRef, useEffect } from 'react';
+import { Search, ShoppingCart, Leaf, Apple, Carrot, Wheat, Milk, BookOpen, Lightbulb, Gift, User, LogOut, Settings, X } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
@@ -68,6 +68,15 @@ export default function Header() {
   const navigate = useNavigate();
   const [productsOpen, setProductsOpen] = useState(false);
   const [blogsOpen, setBlogsOpen] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const searchInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (searchOpen && searchInputRef.current) {
+      searchInputRef.current.focus();
+    }
+  }, [searchOpen]);
 
   const handleLogout = () => {
     clearLocalCart();
@@ -176,9 +185,49 @@ export default function Header() {
                 </DropdownMenuContent>
               </DropdownMenuUI>
             )}
-            <button className="p-2 hover:bg-muted rounded-lg transition-colors">
-              <Search className="w-5 h-5 text-muted-foreground" />
-            </button>
+            <div className="relative flex items-center">
+              {searchOpen && (
+                <form
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    if (searchQuery.trim()) {
+                      navigate(`/products?search=${encodeURIComponent(searchQuery.trim())}`);
+                      setSearchOpen(false);
+                      setSearchQuery('');
+                    }
+                  }}
+                  className="absolute right-0 flex items-center animate-in slide-in-from-right-4 duration-200"
+                >
+                  <input
+                    ref={searchInputRef}
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder="Search products..."
+                    className="w-56 pl-4 pr-8 py-2 text-sm border border-gray-200 rounded-lg bg-white shadow-md focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+                    onKeyDown={(e) => {
+                      if (e.key === 'Escape') {
+                        setSearchOpen(false);
+                        setSearchQuery('');
+                      }
+                    }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => { setSearchOpen(false); setSearchQuery(''); }}
+                    className="absolute right-2 p-0.5 text-gray-400 hover:text-gray-600"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </form>
+              )}
+              <button
+                onClick={() => setSearchOpen(!searchOpen)}
+                className="p-2 hover:bg-muted rounded-lg transition-colors"
+              >
+                <Search className="w-5 h-5 text-muted-foreground" />
+              </button>
+            </div>
             <button 
               onClick={openCart}
               className="relative p-2 hover:bg-muted rounded-lg transition-colors group"
