@@ -23,6 +23,8 @@ import ManagerDashboard from './pages/Manager/ManagerDashboard';
 import ProductsPage from './pages/HomePage/ProductsPage';
 import ProductDetailPage from './pages/HomePage/ProductDetailPage';
 import ChatWidget from './components/ChatWidget';
+import GroupOrderPage from './pages/GroupOrder/GroupOrderPage';
+import GroupOrderActivePage from './pages/GroupOrder/GroupOrderActivePage';
 
 export default function App() {
   return (
@@ -48,6 +50,8 @@ export default function App() {
             <Route path="/product/:id" element={<ProductDetailPage />} />
 
             {/* Protected routes - require authentication */}
+            <Route path="/group-order" element={<ProtectedRoute><GroupOrderPage /></ProtectedRoute>} />
+            <Route path="/group-order/active" element={<ProtectedRoute><GroupOrderActivePage /></ProtectedRoute>} />
             <Route path="/cart" element={<ProtectedRoute><CartPage /></ProtectedRoute>} />
             <Route path="/checkout" element={<ProtectedRoute><CheckoutPage /></ProtectedRoute>} />
             <Route path="/order-success" element={<ProtectedRoute><OrderSuccessPage /></ProtectedRoute>} />

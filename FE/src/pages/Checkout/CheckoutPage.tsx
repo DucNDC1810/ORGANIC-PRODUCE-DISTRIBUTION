@@ -20,7 +20,7 @@ import momoService from "../../services/momoService";
 import voucherService from "../../services/voucherService";
 import { orderService } from "../../services/orderService";
 import StorePickupModal, { type Store as StoreData } from "../../components/StorePickupModal";
-import GroupOrderModal, { type GroupOrderData } from "../../components/GroupOrderModal";
+import { type GroupOrderData } from "../../components/GroupOrderModal";
 import RecurringDeliveryModal, {
   type RecurringData,
   FREQUENCY_LABELS,
@@ -36,8 +36,7 @@ export default function CheckoutPage() {
   const [deliveryType, setDeliveryType] = useState<"delivery" | "pickup">(
     "delivery",
   );
-  const [showGroupModal, setShowGroupModal] = useState(false);
-  const [groupOrderData, setGroupOrderData] = useState<GroupOrderData | null>(null);
+  const [groupOrderData] = useState<GroupOrderData | null>(null);
   const [showRecurringModal, setShowRecurringModal] = useState(false);
   const [recurringData, setRecurringData] = useState<RecurringData | null>(null);
   const isGroupOrder = groupOrderData !== null;
@@ -814,7 +813,7 @@ export default function CheckoutPage() {
             {/* Đặt theo nhóm — Clickable card */}
             <button
               type="button"
-              onClick={() => setShowGroupModal(true)}
+              onClick={() => navigate('/group-order', { state: { cartItems: cart } })}
               className={`w-full text-left bg-white rounded-lg p-5 shadow-sm border-2 transition-all duration-150 hover:shadow-md ${
                 isGroupOrder
                   ? "border-green-400 bg-green-50"
@@ -1409,14 +1408,6 @@ export default function CheckoutPage() {
         onClose={() => setShowStoreModal(false)}
         onConfirm={(store) => setSelectedStore(store)}
         selectedStoreId={selectedStore?.id}
-      />
-
-      {/* Group Order Modal */}
-      <GroupOrderModal
-        isOpen={showGroupModal}
-        onClose={() => setShowGroupModal(false)}
-        onConfirm={(data) => setGroupOrderData(data)}
-        initialData={groupOrderData ?? undefined}
       />
 
       {/* Recurring Delivery Modal */}
