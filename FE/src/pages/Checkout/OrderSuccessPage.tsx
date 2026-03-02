@@ -42,7 +42,20 @@ export default function OrderSuccessPage() {
     const verifyAndLoadOrder = async () => {
       try {
         setLoading(true);
-        
+
+        // ── COD: navigated directly from CheckoutPage ──────────────────────
+        if (location.state?.paymentMethod === "COD") {
+          setPaymentType(null);
+          setVerificationStatus("verified");
+          setOrderData({
+            orderId: location.state.orderId,
+            amount: location.state.totalAmount,
+            paymentMethod: "COD",
+          });
+          setLoading(false);
+          return;
+        }
+
         // Check for MoMo payment first
         const pendingMoMoOrder = sessionStorage.getItem("pendingMoMoOrder");
         const momoOrderIdFromUrl = searchParams.get('orderId');
@@ -367,10 +380,20 @@ export default function OrderSuccessPage() {
                     <div className="bg-primary/5 rounded-lg p-4 border border-primary/20">
                       <div className="flex items-center justify-between">
                         <span className="text-foreground font-medium">
-                          {paymentType === 'momo' ? 'MoMo' : paymentType === 'zalopay' ? 'ZaloPay' : 'Chưa xác định'}
+                          {orderData?.paymentMethod === "COD"
+                            ? "🚚 Tiền mặt khi giao hàng (COD)"
+                            : paymentType === "momo"
+                              ? "MoMo"
+                              : paymentType === "zalopay"
+                                ? "ZaloPay"
+                                : "Chưa xác định"}
                         </span>
-                        <span className="inline-flex items-center gap-1 text-sm font-medium text-primary bg-primary/10 px-3 py-1 rounded-full">
-                          ✓ Đã Thanh Toán
+                        <span className={`inline-flex items-center gap-1 text-sm font-medium px-3 py-1 rounded-full ${
+                          orderData?.paymentMethod === "COD"
+                            ? "text-orange-600 bg-orange-100"
+                            : "text-primary bg-primary/10"
+                        }`}>
+                          {orderData?.paymentMethod === "COD" ? "⏳ Thanh toán khi nhận hàng" : "✓ Đã Thanh Toán"}
                         </span>
                       </div>
                     </div>

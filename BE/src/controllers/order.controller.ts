@@ -28,6 +28,8 @@ export class OrderController {
         subtotal += item.subtotal;
       });
 
+      const isCOD = paymentMethod === 'cod';
+
       const order = await Order.create({
         userId,
         addressId: addressId || null,
@@ -35,6 +37,7 @@ export class OrderController {
         voucherId: voucherId || null,
         items,
         paymentMethod: paymentMethod || 'credit_card',
+        paymentStatus: isCOD ? 'unpaid' : 'pending',
         totalAmount: subtotal,
         notes,
         status: 'pending',

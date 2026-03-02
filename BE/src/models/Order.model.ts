@@ -23,7 +23,7 @@ export interface IOrder extends Document {
     type?: 'delivery' | 'pickup';
   };
   paymentMethod?: string;
-  paymentStatus?: 'pending' | 'paid' | 'failed';
+  paymentStatus?: 'pending' | 'paid' | 'failed' | 'unpaid';
   shippingCost?: number;
   discountAmount?: number;
   taxAmount?: number;
@@ -102,12 +102,12 @@ const orderSchema = new Schema<IOrder>(
     ],
     paymentMethod: {
       type: String,
-      enum: ['credit_card', 'debit_card', 'cash', 'bank_transfer', 'e_wallet', 'zalopay', 'momo'],
+      enum: ['credit_card', 'debit_card', 'cash', 'bank_transfer', 'e_wallet', 'zalopay', 'momo', 'cod'],
       default: 'credit_card'
     },
     paymentStatus: {
       type: String,
-      enum: ['pending', 'paid', 'failed'],
+      enum: ['pending', 'paid', 'failed', 'unpaid'],
       default: 'pending'
     },
     deliveryInfo: {

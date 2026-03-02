@@ -16,6 +16,7 @@ import Header from "../../components/Header";
 import zalopayService from "../../services/zaloPayService";
 import momoService from "../../services/momoService";
 import voucherService from "../../services/voucherService";
+import { orderService } from "../../services/orderService";
 
 export default function CheckoutPage() {
   const { cart, getTotalPrice, removeFromCart, updateQuantity } = useCart();
@@ -29,6 +30,7 @@ export default function CheckoutPage() {
   const [isRecurringOrder, setIsRecurringOrder] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [voucherDiscount, setVoucherDiscount] = useState(0);
   const [appliedVoucher, setAppliedVoucher] = useState<string>("");
   const [voucherError, setVoucherError] = useState(""); // lỗi riêng voucher
@@ -37,7 +39,7 @@ export default function CheckoutPage() {
     fullName: user?.name || "",
     phone: user?.phone || "",
     email: user?.email || "",
-    paymentMethod: "Chuyển khoản",
+    paymentMethod: "COD",
     notes: "",
     promoCode: "",
     groupName: "",
@@ -294,8 +296,57 @@ export default function CheckoutPage() {
       return;
     }
 
-    // Nếu không phải ZaloPay hay MoMo, hiển thị lỗi
-    setError("Hiện tại chỉ hỗ trợ thanh toán bằng ZaloPay hoặc MoMo");
+    // Nếu thanh toán COD
+    if (formData.paymentMethod === "COD") {
+      setLoading(true);
+      try {
+        const orderPayload = {
+          deliveryInfo: {
+            fullName: formData.fullName,
+            phone: formData.phone,
+            email: formData.email,
+            address:
+              deliveryType === "delivery" ? "Delivery address" : "Store pickup",
+            type: deliveryType,
+          },
+          items: cart.map((item) => ({
+            productId: item.id,
+            quantity: item.quantity,
+            price: item.price,
+            subtotal: item.price * item.quantity,
+          })),
+          notes: formData.notes,
+          paymentMethod: "cod",
+          totalAmount: total,
+        };
+
+        const response = await orderService.createOrder(orderPayload as any);
+        const result = (response as any)?.data || response;
+
+        if (result?.success !== false) {
+          navigate("/order-success", {
+            state: {
+              orderId: result?.data?._id,
+              paymentMethod: "COD",
+              totalAmount: total,
+            },
+          });
+        } else {
+          throw new Error(result?.message || "Không thể tạo đơn hàng COD");
+        }
+      } catch (err: any) {
+        setError(
+          err.response?.data?.message ||
+            err.message ||
+            "Lỗi khi đặt hàng. Vui lòng thử lại.",
+        );
+        setLoading(false);
+      }
+      return;
+    }
+
+    // Không có phương thức hợp lệ
+    setError("Vui lòng chọn phương thức thanh toán");
     setLoading(false);
   };
 
@@ -702,12 +753,12 @@ export default function CheckoutPage() {
                   // { value: 'Tiền mặt', icon: '💵' },
                   // { value: 'Visa/Master', icon: '💳' },
                   // { value: 'Cần trợ công nợ', icon: '💰' },
-                  { value: "ZaloPay", icon: "💳" },
+                  { value: "ZaloPay", label: "ZaloPay", icon: "💳" },
                   // { value: 'Thanh toán online qua ví MoMo', icon: '🏦' },
                   // { value: 'Ví Trả Sau - MoMo', icon: '💳' },
-                  { value: "Momo", icon: "🏦" },
+                  { value: "Momo", label: "MoMo", icon: "🏦" },
                   // { value: 'Chuyển khoản qua QR - BIDV', icon: '📱' },
-                  // { value: 'Thanh toán khi giao hàng (COD)', icon: '📦' },
+                  { value: "COD", label: "Tiền mặt khi giao hàng (COD)", icon: "🚚" },
                 ].map((method) => (
                   <label
                     key={method.value}
@@ -727,7 +778,7 @@ export default function CheckoutPage() {
                     />
                     <span className="text-lg">{method.icon}</span>
                     <span className="text-sm text-gray-700">
-                      {method.value}
+                      {method.label}
                     </span>
                   </label>
                 ))}
@@ -947,7 +998,9 @@ export default function CheckoutPage() {
                 </div>
 
                 <button
-                  onClick={handlePlaceOrder}
+                  onClick={() => {
+                    if (validateForm()) setShowConfirmModal(true);
+                  }}
                   disabled={loading}
                   className="w-full px-5 py-3 bg-black text-white rounded-lg font-semibold hover:bg-gray-800 disabled:bg-gray-400 transition-colors text-sm flex items-center justify-center gap-2"
                 >
@@ -959,6 +1012,133 @@ export default function CheckoutPage() {
           </div>
         </div>
       </div>
+      {/* Order Confirmation Modal */}
+      {showConfirmModal && (
+        <div
+          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4"
+          style={{ backgroundColor: "rgba(0,0,0,0.5)", backdropFilter: "blur(4px)" }}
+          onClick={(e) => { if (e.target === e.currentTarget) setShowConfirmModal(false); }}
+        >
+          <div className="bg-white w-full sm:max-w-md rounded-t-3xl sm:rounded-3xl shadow-2xl overflow-hidden animate-in slide-in-from-bottom-4 duration-300">
+            {/* Header illustration */}
+            <div className="bg-gradient-to-br from-green-50 to-emerald-100 px-5 pt-5 pb-4 text-center relative">
+              <button
+                onClick={() => setShowConfirmModal(false)}
+                className="absolute top-3 right-3 w-7 h-7 flex items-center justify-center rounded-full bg-white/70 text-gray-500 hover:bg-white hover:text-gray-800 transition-colors text-base font-light"
+              >
+                ✕
+              </button>
+              {/* Shipper illustration */}
+              <div className="w-14 h-14 mx-auto mb-2 bg-white rounded-full shadow-md flex items-center justify-center">
+                <span className="text-3xl">🛵</span>
+              </div>
+              <h2 className="text-base font-bold text-gray-800">Xác nhận đơn hàng của bạn</h2>
+              <p className="text-xs text-gray-500 mt-0.5">Vui lòng kiểm tra lại trước khi thanh toán</p>
+            </div>
+
+            <div className="px-5 py-3 space-y-3 max-h-[55vh] overflow-y-auto">
+              {/* Product list */}
+              <div>
+                <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Sản phẩm</h3>
+                <div className="space-y-2">
+                  {cart.map((item) => (
+                    <div key={item.id} className="flex items-center gap-2.5">
+                      <div className="w-10 h-10 bg-gray-100 rounded-lg overflow-hidden flex-shrink-0">
+                        <img
+                          src={item.image}
+                          alt={item.name}
+                          className="w-full h-full object-cover"
+                        />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-gray-800 truncate">{item.name}</p>
+                        <p className="text-xs text-gray-400">x{item.quantity}</p>
+                      </div>
+                      <span className="text-sm font-semibold text-gray-800 flex-shrink-0">
+                        {(item.price * item.quantity).toLocaleString("vi-VN")}₫
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Divider */}
+              <div className="border-t border-dashed border-gray-200" />
+
+              {/* Order summary table */}
+              <div>
+                <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Tóm tắt đơn hàng</h3>
+                <div className="bg-gray-50 rounded-xl p-3 space-y-2">
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-500">Địa chỉ giao hàng</span>
+                    <span className="text-gray-800 font-medium text-right max-w-[55%] leading-snug">
+                      {deliveryType === "pickup"
+                        ? "Nhận tại cửa hàng"
+                        : formData.fullName
+                          ? `${formData.fullName}, ${formData.phone}`
+                          : "Chưa nhập địa chỉ"}
+                    </span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-500">Phương thức thanh toán</span>
+                    <span className="text-gray-800 font-medium">
+                      {formData.paymentMethod === "COD"
+                        ? "Tiền mặt (COD)"
+                        : formData.paymentMethod === "ZaloPay"
+                          ? "ZaloPay"
+                          : "MoMo"}
+                    </span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-500">Thời gian dự kiến</span>
+                    <span className="text-gray-800 font-medium">2 – 3 ngày làm việc</span>
+                  </div>
+                  {shipping > 0 && (
+                    <div className="flex justify-between text-sm">
+                      <span className="text-gray-500">Phí vận chuyển</span>
+                      <span className="text-gray-800 font-medium">{shipping.toLocaleString("vi-VN")}₫</span>
+                    </div>
+                  )}
+                  {voucherDiscount > 0 && (
+                    <div className="flex justify-between text-sm">
+                      <span className="text-purple-500">Giảm giá voucher</span>
+                      <span className="text-purple-600 font-medium">-{voucherDiscount.toLocaleString("vi-VN")}₫</span>
+                    </div>
+                  )}
+                  <div className="border-t border-gray-200 pt-2 flex justify-between items-center">
+                    <span className="text-sm font-semibold text-gray-700">Tổng thanh toán</span>
+                    <span className="text-lg font-bold text-gray-900">{total.toLocaleString("vi-VN")}₫</span>
+                  </div>
+                  <p className="text-xs text-gray-400 text-right -mt-1">
+                    Đã bao gồm VAT {vat.toLocaleString("vi-VN")}₫
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Action buttons */}
+            <div className="px-5 pb-5 pt-3 space-y-2">
+              <button
+                onClick={() => {
+                  setShowConfirmModal(false);
+                  handlePlaceOrder();
+                }}
+                disabled={loading}
+                className="w-full py-3 bg-black text-white rounded-xl font-semibold text-sm hover:bg-gray-800 disabled:bg-gray-400 transition-colors flex items-center justify-center gap-2 shadow-md"
+              >
+                {loading ? <Loader className="w-4 h-4 animate-spin" /> : "✓"}
+                {loading ? "Đang xử lý..." : "Xác nhận & Thanh toán"}
+              </button>
+              <button
+                onClick={() => setShowConfirmModal(false)}
+                className="w-full py-2 text-gray-500 text-sm font-medium hover:text-gray-800 transition-colors"
+              >
+                ← Quay lại chỉnh sửa
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
