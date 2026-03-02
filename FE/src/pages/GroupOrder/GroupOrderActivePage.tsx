@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import {
   ArrowLeft,
@@ -8,27 +8,24 @@ import {
   Share2,
   ShoppingCart,
   Clock,
-  Truck,
   ChevronRight,
   Trash2,
   Plus,
   Minus,
   ShieldCheck,
   Zap,
+  X,
+  QrCode,
+  ChevronDown,
 } from "lucide-react";
+import { io } from "socket.io-client";
+import { QRCodeSVG } from "qrcode.react";
+import { toast } from "sonner";
 import Header from "../../components/Header";
+import { groupService, type GroupMember as APIMember } from "../../services/groupService";
 
 // ─── Types & Constants ────────────────────────────────────────────────────────
 
-interface GroupMember {
-  id: number;
-  name: string;
-  avatar: string;
-  isHost: boolean;
-  items: number;
-  total: number;
-  status: "ordered" | "pending" | "invited";
-}
 
 interface CartItem {
   id: number;
@@ -44,13 +41,6 @@ const TIERS = [
   { members: 3, pct: 4 },
   { members: 5, pct: 6 },
   { members: 8, pct: 10 },
-];
-
-const MOCK_MEMBERS: GroupMember[] = [
-  { id: 1, name: "Bạn (chủ nhóm)",   avatar: "🧑‍🌾", isHost: true,  items: 3, total: 185000, status: "ordered"  },
-  { id: 2, name: "Nguyễn Lan Anh",   avatar: "👩‍🍳", isHost: false, items: 2, total: 124000, status: "ordered"  },
-  { id: 3, name: "Trần Minh Khôi",   avatar: "🧑‍💼", isHost: false, items: 0, total: 0,      status: "pending"  },
-  { id: 4, name: "Lê Thu Hiền",      avatar: "👩‍🌾", isHost: false, items: 0, total: 0,      status: "invited"  },
 ];
 
 const MOCK_CART: CartItem[] = [
@@ -75,13 +65,22 @@ function calcProgress(count: number) {
   const end   = ((idx + 1) / (TIERS.length - 1)) * 100;
   return start + ((count - cur.members) / (next.members - cur.members)) * (end - start);
 }
+const AVATARS = ["🧑‍🌾", "👩‍🍳", "🧑‍💼", "👩‍🌾", "👨‍🍳", "🧑‍🦱", "👩‍🦰", "🧑‍🦳"];
 
+function getMemberName(m: APIMember): string {
+  return m.userId?.name || m.tempName || "Khách";
+}
+
+function getMemberAvatar(idx: number): string {
+  return AVATARS[idx % AVATARS.length];
+}
 // ─── Component ───────────────────────────────────────────────────────────────
 
 export default function GroupOrderActivePage() {
   const navigate  = useNavigate();
   const location  = useLocation();
-  const groupName = (location.state as any)?.groupName ?? "Đơn hàng nhóm của Trung";
+  const groupName = (location.state as any)?.groupName ?? "Đơn hàng nhóm";
+  const groupId   = (location.state as any)?.groupId as string | undefined;
 
   // Map cart items from checkout (CartContext shape) → local CartItem shape
   const initialCart: CartItem[] = ((location.state as any)?.cartItems ?? []).length > 0
@@ -101,13 +100,61 @@ export default function GroupOrderActivePage() {
       }))
     : MOCK_CART;
 
-  const [members, setMembers]   = useState<GroupMember[]>(MOCK_MEMBERS);
-  const [cart,    setCart]      = useState<CartItem[]>(initialCart);
-  const [copied,  setCopied]    = useState(false);
-  const [inviteLink]            = useState("https://freshmarket.vn/join/nhom-abc123");
+  const [members,        setMembers]        = useState<APIMember[]>([]);
+  const [membersLoading, setMembersLoading] = useState(true);
+  const [showQRModal,    setShowQRModal]    = useState(false);
+  const [expandedMember, setExpandedMember] = useState<string | null>(null);
+  const [cart,           setCart]           = useState<CartItem[]>(initialCart);
+  const [copied,         setCopied]         = useState(false);
+  const [inviteLink]                        = useState(
+    groupId ? `${window.location.origin}/join-group/${groupId}` : ""
+  );
+
+  // ── Fetch members from API on mount ────────────────────────────────────
+  useEffect(() => {
+    if (!groupId) { setMembersLoading(false); return; }
+    groupService
+      .getMembers(groupId)
+      .then(setMembers)
+      .catch(console.error)
+      .finally(() => setMembersLoading(false));
+  }, [groupId]);
+
+  // ── Socket.io – realtime khi có thành viên mới join ─────────────────────
+  useEffect(() => {
+    if (!groupId) return;
+    const socketUrl =
+      (import.meta.env.VITE_API_URL as string)?.replace("/api", "") ||
+      "http://localhost:5000";
+    const socket = io(socketUrl, { transports: ["websocket", "polling"] });
+    socket.emit("join-group-room", groupId);
+    socket.on("member:joined", (newMember: APIMember) => {
+      setMembers((prev) =>
+        prev.find((m) => m._id === newMember._id) ? prev : [...prev, newMember]
+      );
+    });
+    socket.on("member:updated", (updated: APIMember) => {
+      setMembers((prev) => prev.map((m) => (m._id === updated._id ? updated : m)));
+    });
+    socket.on("member:item_added", (updated: APIMember) => {
+      setMembers((prev) => prev.map((m) => (m._id === updated._id ? updated : m)));
+      const name = updated.userId?.name || updated.tempName || "Thành viên";
+      const latestItem = updated.cartItems?.[updated.cartItems.length - 1];
+      if (latestItem) {
+        toast.success(`${name} đã thêm món!`, {
+          description: latestItem.name,
+          icon: "🛒",
+          id: `item:${updated._id}:${latestItem.productId}`,
+        });
+      }
+      // Mở rộng thành viên đó để chủ nhóm thấy món mới
+      setExpandedMember(updated._id);
+    });
+    return () => { socket.disconnect(); };
+  }, [groupId]);
 
   // derived
-  const joinedCount   = members.filter((m) => m.status === "ordered").length;
+  const joinedCount   = members.filter((m) => m.isReady).length;
   const activeTierIdx = TIERS.reduce((acc, t, i) => (joinedCount >= t.members ? i : acc), -1);
   const activePct     = activeTierIdx >= 0 ? TIERS[activeTierIdx].pct : 0;
   const nextTier      = TIERS[activeTierIdx + 1];
@@ -116,7 +163,7 @@ export default function GroupOrderActivePage() {
   const subtotal = cart.reduce((s, i) => s + i.price * i.qty, 0);
   const discount = Math.round(subtotal * activePct / 100);
   const total    = subtotal - discount;
-  const allOrdered = members.every((m) => m.status === "ordered");
+  const allOrdered = members.length > 0 && members.every((m) => m.isReady);
 
   const handleCopy = () => {
     navigator.clipboard.writeText(inviteLink).catch(() => {});
@@ -133,7 +180,7 @@ export default function GroupOrderActivePage() {
 
   const removeItem = (id: number) => setCart((prev) => prev.filter((i) => i.id !== id));
 
-  const removeMember = (id: number) => setMembers((prev) => prev.filter((m) => m.id !== id));
+  const removeMember = (_id: string) => setMembers((prev) => prev.filter((m) => m._id !== _id));
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -353,58 +400,102 @@ export default function GroupOrderActivePage() {
                   {members.length}
                 </span>
               </h3>
-              <button className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-green-600 text-white text-xs font-medium hover:bg-green-700 transition-colors">
+              <button className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-green-600 text-white text-xs font-medium hover:bg-green-700 transition-colors"
+                onClick={() => setShowQRModal(true)}
+              >
                 <UserPlus className="w-3.5 h-3.5" />
                 Mời thêm thành viên
               </button>
             </div>
 
             <div className="space-y-2.5">
-              {members.map((m) => (
-                <div key={m.id} className="flex items-center gap-4 p-3.5 rounded-xl bg-gray-50 hover:bg-gray-100 transition-colors group">
-                  <div className="relative flex-shrink-0">
-                    <div className="w-10 h-10 rounded-full bg-white border border-gray-200 flex items-center justify-center text-xl shadow-sm">
-                      {m.avatar}
+              {membersLoading ? (
+                <div className="py-6 text-center text-sm text-gray-400">Đang tải thành viên...</div>
+              ) : members.length === 0 ? (
+                <div className="py-6 text-center text-sm text-gray-400">Chưa có thành viên nào.</div>
+              ) : members.map((m, idx) => {
+                const isExpanded  = expandedMember === m._id;
+                const memberItems = m.cartItems ?? [];
+                return (
+                  <div key={m._id} className="rounded-xl border border-gray-100 overflow-hidden">
+                    {/* Member row */}
+                    <div className="flex items-center gap-4 p-3.5 bg-gray-50 hover:bg-gray-100 transition-colors group">
+                      <div className="relative flex-shrink-0">
+                        <div className="w-10 h-10 rounded-full bg-white border border-gray-200 flex items-center justify-center text-xl shadow-sm">
+                          {getMemberAvatar(idx)}
+                        </div>
+                        {m.role === "owner" && (
+                          <div className="absolute -bottom-1 -right-1 w-5 h-5 bg-orange-400 rounded-full flex items-center justify-center text-[9px] text-white font-bold border-2 border-white">
+                            👑
+                          </div>
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-semibold text-gray-900 truncate">{getMemberName(m)}</p>
+                        <p className="text-xs text-gray-400 mt-0.5">
+                          {m.isReady ? `Đã chọn ${memberItems.length} món` : "Chưa chọn món"}
+                        </p>
+                      </div>
+                      {/* Status badge */}
+                      {m.isReady ? (
+                        <span className="flex items-center gap-1 text-xs text-green-600 font-semibold bg-green-50 border border-green-200 px-2.5 py-1 rounded-full">
+                          <Check className="w-3 h-3" />
+                          Đã chọn món
+                        </span>
+                      ) : (
+                        <span className="text-xs text-yellow-600 font-semibold bg-yellow-50 border border-yellow-200 px-2.5 py-1 rounded-full">
+                          Đang chọn
+                        </span>
+                      )}
+                      {/* Expand toggle */}
+                      {memberItems.length > 0 && (
+                        <button
+                          onClick={() => setExpandedMember(isExpanded ? null : m._id)}
+                          className="w-7 h-7 rounded-full bg-white border border-gray-200 flex items-center justify-center flex-shrink-0 transition-transform duration-200"
+                          style={{ transform: isExpanded ? 'rotate(180deg)' : 'rotate(0deg)' }}
+                        >
+                          <ChevronDown className="w-3.5 h-3.5 text-gray-500" />
+                        </button>
+                      )}
+                      {m.role !== "owner" && (
+                        <button
+                          onClick={() => removeMember(m._id)}
+                          className="opacity-0 group-hover:opacity-100 w-7 h-7 rounded-full bg-red-50 text-red-400 hover:bg-red-100 hover:text-red-600 flex items-center justify-center transition-all flex-shrink-0"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      )}
                     </div>
-                    {m.isHost && (
-                      <div className="absolute -bottom-1 -right-1 w-5 h-5 bg-orange-400 rounded-full flex items-center justify-center text-[9px] text-white font-bold border-2 border-white">
-                        👑
+
+                    {/* Expandable items list */}
+                    {isExpanded && memberItems.length > 0 && (
+                      <div className="divide-y divide-gray-50 bg-white">
+                        {memberItems.map((item, iIdx) => (
+                          <div key={iIdx} className="flex items-center gap-3 px-4 py-2.5">
+                            <div className="w-8 h-8 rounded-lg bg-gray-50 border border-gray-100 flex items-center justify-center overflow-hidden flex-shrink-0">
+                              {item.image?.startsWith('http') ? (
+                                <img src={item.image} alt={item.name} className="w-full h-full object-cover" />
+                              ) : (
+                                <span className="text-base">🛒</span>
+                              )}
+                            </div>
+                            <p className="flex-1 text-xs text-gray-700 truncate">{item.name}</p>
+                            <span className="text-xs text-gray-400 flex-shrink-0">×{item.qty}</span>
+                            <span className="text-xs font-semibold text-gray-900 flex-shrink-0 w-16 text-right">
+                              {fmtVND(item.price * item.qty)}
+                            </span>
+                          </div>
+                        ))}
+                        <div className="flex justify-end px-4 py-2 bg-green-50">
+                          <span className="text-xs font-bold text-green-700">
+                            Tổng: {fmtVND(memberItems.reduce((s, i) => s + i.price * i.qty, 0))}
+                          </span>
+                        </div>
                       </div>
                     )}
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold text-gray-900 truncate">{m.name}</p>
-                    <p className="text-xs text-gray-400 mt-0.5">
-                      {m.items > 0 ? `${m.items} món · ${fmtVND(m.total)}` : "Chưa thêm món"}
-                    </p>
-                  </div>
-                  {/* Status badge */}
-                  {m.status === "ordered" && (
-                    <span className="flex items-center gap-1 text-xs text-green-600 font-semibold bg-green-50 border border-green-200 px-2.5 py-1 rounded-full">
-                      <Check className="w-3 h-3" />
-                      Đã đặt món
-                    </span>
-                  )}
-                  {m.status === "pending" && (
-                    <span className="text-xs text-yellow-600 font-semibold bg-yellow-50 border border-yellow-200 px-2.5 py-1 rounded-full">
-                      Đang chọn
-                    </span>
-                  )}
-                  {m.status === "invited" && (
-                    <span className="text-xs text-gray-400 font-medium bg-gray-100 border border-gray-200 px-2.5 py-1 rounded-full">
-                      Đã mời
-                    </span>
-                  )}
-                  {!m.isHost && (
-                    <button
-                      onClick={() => removeMember(m.id)}
-                      className="opacity-0 group-hover:opacity-100 w-7 h-7 rounded-full bg-red-50 text-red-400 hover:bg-red-100 hover:text-red-600 flex items-center justify-center transition-all flex-shrink-0"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
-                  )}
-                </div>
-              ))}
+                );
+              })}
             </div>
 
             {/* Invite link row */}
@@ -439,14 +530,20 @@ export default function GroupOrderActivePage() {
             <h3 className="text-base font-bold text-gray-900 mb-5">Tóm tắt đơn nhóm</h3>
 
             {/* Per-member rows */}
-            <div className="space-y-3 mb-4">
-              {members.filter((m) => m.items > 0).map((m) => (
-                <div key={m.id} className="flex items-center gap-3">
+            <div className="space-y-2.5">
+              {membersLoading ? (
+                <div className="py-6 text-center text-sm text-gray-400">Đang tải...</div>
+              ) : members.map((m, idx) => (
+                <div key={m._id} className="flex items-center gap-3">
                   <div className="w-7 h-7 rounded-full bg-gray-100 flex items-center justify-center text-base flex-shrink-0">
-                    {m.avatar}
+                    {getMemberAvatar(idx)}
                   </div>
-                  <p className="flex-1 text-xs text-gray-600 truncate">{m.name}</p>
-                  <p className="text-xs font-semibold text-gray-900 flex-shrink-0">{fmtVND(m.total)}</p>
+                  <p className="flex-1 text-xs text-gray-600 truncate">{getMemberName(m)}</p>
+                  <span className={`text-xs font-semibold flex-shrink-0 ${
+                    m.isReady ? "text-green-600" : "text-gray-400"
+                  }`}>
+                    {m.isReady ? `${(m.cartItems ?? []).length} món` : "Đang chọn"}
+                  </span>
                 </div>
               ))}
             </div>
@@ -477,31 +574,34 @@ export default function GroupOrderActivePage() {
           <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
             <h3 className="text-sm font-bold text-gray-900 mb-3">Trạng thái thành viên</h3>
             <div className="flex items-center gap-2 flex-wrap">
-              {members.map((m) => (
-                <div key={m.id} title={m.name} className="relative">
+              {members.map((m, idx) => (
+                <div key={m._id} title={getMemberName(m)} className="relative">
                   <div className={`w-10 h-10 rounded-full border-2 flex items-center justify-center text-xl ${
-                    m.status === "ordered"  ? "border-green-400 bg-green-50"  :
-                    m.status === "pending"  ? "border-yellow-400 bg-yellow-50" :
-                    "border-gray-200 bg-gray-50"
+                    m.isReady
+                      ? "border-green-400 bg-green-50"
+                      : "border-yellow-400 bg-yellow-50"
                   }`}>
-                    {m.avatar}
+                    {getMemberAvatar(idx)}
                   </div>
-                  {m.status === "ordered" && (
+                  {m.isReady && (
                     <div className="absolute -bottom-0.5 -right-0.5 w-4 h-4 bg-green-500 rounded-full border-2 border-white flex items-center justify-center">
                       <Check className="w-2 h-2 text-white" />
                     </div>
                   )}
                 </div>
               ))}
-              <button className="w-10 h-10 rounded-full border-2 border-dashed border-gray-300 flex items-center justify-center text-gray-400 hover:border-green-400 hover:text-green-500 transition-colors">
+              <button
+                onClick={() => setShowQRModal(true)}
+                className="w-10 h-10 rounded-full border-2 border-dashed border-gray-300 flex items-center justify-center text-gray-400 hover:border-green-400 hover:text-green-500 transition-colors"
+              >
                 <Plus className="w-4 h-4" />
               </button>
             </div>
             {allOrdered ? (
-              <p className="text-xs text-green-600 font-semibold mt-3">✅ Tất cả thành viên đã đặt món!</p>
+              <p className="text-xs text-green-600 font-semibold mt-3">✅ Tất cả thành viên đã chọn món!</p>
             ) : (
               <p className="text-xs text-gray-400 mt-3">
-                {members.filter((m) => m.status === "ordered").length}/{members.length} đã thêm món
+                {joinedCount}/{members.length} đã thêm món
               </p>
             )}
           </div>
@@ -516,7 +616,7 @@ export default function GroupOrderActivePage() {
           </button>
           {!allOrdered && (
             <p className="text-center text-xs text-amber-500 font-medium -mt-1">
-              ⚠ Còn {members.filter((m) => m.status !== "ordered").length} thành viên chưa đặt món
+              ⚠ Còn {members.filter((m) => !m.isReady).length} thành viên chưa chọn món
             </p>
           )}
 
@@ -527,6 +627,78 @@ export default function GroupOrderActivePage() {
           </button>
         </div>
       </div>
+
+      {/* ════════════ QR INVITE MODAL ════════════ */}
+      {showQRModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setShowQRModal(false)} />
+          <div className="relative bg-white rounded-3xl shadow-2xl w-full max-w-sm mx-4 overflow-hidden">
+            {/* Header */}
+            <div className="bg-gradient-to-br from-green-600 to-emerald-500 px-6 py-5 flex items-center gap-3">
+              <div className="w-9 h-9 rounded-full bg-white/20 flex items-center justify-center">
+                <QrCode className="w-5 h-5 text-white" />
+              </div>
+              <div className="flex-1">
+                <p className="text-xs text-green-100">Mời thành viên</p>
+                <p className="text-sm font-bold text-white truncate">{groupName}</p>
+              </div>
+              <button
+                onClick={() => setShowQRModal(false)}
+                className="w-8 h-8 rounded-full bg-white/20 text-white hover:bg-white/30 flex items-center justify-center transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* QR code */}
+            <div className="px-8 pt-7 pb-3 flex flex-col items-center">
+              <p className="text-sm text-gray-500 text-center mb-5 leading-relaxed">
+                Chia sẻ mã QR hoặc đường link bên dưới để mời bạn bè tham gia nhóm
+              </p>
+              {inviteLink ? (
+                <div className="p-4 rounded-2xl border-2 border-green-100 bg-green-50 shadow-sm">
+                  <QRCodeSVG
+                    value={inviteLink}
+                    size={180}
+                    bgColor="#f0fdf4"
+                    fgColor="#15803d"
+                    level="M"
+                  />
+                </div>
+              ) : (
+                <div className="w-[180px] h-[180px] rounded-2xl bg-gray-100 flex items-center justify-center">
+                  <p className="text-xs text-gray-400">Không có QR</p>
+                </div>
+              )}
+            </div>
+
+            {/* Link copy */}
+            <div className="px-6 pb-7 space-y-3">
+              <div className="flex items-center gap-2">
+                <div className="flex-1 px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-mono text-gray-500 truncate">
+                  {inviteLink || "Chưa có link mời"}
+                </div>
+                <button
+                  onClick={handleCopy}
+                  disabled={!inviteLink}
+                  className={`flex items-center gap-1.5 px-3 py-2.5 rounded-xl text-xs font-medium transition-all flex-shrink-0 ${
+                    copied ? "bg-green-500 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                  } disabled:opacity-50`}
+                >
+                  {copied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                  {copied ? "Copied!" : "Sao chép"}
+                </button>
+              </div>
+              <button
+                onClick={() => setShowQRModal(false)}
+                className="w-full py-3 rounded-2xl bg-green-600 text-white font-bold text-sm hover:bg-green-700 transition-colors"
+              >
+                Xong
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

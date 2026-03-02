@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { Toaster } from 'sonner';
 import { CartProvider } from './context/CartContext';
 import { AuthProvider } from './context/AuthContext';
+import { GroupProvider } from './context/GroupContext';
 import { ProtectedRoute, CustomerRoute, AdminRoute, ManagerRoute } from './components/ProtectedRoute';
 import MiniCart from './components/MiniCart';
 import HomePage from './pages/HomePage/Home';
@@ -25,12 +26,15 @@ import ProductDetailPage from './pages/HomePage/ProductDetailPage';
 import ChatWidget from './components/ChatWidget';
 import GroupOrderPage from './pages/GroupOrder/GroupOrderPage';
 import GroupOrderActivePage from './pages/GroupOrder/GroupOrderActivePage';
+import JoinGroupPage from './pages/GroupOrder/JoinGroupPage';
+import GroupMemberPage from './pages/GroupOrder/GroupMemberPage';
 
 export default function App() {
   return (
     <AuthProvider>
       <CartProvider>
-        <BrowserRouter>
+        <GroupProvider>
+          <BrowserRouter>
           <Toaster position="bottom-right" richColors />
           <MiniCart />
           <Routes>
@@ -52,6 +56,10 @@ export default function App() {
             {/* Protected routes - require authentication */}
             <Route path="/group-order" element={<ProtectedRoute><GroupOrderPage /></ProtectedRoute>} />
             <Route path="/group-order/active" element={<ProtectedRoute><GroupOrderActivePage /></ProtectedRoute>} />
+            {/* Public invite link – không cần đăng nhập */}
+            <Route path="/join-group/:groupId" element={<JoinGroupPage />} />
+            {/* Trang xem nhóm cho thành viên – không cần đăng nhập */}
+            <Route path="/group/members" element={<GroupMemberPage />} />
             <Route path="/cart" element={<ProtectedRoute><CartPage /></ProtectedRoute>} />
             <Route path="/checkout" element={<ProtectedRoute><CheckoutPage /></ProtectedRoute>} />
             <Route path="/order-success" element={<ProtectedRoute><OrderSuccessPage /></ProtectedRoute>} />
@@ -65,7 +73,8 @@ export default function App() {
             <Route path="/manager" element={<ManagerRoute><ManagerDashboard /></ManagerRoute>} />
           </Routes>
           <ChatWidget />
-        </BrowserRouter>
+          </BrowserRouter>
+        </GroupProvider>
       </CartProvider>
     </AuthProvider>
   );

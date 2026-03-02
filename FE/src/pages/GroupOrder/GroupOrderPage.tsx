@@ -1,5 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
+import { toast } from "sonner";
+import { groupService } from "../../services/groupService";
 import {
   ArrowLeft,
   Clock,
@@ -127,10 +129,25 @@ export default function GroupOrderPage() {
   const [tlMin,   setTlMin]   = useState("15");
 
   // Payment sheet
-  const [showPaySheet, setShowPaySheet] = useState(false);
+  const [showPaySheet,  setShowPaySheet]  = useState(false);
+  const [confirming,    setConfirming]    = useState(false);
 
-  const handleConfirm = () => {
-    navigate("/group-order/active", { state: { groupName, cartItems: passedCartItems } });
+  const handleConfirm = async () => {
+    setConfirming(true);
+    try {
+      const group = await groupService.createGroup({
+        groupName,
+        paymentMethod: paymentMode,
+        timeLimit: timeLimit !== "Đăng chờ" && timeLimit !== "Không có" ? null : null,
+      });
+      navigate("/group-order/active", {
+        state: { groupName, cartItems: passedCartItems, groupId: group._id },
+      });
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message ?? "Không tạo được nhóm. Vui lòng thử lại.");
+    } finally {
+      setConfirming(false);
+    }
   };
 
   return (
@@ -290,9 +307,18 @@ export default function GroupOrderPage() {
           {/* ── Confirm button ── */}
           <button
             onClick={handleConfirm}
-            className="w-full py-4 rounded-2xl bg-gradient-to-r from-green-600 to-emerald-500 text-white text-base font-extrabold shadow-lg hover:from-green-700 hover:to-emerald-600 active:scale-[0.98] transition-all duration-150"
+            disabled={confirming}
+            className="w-full py-4 rounded-2xl bg-gradient-to-r from-green-600 to-emerald-500 text-white text-base font-extrabold shadow-lg hover:from-green-700 hover:to-emerald-600 active:scale-[0.98] transition-all duration-150 disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center gap-2"
           >
-            Tạo Đơn hàng nhóm →
+            {confirming ? (
+              <>
+                <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
+                </svg>
+                Đang tạo nhóm...
+              </>
+            ) : "Tạo Đơn hàng nhóm →"}
           </button>
           <p className="text-center text-xs text-gray-400">
             Bạn có thể mời thành viên sau khi tạo nhóm

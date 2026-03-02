@@ -1,7 +1,11 @@
+import { useState } from 'react';
 import { Heart } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { Link } from 'react-router-dom';
+import { toast } from 'sonner';
 import { useCart } from '../context/CartContext';
+import { useGroup } from '../context/GroupContext';
+import { groupService } from '../services/groupService';
 import { Product as APIProduct } from '../services/productService';
 import { ImageWithFallback } from '../components/figma/ImageWithFallback';
 import { RatingDisplay } from './RatingDisplay';
@@ -12,19 +16,50 @@ interface ProductCardProps {
 
 export default function ProductCard({ product }: ProductCardProps) {
   const { addToCart } = useCart();
-  const isOutOfStock = product.stock <= 0;
+  const { groupSession } = useGroup();
+  const [adding, setAdding] = useState(false);
 
-  const handleAddToCart = () => {
+  const isOutOfStock  = product.stock <= 0;
+  const isGroupMode   = !!(groupSession?.groupId && groupSession?.memberId);
+
+  const handleAddToCart = async () => {
     if (isOutOfStock) return;
-    
-    // Map API product to cart product format
+
+    // ── Group mode: thêm món vào giỏ nhóm ──
+    if (isGroupMode) {
+      setAdding(true);
+      try {
+        await groupService.addGroupItem(
+          groupSession!.groupId,
+          groupSession!.memberId!,
+          {
+            productId: product._id,
+            name:      product.name,
+            price:     product.price,
+            image:     product.images?.[0] || product.thumbnail || '',
+            qty:       1,
+          }
+        );
+        toast.success(`Đã thêm vào giỏ hàng của nhóm!`, {
+          description: product.name,
+          icon: '🛒',
+        });
+      } catch {
+        toast.error('Không thể thêm món. Vui lòng thử lại.');
+      } finally {
+        setAdding(false);
+      }
+      return;
+    }
+
+    // ── Normal mode: thêm vào giỏ cá nhân ──
     const cartProduct = {
-      id: product._id,
-      name: product.name,
+      id:          product._id,
+      name:        product.name,
       description: product.description,
-      price: product.price,
-      image: product.images?.[0] || product.thumbnail || '',
-      category: product.category
+      price:       product.price,
+      image:       product.images?.[0] || product.thumbnail || '',
+      category:    product.category,
     };
     addToCart(cartProduct);
   };
@@ -57,9 +92,14 @@ export default function ProductCard({ product }: ProductCardProps) {
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
                 onClick={handleAddToCart}
-                className="absolute top-4 right-4 z-10 px-4 py-2 bg-emerald-500 text-white rounded-full font-semibold text-sm hover:bg-emerald-600 transition-all shadow-lg whitespace-nowrap opacity-0 group-hover:opacity-100"
+                disabled={adding}
+                className={`absolute top-4 right-4 z-10 px-4 py-2 rounded-full font-semibold text-sm transition-all shadow-lg whitespace-nowrap opacity-0 group-hover:opacity-100 disabled:opacity-70 ${
+                  isGroupMode
+                    ? 'bg-orange-500 text-white hover:bg-orange-600'
+                    : 'bg-emerald-500 text-white hover:bg-emerald-600'
+                }`}
               >
-                Add To Cart
+                {adding ? '...' : isGroupMode ? '+ Nhóm' : 'Add To Cart'}
               </motion.button>
             </>
           )}
