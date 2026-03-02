@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import {
   Plus,
@@ -10,6 +10,7 @@ import {
   Users,
   Loader,
   X,
+  AlertCircle,
 } from "lucide-react";
 import { useCart } from "../../context/CartContext";
 import { useAuth } from "../../context/AuthContext";
@@ -33,7 +34,7 @@ export default function CheckoutPage() {
   const navigate = useNavigate();
 
   const [deliveryType, setDeliveryType] = useState<"delivery" | "pickup">(
-    "pickup",
+    "delivery",
   );
   const [showGroupModal, setShowGroupModal] = useState(false);
   const [groupOrderData, setGroupOrderData] = useState<GroupOrderData | null>(null);
@@ -43,6 +44,42 @@ export default function CheckoutPage() {
   const isRecurringOrder = recurringData !== null;
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+
+  // Auto-dismiss toast after 4 seconds
+  useEffect(() => {
+    if (!error) return;
+    const t = setTimeout(() => setError(""), 4000);
+    return () => clearTimeout(t);
+  }, [error]);
+
+  // Auto-focus first empty / invalid field when error toast appears
+  useEffect(() => {
+    if (!error) return;
+    const textFields: Array<[string, string]> = [
+      ["fullName", formData.fullName],
+      ["phone",    formData.phone],
+      ["email",    formData.email],
+    ];
+    if (deliveryType === "delivery") {
+      textFields.push(["address", formData.address]);
+    }
+    for (const [name, value] of textFields) {
+      if (!value.trim()) {
+        document.querySelector<HTMLInputElement>(`input[name="${name}"]`)?.focus();
+        return;
+      }
+    }
+    // Location picker: open panel at the first incomplete level
+    if (deliveryType === "delivery" && (!selectedProvince || !selectedDistrict || !selectedWard)) {
+      setShowLocationPanel(true);
+      setLocationTab(!selectedProvince ? "province" : !selectedDistrict ? "district" : "ward");
+      setTimeout(() => {
+        locationPanelRef.current?.querySelector<HTMLButtonElement>("button")?.focus();
+      }, 50);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [error]);
+
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [voucherDiscount, setVoucherDiscount] = useState(0);
   const [appliedVoucher, setAppliedVoucher] = useState<string>("");
@@ -54,6 +91,7 @@ export default function CheckoutPage() {
     fullName: user?.name || "",
     phone: user?.phone || "",
     email: user?.email || "",
+    address: "",
     paymentMethod: "COD",
     notes: "",
     promoCode: "",
@@ -66,6 +104,86 @@ export default function CheckoutPage() {
     recurringStartDate: "",
     recurringDuration: "3",
   });
+
+  // ---------- Vietnam Province / District / Ward state ----------
+  interface ProvinceItem { code: number; name: string; }
+  interface DistrictItem { code: number; name: string; }
+  interface WardItem    { code: number; name: string; }
+
+  const [provinces, setProvinces] = useState<ProvinceItem[]>([]);
+  const [districts, setDistricts] = useState<DistrictItem[]>([]);
+  const [wards,     setWards]     = useState<WardItem[]>([]);
+
+  const [selectedProvince, setSelectedProvince] = useState<{ code: number; name: string } | null>(null);
+  const [selectedDistrict, setSelectedDistrict] = useState<{ code: number; name: string } | null>(null);
+  const [selectedWard,     setSelectedWard]     = useState<{ code: number; name: string } | null>(null);
+
+  const [loadingDistricts, setLoadingDistricts] = useState(false);
+  const [loadingWards,     setLoadingWards]     = useState(false);
+
+  // Tab-based location picker state
+  const [showLocationPanel, setShowLocationPanel] = useState(false);
+  const [locationTab, setLocationTab] = useState<"province" | "district" | "ward">("province");
+  const locationPanelRef = useRef<HTMLDivElement>(null);
+
+  // Close panel on outside click
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (locationPanelRef.current && !locationPanelRef.current.contains(e.target as Node)) {
+        setShowLocationPanel(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  // Fetch all provinces once on mount
+  useEffect(() => {
+    fetch("https://provinces.open-api.vn/api/?depth=1")
+      .then((r) => r.json())
+      .then((data: ProvinceItem[]) => setProvinces(data))
+      .catch(() => setProvinces([]));
+  }, []);
+
+  const handleProvinceChange = async (code: number, name: string) => {
+    setSelectedProvince({ code, name });
+    setSelectedDistrict(null);
+    setSelectedWard(null);
+    setWards([]);
+    setLocationTab("district");
+    setLoadingDistricts(true);
+    try {
+      const res = await fetch(`https://provinces.open-api.vn/api/p/${code}?depth=2`);
+      const data = await res.json();
+      setDistricts(data.districts ?? []);
+    } catch {
+      setDistricts([]);
+    } finally {
+      setLoadingDistricts(false);
+    }
+  };
+
+  const handleDistrictChange = async (code: number, name: string) => {
+    setSelectedDistrict({ code, name });
+    setSelectedWard(null);
+    setLocationTab("ward");
+    setLoadingWards(true);
+    try {
+      const res = await fetch(`https://provinces.open-api.vn/api/d/${code}?depth=2`);
+      const data = await res.json();
+      setWards(data.wards ?? []);
+    } catch {
+      setWards([]);
+    } finally {
+      setLoadingWards(false);
+    }
+  };
+
+  const handleWardChange = (code: number, name: string) => {
+    setSelectedWard({ code, name });
+    setShowLocationPanel(false);
+  };
+  // ----------------------------------------------------------------
 
   const subtotal = getTotalPrice();
   const shipping = deliveryType === "pickup" ? 0 : 25000; // 25k for delivery
@@ -85,6 +203,24 @@ export default function CheckoutPage() {
     if (!formData.email.trim()) {
       setError("Please enter your email");
       return false;
+    }
+    if (deliveryType === "delivery") {
+      if (!formData.address.trim()) {
+        setError("Vui lòng nhập địa chỉ cụ thể (số nhà, tên đường)");
+        return false;
+      }
+      if (!selectedProvince) {
+        setError("Vui lòng chọn Tỉnh/Thành phố");
+        return false;
+      }
+      if (!selectedDistrict) {
+        setError("Vui lòng chọn Quận/Huyện");
+        return false;
+      }
+      if (!selectedWard) {
+        setError("Vui lòng chọn Phường/Xã");
+        return false;
+      }
     }
     if (isGroupOrder && !groupOrderData?.groupName?.trim()) {
       setError("Please enter a group name");
@@ -440,12 +576,6 @@ export default function CheckoutPage() {
         <h1 className="text-xl font-bold text-gray-800 mb-4">Organica</h1>
 
         <div className="grid lg:grid-cols-3 gap-6">
-          {/* Error Alert */}
-          {error && (
-            <div className="lg:col-span-2 bg-red-50 border border-red-200 rounded-lg p-4">
-              <p className="text-red-700 text-sm font-medium">{error}</p>
-            </div>
-          )}
 
           {/* Left Column - Form */}
           <div className="lg:col-span-2 space-y-4">
@@ -526,6 +656,136 @@ export default function CheckoutPage() {
                   placeholder="Email (optional)"
                   className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary text-sm"
                 />
+
+                {deliveryType === "delivery" && (
+                  <>
+                    {/* Street address */}
+                    <input
+                      type="text"
+                      name="address"
+                      value={formData.address}
+                      onChange={handleInputChange}
+                      placeholder="Địa chỉ cụ thể (số nhà, tên đường)"
+                      required
+                      className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary text-sm"
+                    />
+
+                    {/* Tab-based location picker */}
+                    <div className="relative" ref={locationPanelRef}>
+                      {/* Trigger button, shows selected value */}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const open = !showLocationPanel;
+                          setShowLocationPanel(open);
+                          if (open) {
+                            setLocationTab(
+                              !selectedProvince ? "province"
+                              : !selectedDistrict ? "district"
+                              : "ward"
+                            );
+                          }
+                        }}
+                        className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm text-left bg-white hover:border-primary focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary transition-colors"
+                      >
+                        {selectedWard && selectedDistrict && selectedProvince ? (
+                          <span className="text-gray-800">
+                            {selectedWard.name}, {selectedDistrict.name}, {selectedProvince.name}
+                          </span>
+                        ) : (
+                          <span className="text-gray-400">Tỉnh/Thành phố, Quận/Huyện, Phường/Xã</span>
+                        )}
+                      </button>
+
+                      {/* Dropdown panel */}
+                      {showLocationPanel && (
+                        <div className="absolute left-0 right-0 top-full mt-1 bg-white border border-gray-200 rounded-lg shadow-xl z-50">
+                          {/* Tab headers */}
+                          <div className="flex border-b border-gray-200">
+                            {([
+                              { key: "province" as const, label: "Tỉnh / TP" },
+                              { key: "district" as const, label: "Quận / Huyện" },
+                              { key: "ward"     as const, label: "Phường / Xã" },
+                            ]).map(({ key, label }) => (
+                              <button
+                                key={key}
+                                type="button"
+                                disabled={
+                                  (key === "district" && !selectedProvince) ||
+                                  (key === "ward"     && !selectedDistrict)
+                                }
+                                onClick={() => setLocationTab(key)}
+                                className={`flex-1 py-2.5 text-xs font-semibold border-b-2 transition-colors ${
+                                  locationTab === key
+                                    ? "border-primary text-primary"
+                                    : "border-transparent text-gray-500 hover:text-gray-700 disabled:text-gray-300 disabled:cursor-not-allowed"
+                                }`}
+                              >
+                                {label}
+                              </button>
+                            ))}
+                          </div>
+
+                          {/* List */}
+                          <div className="max-h-56 overflow-y-auto py-1">
+                            {locationTab === "province" && provinces.map((p) => (
+                              <button
+                                key={p.code}
+                                type="button"
+                                onClick={() => handleProvinceChange(p.code, p.name)}
+                                className={`w-full text-left px-4 py-2 text-sm transition-colors hover:bg-gray-50 ${
+                                  selectedProvince?.code === p.code
+                                    ? "text-primary font-medium bg-green-50"
+                                    : "text-gray-700"
+                                }`}
+                              >
+                                {p.name}
+                              </button>
+                            ))}
+
+                            {locationTab === "district" && (
+                              loadingDistricts
+                                ? <p className="text-center py-6 text-sm text-gray-400">Đang tải...</p>
+                                : districts.map((d) => (
+                                    <button
+                                      key={d.code}
+                                      type="button"
+                                      onClick={() => handleDistrictChange(d.code, d.name)}
+                                      className={`w-full text-left px-4 py-2 text-sm transition-colors hover:bg-gray-50 ${
+                                        selectedDistrict?.code === d.code
+                                          ? "text-primary font-medium bg-green-50"
+                                          : "text-gray-700"
+                                      }`}
+                                    >
+                                      {d.name}
+                                    </button>
+                                  ))
+                            )}
+
+                            {locationTab === "ward" && (
+                              loadingWards
+                                ? <p className="text-center py-6 text-sm text-gray-400">Đang tải...</p>
+                                : wards.map((w) => (
+                                    <button
+                                      key={w.code}
+                                      type="button"
+                                      onClick={() => handleWardChange(w.code, w.name)}
+                                      className={`w-full text-left px-4 py-2 text-sm transition-colors hover:bg-gray-50 ${
+                                        selectedWard?.code === w.code
+                                          ? "text-primary font-medium bg-green-50"
+                                          : "text-gray-700"
+                                      }`}
+                                    >
+                                      {w.name}
+                                    </button>
+                                  ))
+                            )}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </>
+                )}
 
                 {deliveryType === "pickup" && (
                   <button
@@ -997,9 +1257,26 @@ export default function CheckoutPage() {
                       )}
                     </>
                   ) : (
-                    <p className="text-xs font-medium text-gray-800 mt-0.5">
-                      {formData.fullName || "—"}{formData.phone ? ` · ${formData.phone}` : ""}
-                    </p>
+                    <>
+                      <p className="text-xs font-medium text-gray-800 mt-0.5">
+                        {formData.fullName || "—"}{formData.phone ? ` · ${formData.phone}` : ""}
+                      </p>
+                      {(formData.address || selectedWard || selectedDistrict || selectedProvince) && (
+                        <p className="text-xs text-gray-400 mt-0.5 flex items-start gap-1">
+                          <span className="flex-shrink-0">📍</span>
+                          <span>
+                            {[
+                              formData.address,
+                              selectedWard?.name,
+                              selectedDistrict?.name,
+                              selectedProvince?.name,
+                            ]
+                              .filter(Boolean)
+                              .join(", ")}
+                          </span>
+                        </p>
+                      )}
+                    </>
                   )}
                 </div>
               </div>
@@ -1149,6 +1426,24 @@ export default function CheckoutPage() {
         onConfirm={(data) => setRecurringData(data)}
         initialData={recurringData ?? undefined}
       />
+
+      {/* Toast notification */}
+      <div
+        className={`fixed bottom-6 left-1/2 -translate-x-1/2 z-[9999] transition-all duration-300 ${
+          error ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4 pointer-events-none"
+        }`}
+      >
+        <div className="flex items-center gap-3 bg-gray-900 text-white px-4 py-3 rounded-xl shadow-2xl min-w-[280px] max-w-[420px]">
+          <AlertCircle className="w-5 h-5 text-red-400 flex-shrink-0" />
+          <p className="text-sm font-medium flex-1">{error}</p>
+          <button
+            onClick={() => setError("")}
+            className="ml-1 p-0.5 rounded-md hover:bg-white/10 transition-colors flex-shrink-0"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
