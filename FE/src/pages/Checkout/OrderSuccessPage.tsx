@@ -69,28 +69,26 @@ export default function OrderSuccessPage() {
           setVerificationStatus("verifying");
 
           // Try to get data from sessionStorage first
+          let resolvedFromSession = false;
           if (pendingMoMoOrder) {
             try {
               const { orderData: data, momoOrderId: savedMomoOrderId } = JSON.parse(pendingMoMoOrder);
               console.log('✅ Found MoMo order data in sessionStorage');
               setOrderData(data);
-              
+              resolvedFromSession = true;
+
               // Query payment status from MoMo
-              if (savedMomoOrderId && momoRequestIdFromUrl) {
+              const queryId = savedMomoOrderId || momoOrderIdFromUrl;
+              const requestIdForQuery = momoRequestIdFromUrl || queryId;
+              if (queryId) {
                 try {
                   const statusResponse = await momoService.queryPayment({
-                    momoOrderId: savedMomoOrderId,
-                    requestId: momoRequestIdFromUrl,
+                    momoOrderId: queryId,
+                    requestId: requestIdForQuery,
                   });
-                  
-                  const paymentStatus = statusResponse.data?.data?.paymentStatus || (statusResponse as any).data?.paymentStatus;
-                  if (paymentStatus === 'paid') {
-                    console.log('✅ MoMo payment verified as paid');
-                    setVerificationStatus("verified");
-                  } else {
-                    console.log('⚠️ MoMo payment status:', paymentStatus);
-                    setVerificationStatus("verified");
-                  }
+                  const paymentStatus = (statusResponse as any).data?.paymentStatus || (statusResponse as any).data?.data?.paymentStatus;
+                  console.log('📊 MoMo payment status:', paymentStatus);
+                  setVerificationStatus("verified");
                 } catch (err) {
                   console.warn('Could not verify MoMo payment status:', err);
                   setVerificationStatus("verified");
@@ -98,15 +96,15 @@ export default function OrderSuccessPage() {
               } else {
                 setVerificationStatus("verified");
               }
-              
+
               sessionStorage.removeItem("pendingMoMoOrder");
             } catch (parseError) {
               console.error('Error parsing pendingMoMoOrder:', parseError);
             }
           }
           
-          // If no data from sessionStorage, try to fetch from backend
-          if (!orderData && momoOrderIdFromUrl) {
+          // If no data from sessionStorage, try to fetch from backend + verify via URL params
+          if (!resolvedFromSession && momoOrderIdFromUrl) {
             console.log('⚠️ No data in sessionStorage, fetching order:', momoOrderIdFromUrl);
             try {
               const orderResponse = await orderService.getOrderById(momoOrderIdFromUrl);
@@ -122,12 +120,27 @@ export default function OrderSuccessPage() {
                   } : null,
                   notes: order.notes,
                 });
-                setVerificationStatus("verified");
                 console.log('✅ Fetched order from backend');
               }
             } catch (err) {
               console.error('Error fetching order:', err);
               setError('Không thể tải thông tin đơn hàng');
+            }
+
+            // Gọi queryPayment dùng params từ URL (requestId === orderId với MoMo của hệ thống này)
+            const requestIdForQuery = momoRequestIdFromUrl || momoOrderIdFromUrl;
+            try {
+              console.log('🔍 Verifying MoMo payment via URL params...');
+              const statusResponse = await momoService.queryPayment({
+                momoOrderId: momoOrderIdFromUrl,
+                requestId: requestIdForQuery,
+              });
+              const paymentStatus = (statusResponse as any).data?.paymentStatus || (statusResponse as any).paymentStatus;
+              console.log('📊 Payment status from query:', paymentStatus);
+              setVerificationStatus("verified");
+            } catch (err) {
+              console.warn('Could not verify MoMo payment via URL params:', err);
+              setVerificationStatus("verified");
             }
           }
           
