@@ -1,5 +1,5 @@
 import { Response, NextFunction } from 'express';
-import { Subscription, SubscriptionItem } from '../models/Subscription.model';
+import { Subscription } from '../models/Subscription.model';
 import { AuthRequest } from '../middlewares/auth.middleware';
 import { AppError } from '../utils/AppError';
 
@@ -10,57 +10,62 @@ export class SubscriptionController {
    */
   createSubscription = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
     try {
-      const { addressId, frequency, nextDeliveryDate, items, notes } = req.body;
+      const {
+        addressId,
+        frequency,
+        deliveryDay,
+        nextDeliveryDate,
+        items,
+        discountRate,
+        paymentMethod,
+        notes
+      } = req.body;
       const userId = req.user?.id;
 
       if (!userId) {
         throw new AppError('User not authenticated', 401);
       }
 
-      if (!frequency || !nextDeliveryDate) {
-        throw new AppError('Frequency and next delivery date are required', 400);
+      if (!frequency || !nextDeliveryDate || deliveryDay === undefined) {
+        throw new AppError('Frequency, deliveryDay and nextDeliveryDate are required', 400);
       }
 
-      if (!['weekly', 'monthly'].includes(frequency)) {
-        throw new AppError('Frequency must be weekly or monthly', 400);
+      if (!['weekly', 'bi-weekly', 'monthly'].includes(frequency)) {
+        throw new AppError('Frequency must be weekly, bi-weekly or monthly', 400);
       }
 
       if (!items || items.length === 0) {
         throw new AppError('At least one product is required', 400);
       }
 
-      // Create subscription
+      const embeddedItems = items.map((item: any) => ({
+        productId: item.productId,
+        quantity: item.quantity ?? 1,
+        priceAtSubscription: item.priceAtSubscription
+      }));
+
       const subscription = await Subscription.create({
         userId,
         addressId: addressId || null,
+        items: embeddedItems,
         frequency,
+        deliveryDay,
         nextDeliveryDate: new Date(nextDeliveryDate),
         status: 'active',
         startDate: new Date(),
+        discountRate: discountRate ?? 0.05,
+        paymentMethod: paymentMethod ?? 'COD',
         notes
       });
 
-      // Create subscription items
-      const subscriptionItems = await Promise.all(
-        items.map((item: any) =>
-          SubscriptionItem.create({
-            subscriptionId: subscription._id,
-            productId: item.productId,
-            quantity: item.quantity
-          })
-        )
-      );
-
       await subscription.populate('userId', 'name email phone');
       await subscription.populate('addressId');
+      await subscription.populate('items.productId', 'name price thumbnail');
 
       res.status(201).json({
         success: true,
         message: 'Subscription created successfully',
-        data: {
-          subscription,
-          items: subscriptionItems
-        }
+        data: subscription
       });
     } catch (error) {
       next(error);
@@ -98,7 +103,8 @@ export class SubscriptionController {
         .skip(skip)
         .limit(limitNum)
         .populate('userId', 'name email phone')
-        .populate('addressId');
+        .populate('addressId')
+        .populate('items.productId', 'name price thumbnail');
 
       const total = await Subscription.countDocuments(filter);
       const pages = Math.ceil(total / limitNum);
@@ -145,28 +151,15 @@ export class SubscriptionController {
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(limitNum)
-        .populate('addressId');
-
-      // Get items for each subscription
-      const subscriptionsWithItems = await Promise.all(
-        subscriptions.map(async (sub) => {
-          const items = await SubscriptionItem.find({ subscriptionId: sub._id }).populate(
-            'productId',
-            'name price thumbnail'
-          );
-          return {
-            ...sub.toObject(),
-            items
-          };
-        })
-      );
+        .populate('addressId')
+        .populate('items.productId', 'name price thumbnail');
 
       const total = await Subscription.countDocuments(filter);
       const pages = Math.ceil(total / limitNum);
 
       res.status(200).json({
         success: true,
-        data: subscriptionsWithItems,
+        data: subscriptions,
         pagination: {
           currentPage: pageNum,
           totalPages: pages,
@@ -189,7 +182,8 @@ export class SubscriptionController {
 
       const subscription = await Subscription.findById(id)
         .populate('userId', 'name email phone')
-        .populate('addressId');
+        .populate('addressId')
+        .populate('items.productId', 'name price thumbnail description');
 
       if (!subscription) {
         throw new AppError('Subscription not found', 404);
@@ -200,18 +194,9 @@ export class SubscriptionController {
         throw new AppError('You do not have permission to view this subscription', 403);
       }
 
-      // Get subscription items
-      const items = await SubscriptionItem.find({ subscriptionId: id }).populate(
-        'productId',
-        'name price thumbnail description'
-      );
-
       res.status(200).json({
         success: true,
-        data: {
-          ...subscription.toObject(),
-          items
-        }
+        data: subscription
       });
     } catch (error) {
       next(error);
@@ -225,7 +210,7 @@ export class SubscriptionController {
   updateSubscription = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
     try {
       const { id } = req.params;
-      const { addressId, frequency, nextDeliveryDate, notes } = req.body;
+      const { addressId, frequency, deliveryDay, nextDeliveryDate, discountRate, paymentMethod, notes } = req.body;
 
       const subscription = await Subscription.findById(id);
 
@@ -246,8 +231,11 @@ export class SubscriptionController {
       const updateData: any = {};
 
       if (addressId) updateData.addressId = addressId;
-      if (frequency && ['weekly', 'monthly'].includes(frequency)) updateData.frequency = frequency;
+      if (frequency && ['weekly', 'bi-weekly', 'monthly'].includes(frequency)) updateData.frequency = frequency;
+      if (deliveryDay !== undefined) updateData.deliveryDay = deliveryDay;
       if (nextDeliveryDate) updateData.nextDeliveryDate = new Date(nextDeliveryDate);
+      if (discountRate !== undefined) updateData.discountRate = discountRate;
+      if (paymentMethod) updateData.paymentMethod = paymentMethod;
       if (notes) updateData.notes = notes;
 
       const updatedSubscription = await Subscription.findByIdAndUpdate(id, updateData, {
@@ -255,7 +243,8 @@ export class SubscriptionController {
         runValidators: true
       })
         .populate('userId', 'name email phone')
-        .populate('addressId');
+        .populate('addressId')
+        .populate('items.productId', 'name price thumbnail');
 
       res.status(200).json({
         success: true,
@@ -291,24 +280,22 @@ export class SubscriptionController {
         throw new AppError('At least one product is required', 400);
       }
 
-      // Delete old items
-      await SubscriptionItem.deleteMany({ subscriptionId: id });
+      const embeddedItems = items.map((item: any) => ({
+        productId: item.productId,
+        quantity: item.quantity ?? 1,
+        priceAtSubscription: item.priceAtSubscription
+      }));
 
-      // Create new items
-      const subscriptionItems = await Promise.all(
-        items.map((item: any) =>
-          SubscriptionItem.create({
-            subscriptionId: subscription._id,
-            productId: item.productId,
-            quantity: item.quantity
-          })
-        )
-      );
+      const updatedSubscription = await Subscription.findByIdAndUpdate(
+        id,
+        { $set: { items: embeddedItems } },
+        { new: true, runValidators: true }
+      ).populate('items.productId', 'name price thumbnail');
 
       res.status(200).json({
         success: true,
         message: 'Subscription items updated successfully',
-        data: subscriptionItems
+        data: updatedSubscription
       });
     } catch (error) {
       next(error);
@@ -461,25 +448,12 @@ export class SubscriptionController {
         }
       })
         .populate('userId', 'name email phone address')
-        .populate('addressId');
-
-      // Get items for each subscription
-      const subscriptionsWithItems = await Promise.all(
-        subscriptions.map(async (sub) => {
-          const items = await SubscriptionItem.find({ subscriptionId: sub._id }).populate(
-            'productId',
-            'name price thumbnail unit'
-          );
-          return {
-            ...sub.toObject(),
-            items
-          };
-        })
-      );
+        .populate('addressId')
+        .populate('items.productId', 'name price thumbnail unit');
 
       res.status(200).json({
         success: true,
-        data: subscriptionsWithItems
+        data: subscriptions
       });
     } catch (error) {
       next(error);

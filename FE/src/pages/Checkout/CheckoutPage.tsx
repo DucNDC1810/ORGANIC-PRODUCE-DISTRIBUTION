@@ -20,6 +20,7 @@ import zalopayService from "../../services/zaloPayService";
 import momoService from "../../services/momoService";
 import voucherService from "../../services/voucherService";
 import { orderService } from "../../services/orderService";
+import subscriptionService from "../../services/subscriptionService";
 import StorePickupModal, { type Store as StoreData } from "../../components/StorePickupModal";
 import RecurringDeliveryModal, {
   type RecurringData,
@@ -296,6 +297,35 @@ export default function CheckoutPage() {
     }
   };
 
+  // ── Build subscription payload from recurringData (maps frontend → backend) ──
+  const buildSubscriptionPayload = () => {
+    if (!recurringData) return null;
+    const weekdayToNum: Record<string, number> = {
+      sunday: 0, monday: 1, tuesday: 2, wednesday: 3,
+      thursday: 4, friday: 5, saturday: 6,
+    };
+    const frequencyMap: Record<string, "weekly" | "bi-weekly" | "monthly"> = {
+      weekly: "weekly", biweekly: "bi-weekly", monthly: "monthly",
+    };
+    const deliveryDay =
+      recurringData.recurringFrequency === "monthly"
+        ? parseInt(recurringData.recurringDay)
+        : weekdayToNum[recurringData.recurringDay] ?? 1;
+    return {
+      frequency: frequencyMap[recurringData.recurringFrequency],
+      deliveryDay,
+      nextDeliveryDate: new Date(recurringData.recurringStartDate).toISOString(),
+      items: cart.map((item) => ({
+        productId: item.id,
+        quantity: item.quantity,
+        priceAtSubscription: item.price,
+      })),
+      discountRate: 0.05,
+      paymentMethod: formData.paymentMethod,
+      notes: formData.notes || undefined,
+    };
+  };
+
   const handlePlaceOrder = async () => {
     if (!validateForm()) return;
     if (!user) {
@@ -308,12 +338,15 @@ export default function CheckoutPage() {
       setLoading(true);
       try {
         // Gọi API zalopay/init để tạo order + khởi tạo thanh toán ZaloPay
+        const builtAddress = deliveryType === "delivery"
+          ? [formData.address, selectedWard?.name, selectedDistrict?.name, selectedProvince?.name].filter(Boolean).join(', ')
+          : (selectedStore ? `${selectedStore.name} - ${selectedStore.address}` : "Store pickup");
         const orderData = {
           deliveryInfo: {
             fullName: formData.fullName,
             phone: formData.phone,
             email: formData.email,
-            address: deliveryType === "delivery" ? "Delivery address" : "Store pickup",
+            address: builtAddress,
             type: deliveryType,
           },
           items: cart.map((item) => ({
@@ -341,7 +374,7 @@ export default function CheckoutPage() {
             fullName: formData.fullName,
             phone: formData.phone,
             email: formData.email,
-            address: deliveryType === "delivery" ? "Delivery address" : "Store pickup",
+            address: builtAddress,
             type: deliveryType,
           },
         });
@@ -373,6 +406,7 @@ export default function CheckoutPage() {
               orderId: zaloPayResponse.data.orderId,
               paymentId: zaloPayResponse.data.paymentId,
               apptransid: zaloPayResponse.data.apptransid,
+              subscriptionConfig: isRecurringOrder ? buildSubscriptionPayload() : null,
             })
           );
 
@@ -404,12 +438,15 @@ export default function CheckoutPage() {
     if (formData.paymentMethod === "Momo") {
       setLoading(true);
       try {
+        const momoBuiltAddress = deliveryType === "delivery"
+          ? [formData.address, selectedWard?.name, selectedDistrict?.name, selectedProvince?.name].filter(Boolean).join(', ')
+          : (selectedStore ? `${selectedStore.name} - ${selectedStore.address}` : "Store pickup");
         const orderData = {
           deliveryInfo: {
             fullName: formData.fullName,
             phone: formData.phone,
             email: formData.email,
-            address: deliveryType === "delivery" ? "Delivery address" : "Store pickup",
+            address: momoBuiltAddress,
             type: deliveryType,
           },
           items: cart.map((item) => ({
@@ -435,7 +472,7 @@ export default function CheckoutPage() {
             fullName: formData.fullName,
             phone: formData.phone,
             email: formData.email,
-            address: deliveryType === "delivery" ? "Delivery address" : "Store pickup",
+            address: momoBuiltAddress,
             type: deliveryType,
           },
         });
@@ -460,6 +497,7 @@ export default function CheckoutPage() {
               momoOrderId: momoResponse.data.momoOrderId,
               requestId: momoResponse.data.requestId,
               fromMoMo: true,
+              subscriptionConfig: isRecurringOrder ? buildSubscriptionPayload() : null,
             })
           );
 
@@ -485,13 +523,15 @@ export default function CheckoutPage() {
     if (formData.paymentMethod === "COD") {
       setLoading(true);
       try {
+        const codBuiltAddress = deliveryType === "delivery"
+          ? [formData.address, selectedWard?.name, selectedDistrict?.name, selectedProvince?.name].filter(Boolean).join(', ')
+          : (selectedStore ? `${selectedStore.name} - ${selectedStore.address}` : "Store pickup");
         const orderPayload = {
           deliveryInfo: {
             fullName: formData.fullName,
             phone: formData.phone,
             email: formData.email,
-            address:
-              deliveryType === "delivery" ? "Delivery address" : "Store pickup",
+            address: codBuiltAddress,
             type: deliveryType,
           },
           items: cart.map((item) => ({
@@ -517,11 +557,24 @@ export default function CheckoutPage() {
         const result = (response as any)?.data || response;
 
         if (result?.success !== false) {
+          // Create subscription if recurring order was configured
+          if (isRecurringOrder && recurringData) {
+            try {
+              const subPayload = buildSubscriptionPayload();
+              if (subPayload) {
+                await subscriptionService.createSubscription(subPayload as any);
+              }
+            } catch (subErr) {
+              // Non-fatal: order was placed successfully, log and continue
+              console.warn("Subscription creation failed:", subErr);
+            }
+          }
           navigate("/order-success", {
             state: {
               orderId: result?.data?._id,
               paymentMethod: "COD",
               totalAmount: total,
+              isRecurring: isRecurringOrder,
             },
           });
         } else {
@@ -856,7 +909,17 @@ export default function CheckoutPage() {
             {/* Đặt theo nhóm — Clickable card */}
             <button
               type="button"
-              onClick={() => navigate('/group-order', { state: { cartItems: cart } })}
+              onClick={() =>
+                isGroupOrder
+                  ? navigate('/group-order/active', {
+                      state: {
+                        groupId: activeGroupId,
+                        groupName: navGroupData?.groupName ?? groupSession?.groupName,
+                        cartItems: cart,
+                      },
+                    })
+                  : navigate('/group-order', { state: { cartItems: cart } })
+              }
               className={`w-full text-left bg-white rounded-lg p-5 shadow-sm border-2 transition-all duration-150 hover:shadow-md ${
                 isGroupOrder
                   ? "border-green-400 bg-green-50"
@@ -943,10 +1006,15 @@ export default function CheckoutPage() {
                     </div>
                     {isRecurringOrder && recurringData ? (
                       <div className="mt-1 space-y-0.5">
-                        <p className="text-xs text-gray-700">
+                        <p className="text-xs font-medium text-blue-700">
+                          ✅ Đã thiết lập
+                        </p>
+                        <p className="text-xs text-blue-600">
                           {FREQUENCY_LABELS[recurringData.recurringFrequency]} ·{" "}
-                          {DAY_LABELS[recurringData.recurringDay]} ·{" "}
-                          {DURATION_LABELS[recurringData.recurringDuration]}
+                          {recurringData.recurringFrequency === "monthly"
+                            ? `Ngày ${recurringData.recurringDay} hàng tháng`
+                            : DAY_LABELS[recurringData.recurringDay]}{" "}
+                          · {DURATION_LABELS[recurringData.recurringDuration]}
                         </p>
                         <p className="text-xs text-gray-500">
                           📅 Bắt đầu:{" "}
@@ -1206,11 +1274,9 @@ export default function CheckoutPage() {
                   )}
                   {isRecurringOrder && (
                     <div className="flex justify-between text-sm">
-                      <span className="text-blue-600">
-                        Recurring order discount (5%)
-                      </span>
+                      <span className="text-blue-600">✨ Ưu đãi định kỳ (−5%)</span>
                       <span className="font-medium text-blue-600">
-                        -{recurringDiscount.toLocaleString("vi-VN")}₫
+                        −{recurringDiscount.toLocaleString("vi-VN")}₫
                       </span>
                     </div>
                   )}
@@ -1350,7 +1416,11 @@ export default function CheckoutPage() {
                       <Calendar className="w-3.5 h-3.5 text-blue-500 flex-shrink-0" />
                       <p className="text-xs text-gray-700 truncate">
                         <span className="font-semibold">Định kỳ: </span>
-                        {FREQUENCY_LABELS[recurringData.recurringFrequency]} · {DAY_LABELS[recurringData.recurringDay]} · {new Date(recurringData.recurringStartDate).toLocaleDateString("vi-VN")}
+                        {FREQUENCY_LABELS[recurringData.recurringFrequency]} ·{": "}
+                        {recurringData.recurringFrequency === "monthly"
+                          ? `Ngày ${recurringData.recurringDay} hàng tháng`
+                          : DAY_LABELS[recurringData.recurringDay]}{": "}
+                        · {new Date(recurringData.recurringStartDate).toLocaleDateString("vi-VN")}
                       </p>
                     </div>
                   )}

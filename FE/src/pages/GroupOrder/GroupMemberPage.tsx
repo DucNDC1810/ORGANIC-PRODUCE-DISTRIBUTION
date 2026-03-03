@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   ArrowLeft,
@@ -15,7 +15,8 @@ import {
   Check,
   Lock,
 } from "lucide-react";
-import { io } from "socket.io-client";
+import { io, type Socket } from "socket.io-client";
+import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
 import { groupService, type Group, type GroupMember, type GroupCartItem } from "../../services/groupService";
 import { useGroup } from "../../context/GroupContext";
@@ -70,6 +71,9 @@ export default function GroupMemberPage() {
   const [error,      setError]      = useState("");
   const [myCart,     setMyCart]     = useState<GroupCartItem[]>([]);
   const [confirming, setConfirming] = useState(false);
+  const [leaving,    setLeaving]    = useState(false);
+
+  const socketRef = useRef<Socket | null>(null);
 
   const groupId  = groupSession?.groupId;
   const memberId = groupSession?.memberId;
@@ -154,9 +158,20 @@ export default function GroupMemberPage() {
     }
   };
 
-  const handleLeave = () => {
-    clearGroupSession();
-    navigate("/products");
+  const handleLeave = async () => {
+    if (!groupId || !memberId) { clearGroupSession(); navigate("/products"); return; }
+    setLeaving(true);
+    try {
+      // Gọi API xóa khỏi DB
+      await groupService.leaveGroup(groupId, memberId);
+      // Emit socket để Owner và các thành viên khác cập nhật ngay
+      socketRef.current?.emit("member:left", { groupId, memberId });
+    } catch {
+      // Vẫn cho rời dù API lỗi (session đã xóa ở client)
+    } finally {
+      clearGroupSession();
+      navigate("/products");
+    }
   };
 
   // ── Derived values ─────────────────────────────────────────────────────────
@@ -463,12 +478,20 @@ export default function GroupMemberPage() {
             </div>
 
             <div className="space-y-2.5">
+              <AnimatePresence initial={false}>
               {members.map((m, idx) => {
                 const isMe    = m._id === memberId;
                 const isOwner = m.role === "owner";
                 return (
-                  <div
+                  <motion.div
                     key={m._id}
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: "auto" }}
+                    exit={{ opacity: 0, height: 0, marginBottom: 0 }}
+                    transition={{ duration: 0.25 }}
+                    className="overflow-hidden"
+                  >
+                  <div
                     className={`flex items-center gap-4 p-3.5 rounded-xl border transition-colors ${
                       isMe
                         ? "bg-green-50 border-green-100"
@@ -518,8 +541,10 @@ export default function GroupMemberPage() {
                       </span>
                     )}
                   </div>
+                  </motion.div>
                 );
               })}
+              </AnimatePresence>
             </div>
 
             {orderedCount === members.length && members.length > 0 && (
@@ -647,10 +672,14 @@ export default function GroupMemberPage() {
           {/* ── Leave group ── */}
           <button
             onClick={handleLeave}
-            className="w-full py-3 rounded-2xl border border-red-200 text-red-500 text-sm font-semibold hover:bg-red-50 transition-colors flex items-center justify-center gap-2"
+            disabled={leaving}
+            className="w-full py-3 rounded-2xl border border-red-200 text-red-500 text-sm font-semibold hover:bg-red-50 transition-colors flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
           >
-            <LogOut className="w-4 h-4" />
-            Rời khỏi nhóm
+            {leaving ? (
+              <><RefreshCw className="w-4 h-4 animate-spin" /> Đang rời nhóm...</>
+            ) : (
+              <><LogOut className="w-4 h-4" /> Rời khỏi nhóm</>
+            )}
           </button>
         </div>
       </div>

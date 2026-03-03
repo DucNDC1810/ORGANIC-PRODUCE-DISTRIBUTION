@@ -60,6 +60,11 @@ export class GroupService {
     return member;
   }
 
+  /** Xóa thành viên khỏi nhóm (rời nhóm) */
+  async removeMember(groupId: string, memberId: string) {
+    return GroupMember.findOneAndDelete({ _id: memberId, groupId, role: { $ne: 'owner' } });
+  }
+
   /** Cập nhật trạng thái sẵn sàng (đã chọn món) của một thành viên */
   async setMemberReady(memberId: string, isReady: boolean) {
     return GroupMember.findByIdAndUpdate(memberId, { isReady }, { new: true });

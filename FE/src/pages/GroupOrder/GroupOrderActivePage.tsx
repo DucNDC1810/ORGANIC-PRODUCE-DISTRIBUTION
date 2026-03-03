@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
+import { useGroup } from "../../context/GroupContext";
 import {
   ArrowLeft,
   UserPlus,
@@ -18,6 +19,7 @@ import {
   QrCode,
   ChevronDown,
 } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
 import { io } from "socket.io-client";
 import { QRCodeSVG } from "qrcode.react";
 import { toast } from "sonner";
@@ -43,11 +45,7 @@ const TIERS = [
   { members: 8, pct: 10 },
 ];
 
-const MOCK_CART: CartItem[] = [
-  { id: 1, name: "Rau muống tươi",     price: 12000, qty: 2, image: "🥬", unit: "bó"  },
-  { id: 2, name: "Cà chua bi hữu cơ", price: 35000, qty: 1, image: "🍅", unit: "túi" },
-  { id: 3, name: "Dưa leo sạch",      price: 18000, qty: 2, image: "🥒", unit: "kg"  },
-];
+
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -79,8 +77,9 @@ function getMemberAvatar(idx: number): string {
 export default function GroupOrderActivePage() {
   const navigate  = useNavigate();
   const location  = useLocation();
-  const groupName = (location.state as any)?.groupName ?? "Đơn hàng nhóm";
-  const groupId   = (location.state as any)?.groupId as string | undefined;
+  const { groupSession } = useGroup();
+  const groupName = (location.state as any)?.groupName ?? groupSession?.groupName ?? "Đơn hàng nhóm";
+  const groupId   = ((location.state as any)?.groupId as string | undefined) ?? groupSession?.groupId;
 
   // Map cart items from checkout (CartContext shape) → local CartItem shape
   const initialCart: CartItem[] = ((location.state as any)?.cartItems ?? []).length > 0
@@ -98,7 +97,7 @@ export default function GroupOrderActivePage() {
         image: item.image || "🛒",
         unit: "phần",
       }))
-    : MOCK_CART;
+    : [];
 
   const [members,        setMembers]        = useState<APIMember[]>([]);
   const [membersLoading, setMembersLoading] = useState(true);
@@ -149,6 +148,11 @@ export default function GroupOrderActivePage() {
       }
       // Mở rộng thành viên đó để chủ nhóm thấy món mới
       setExpandedMember(updated._id);
+    });
+    // Thành viên rời nhóm: xóa khỏi danh sách
+    socket.on("member:left", (leftMemberId: string) => {
+      setMembers((prev) => prev.filter((m) => m._id !== leftMemberId));
+      toast.info("Một thành viên vừa rời khỏi nhóm.", { icon: "🚪" });
     });
     return () => { socket.disconnect(); };
   }, [groupId]);
@@ -426,11 +430,21 @@ export default function GroupOrderActivePage() {
                 <div className="py-6 text-center text-sm text-gray-400">Đang tải thành viên...</div>
               ) : members.length === 0 ? (
                 <div className="py-6 text-center text-sm text-gray-400">Chưa có thành viên nào.</div>
-              ) : members.map((m, idx) => {
+              ) : (
+              <AnimatePresence initial={false}>
+              {members.map((m, idx) => {
                 const isExpanded  = expandedMember === m._id;
                 const memberItems = m.cartItems ?? [];
                 return (
-                  <div key={m._id} className="rounded-xl border border-gray-100 overflow-hidden">
+                  <motion.div
+                    key={m._id}
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: "auto" }}
+                    exit={{ opacity: 0, height: 0, marginBottom: 0 }}
+                    transition={{ duration: 0.28 }}
+                    className="overflow-hidden"
+                  >
+                  <div className="rounded-xl border border-gray-100 overflow-hidden mb-2.5">
                     {/* Member row */}
                     <div className="flex items-center gap-4 p-3.5 bg-gray-50 hover:bg-gray-100 transition-colors group">
                       <div className="relative flex-shrink-0">
@@ -507,8 +521,11 @@ export default function GroupOrderActivePage() {
                       </div>
                     )}
                   </div>
+                  </motion.div>
                 );
               })}
+              </AnimatePresence>
+              )}
             </div>
 
             {/* Invite link row */}

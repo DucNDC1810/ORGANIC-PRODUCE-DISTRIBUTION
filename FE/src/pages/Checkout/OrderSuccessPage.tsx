@@ -10,13 +10,15 @@ import {
   Clock,
   ArrowRight,
   Loader,
-  AlertCircle
+  AlertCircle,
+  User
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import Header from '../../components/Header';
 import zalopayService from "../../services/zaloPayService";
 import { orderService } from "../../services/orderService";
 import momoService from "../../services/momoService";
+import subscriptionService from "../../services/subscriptionService";
 
 export default function OrderSuccessPage() {
   const location = useLocation();
@@ -47,11 +49,28 @@ export default function OrderSuccessPage() {
         if (location.state?.paymentMethod === "COD") {
           setPaymentType(null);
           setVerificationStatus("verified");
-          setOrderData({
-            orderId: location.state.orderId,
-            amount: location.state.totalAmount,
-            paymentMethod: "COD",
-          });
+          const codOrderId = location.state.orderId;
+          // Fetch full order to populate deliveryInfo
+          if (codOrderId) {
+            try {
+              const orderRes = await orderService.getOrderById(codOrderId);
+              if (orderRes.data?.data) {
+                const order = orderRes.data.data;
+                setOrderData({
+                  orderId: order._id,
+                  amount: order.totalAmount,
+                  paymentMethod: "COD",
+                  deliveryInfo: (order as any).deliveryInfo || null,
+                });
+              } else {
+                setOrderData({ orderId: codOrderId, amount: location.state.totalAmount, paymentMethod: "COD" });
+              }
+            } catch {
+              setOrderData({ orderId: codOrderId, amount: location.state.totalAmount, paymentMethod: "COD" });
+            }
+          } else {
+            setOrderData({ orderId: location.state.orderId, amount: location.state.totalAmount, paymentMethod: "COD" });
+          }
           setLoading(false);
           return;
         }
@@ -72,10 +91,27 @@ export default function OrderSuccessPage() {
           let resolvedFromSession = false;
           if (pendingMoMoOrder) {
             try {
-              const { orderData: data, momoOrderId: savedMomoOrderId } = JSON.parse(pendingMoMoOrder);
+              const { orderData: data, orderId: savedDbOrderId, momoOrderId: savedMomoOrderId, subscriptionConfig } = JSON.parse(pendingMoMoOrder);
               console.log('✅ Found MoMo order data in sessionStorage');
-              setOrderData(data);
               resolvedFromSession = true;
+              // Fetch fresh delivery info from DB (the actual address filled in by user)
+              let mergedData = { ...data };
+              const fetchId = savedDbOrderId || momoOrderIdFromUrl;
+              if (fetchId) {
+                try {
+                  const orderRes = await orderService.getOrderById(fetchId);
+                  if (orderRes.data?.data) {
+                    mergedData = { ...mergedData, deliveryInfo: (orderRes.data.data as any).deliveryInfo || data.deliveryInfo };
+                  }
+                } catch { /* non-fatal — fall back to cached data */ }
+              }
+              setOrderData(mergedData);
+              // Create subscription if this was a recurring order
+              if (subscriptionConfig) {
+                subscriptionService.createSubscription(subscriptionConfig).catch((err) =>
+                  console.warn('Subscription creation failed (MoMo):', err)
+                );
+              }
 
               // Query payment status from MoMo
               const queryId = savedMomoOrderId || momoOrderIdFromUrl;
@@ -113,11 +149,7 @@ export default function OrderSuccessPage() {
                 setOrderData({
                   orderId: order._id,
                   amount: order.totalAmount,
-                  deliveryInfo: order.addressId ? {
-                    address: 'Đang tải...',
-                    phone: 'Đang tải...',
-                    email: 'Đang tải...',
-                  } : null,
+                  deliveryInfo: (order as any).deliveryInfo || null,
                   notes: order.notes,
                 });
                 console.log('✅ Fetched order from backend');
@@ -151,8 +183,14 @@ export default function OrderSuccessPage() {
         // Get pending order data from localStorage if exists (ZaloPay)
         const pendingOrderData = localStorage.getItem("pendingZaloPayOrder");
         if (pendingOrderData) {
-          const { orderData: data, appTransId } = JSON.parse(pendingOrderData);
+          const { orderData: data, appTransId, subscriptionConfig } = JSON.parse(pendingOrderData);
           setOrderData(data);
+          // Create subscription if this was a recurring order
+          if (subscriptionConfig) {
+            subscriptionService.createSubscription(subscriptionConfig).catch((err) =>
+              console.warn('Subscription creation failed (ZaloPay):', err)
+            );
+          }
           setPaymentType('zalopay');
 
           // If coming from ZaloPay return, verify payment status
@@ -356,33 +394,50 @@ export default function OrderSuccessPage() {
                     <div className="space-y-4 pb-6 border-b border-border">
                       <h3 className="font-semibold text-foreground">Thông Tin Giao Hàng</h3>
                       <div className="space-y-2 text-sm">
-                        <div className="flex items-start gap-3">
-                          <MapPin className="w-5 h-5 text-primary flex-shrink-0 mt-0.5" />
-                          <div>
-                            <div className="text-muted-foreground">Địa Chỉ</div>
-                            <div className="text-foreground font-medium">
-                              {orderData.deliveryInfo.address}
+                        {orderData.deliveryInfo.fullName && (
+                          <div className="flex items-start gap-3">
+                            <User className="w-5 h-5 text-primary flex-shrink-0 mt-0.5" />
+                            <div>
+                              <div className="text-muted-foreground">Tên Người Nhận</div>
+                              <div className="text-foreground font-medium">
+                                {orderData.deliveryInfo.fullName}
+                              </div>
                             </div>
                           </div>
-                        </div>
-                        <div className="flex items-start gap-3">
-                          <Phone className="w-5 h-5 text-primary flex-shrink-0 mt-0.5" />
-                          <div>
-                            <div className="text-muted-foreground">Số Điện Thoại</div>
-                            <div className="text-foreground font-medium">
-                              {orderData.deliveryInfo.phone}
+                        )}
+                        {orderData.deliveryInfo.phone && (
+                          <div className="flex items-start gap-3">
+                            <Phone className="w-5 h-5 text-primary flex-shrink-0 mt-0.5" />
+                            <div>
+                              <div className="text-muted-foreground">Số Điện Thoại</div>
+                              <div className="text-foreground font-medium">
+                                {orderData.deliveryInfo.phone}
+                              </div>
                             </div>
                           </div>
-                        </div>
-                        <div className="flex items-start gap-3">
-                          <Mail className="w-5 h-5 text-primary flex-shrink-0 mt-0.5" />
-                          <div>
-                            <div className="text-muted-foreground">Email</div>
-                            <div className="text-foreground font-medium">
-                              {orderData.deliveryInfo.email}
+                        )}
+                        {orderData.deliveryInfo.address && (
+                          <div className="flex items-start gap-3">
+                            <MapPin className="w-5 h-5 text-primary flex-shrink-0 mt-0.5" />
+                            <div>
+                              <div className="text-muted-foreground">Địa Chỉ</div>
+                              <div className="text-foreground font-medium">
+                                {orderData.deliveryInfo.address}
+                              </div>
                             </div>
                           </div>
-                        </div>
+                        )}
+                        {orderData.deliveryInfo.email && (
+                          <div className="flex items-start gap-3">
+                            <Mail className="w-5 h-5 text-primary flex-shrink-0 mt-0.5" />
+                            <div>
+                              <div className="text-muted-foreground">Email</div>
+                              <div className="text-foreground font-medium">
+                                {orderData.deliveryInfo.email}
+                              </div>
+                            </div>
+                          </div>
+                        )}
                       </div>
                     </div>
                   )}

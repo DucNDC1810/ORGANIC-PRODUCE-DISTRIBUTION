@@ -67,6 +67,11 @@ export const groupService = {
     return res.data;
   },
 
+  /** DELETE /api/groups/:id/members/:memberId — Rời nhóm */
+  leaveGroup: async (groupId: string, memberId: string): Promise<void> => {
+    await api.delete(`/groups/${groupId}/members/${memberId}`);
+  },
+
   /** PATCH /api/groups/:id/members/:memberId/ready — Đánh dấu đã chọn món */
   setMemberReady: async (
     groupId: string,

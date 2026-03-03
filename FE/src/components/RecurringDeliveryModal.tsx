@@ -61,7 +61,22 @@ export default function RecurringDeliveryModal({
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
   ) => {
-    setData((prev) => ({ ...prev, [e.target.name]: e.target.value }));
+    const { name, value } = e.target;
+    setData((prev) => {
+      // When switching frequency type, reset recurringDay to a sensible default
+      if (name === "recurringFrequency") {
+        const switchingToMonthly = value === "monthly";
+        const wasMonthly = prev.recurringFrequency === "monthly";
+        if (switchingToMonthly !== wasMonthly) {
+          return {
+            ...prev,
+            [name]: value as RecurringData["recurringFrequency"],
+            recurringDay: switchingToMonthly ? "15" : "monday",
+          };
+        }
+      }
+      return { ...prev, [name]: value };
+    });
   };
 
   const handleConfirm = () => {
@@ -134,22 +149,37 @@ export default function RecurringDeliveryModal({
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-xs font-medium text-gray-600 mb-1">
-                Ngày giao hàng
+                {data.recurringFrequency === "monthly" ? "Ngày trong tháng" : "Thứ trong tuần"}
               </label>
-              <select
-                name="recurringDay"
-                value={data.recurringDay}
-                onChange={handleChange}
-                className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-gray-400 text-sm appearance-none bg-white"
-              >
-                <option value="monday">Thứ Hai</option>
-                <option value="tuesday">Thứ Ba</option>
-                <option value="wednesday">Thứ Tư</option>
-                <option value="thursday">Thứ Năm</option>
-                <option value="friday">Thứ Sáu</option>
-                <option value="saturday">Thứ Bảy</option>
-                <option value="sunday">Chủ Nhật</option>
-              </select>
+              {data.recurringFrequency === "monthly" ? (
+                <select
+                  name="recurringDay"
+                  value={data.recurringDay}
+                  onChange={handleChange}
+                  className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-gray-400 text-sm appearance-none bg-white"
+                >
+                  {Array.from({ length: 28 }, (_, i) => i + 1).map((d) => (
+                    <option key={d} value={String(d)}>
+                      Ngày {d}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <select
+                  name="recurringDay"
+                  value={data.recurringDay}
+                  onChange={handleChange}
+                  className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-gray-400 text-sm appearance-none bg-white"
+                >
+                  <option value="monday">Thứ Hai</option>
+                  <option value="tuesday">Thứ Ba</option>
+                  <option value="wednesday">Thứ Tư</option>
+                  <option value="thursday">Thứ Năm</option>
+                  <option value="friday">Thứ Sáu</option>
+                  <option value="saturday">Thứ Bảy</option>
+                  <option value="sunday">Chủ Nhật</option>
+                </select>
+              )}
             </div>
 
             <div>
@@ -197,15 +227,24 @@ export default function RecurringDeliveryModal({
                 <span className="font-semibold text-gray-900">
                   {FREQUENCY_LABELS[data.recurringFrequency]}
                 </span>{" "}
-                vào{" "}
-                <span className="font-semibold text-gray-900">
-                  {DAY_LABELS[data.recurringDay]}
-                </span>
+                {data.recurringFrequency === "monthly" ? (
+                  <>
+                    vào{" "}
+                    <span className="font-semibold text-gray-900">
+                      ngày {data.recurringDay} hàng tháng
+                    </span>
+                  </>
+                ) : (
+                  <>
+                    vào{" "}
+                    <span className="font-semibold text-gray-900">
+                      {DAY_LABELS[data.recurringDay]}
+                    </span>
+                  </>
+                )}
                 , bắt đầu từ{" "}
                 <span className="font-semibold text-gray-900">
-                  {new Date(data.recurringStartDate).toLocaleDateString(
-                    "vi-VN"
-                  )}
+                  {new Date(data.recurringStartDate).toLocaleDateString("vi-VN")}
                 </span>
                 , trong{" "}
                 <span className="font-semibold text-gray-900">

@@ -82,6 +82,27 @@ export class GroupController {
     }
   };
 
+  /** DELETE /api/groups/:id/members/:memberId — Thành viên rời nhóm */
+  leaveGroup = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const { id: groupId, memberId } = req.params;
+      const userId = req.user?.id;
+      if (!userId) throw new AppError('Unauthorized', 401);
+
+      const removed = await groupService.removeMember(groupId, memberId);
+      if (!removed) throw new AppError('Không tìm thấy thành viên hoặc bạn không có quyền rời nhóm này', 404);
+
+      // Phát sự kiện real-time cho tất cả trong room
+      try {
+        getIO().to(`group:${groupId}`).emit('member:left', memberId);
+      } catch (_) {}
+
+      res.json({ success: true, message: 'Rời nhóm thành công' });
+    } catch (err) {
+      next(err);
+    }
+  };
+
   /** PATCH /api/groups/:id/members/:memberId/ready — Đánh dấu đã chọn món */
   setMemberReady = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
