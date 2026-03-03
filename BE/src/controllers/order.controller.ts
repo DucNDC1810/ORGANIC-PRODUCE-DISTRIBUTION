@@ -11,7 +11,7 @@ export class OrderController {
    */
   createOrder = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
     try {
-      const { addressId, deliveryInfo, voucherId, items, paymentMethod, notes } = req.body;
+      const { addressId, deliveryInfo, voucherId, items, paymentMethod, notes, pickupLocation } = req.body;
       const userId = req.user?.id;
 
       if (!userId) {
@@ -34,6 +34,7 @@ export class OrderController {
         userId,
         addressId: addressId || null,
         deliveryInfo: deliveryInfo || {},
+        pickupLocation: pickupLocation || null,
         voucherId: voucherId || null,
         items,
         paymentMethod: paymentMethod || 'credit_card',

@@ -18,7 +18,7 @@ export class MoMoController {
    */
   createPayment = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
     try {
-      const { orderId, amount, description, deliveryInfo } = req.body;
+      const { orderId, amount, description, deliveryInfo, items, notes, pickupLocation } = req.body;
       const userId = req.user?.id;
 
       // Validate required fields
@@ -42,10 +42,12 @@ export class MoMoController {
         const newOrder = await Order.create({
           userId,
           deliveryInfo,
+          ...(pickupLocation ? { pickupLocation } : {}),
           paymentMethod: 'momo',
-          items: [],
+          items: Array.isArray(items) ? items : [],
           totalAmount: amount,
           status: 'pending',
+          ...(notes ? { notes } : {}),
         });
 
         finalOrderId = newOrder._id.toString();

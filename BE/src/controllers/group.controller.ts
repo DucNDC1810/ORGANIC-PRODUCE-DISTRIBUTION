@@ -50,23 +50,20 @@ export class GroupController {
     }
   };
 
-  /** POST /api/groups/:id/join — Tham gia nhóm */
+  /** POST /api/groups/:id/join — Tham gia nhóm (bắt buộc đăng nhập) */
   joinGroup = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
     try {
       const groupId = req.params.id;
-      const userId = req.user?.id ?? null;
-      const { tempName } = req.body;
+      const userId = req.user?.id;
 
-      if (!userId && !tempName?.trim()) {
-        throw new AppError('tempName là bắt buộc cho khách vãng lai', 400);
-      }
+      if (!userId) throw new AppError('Unauthorized – vui lòng đăng nhập', 401);
 
       // Kiểm tra nhóm tồn tại
       const group = await groupService.getGroupById(groupId);
       if (!group) throw new AppError('Không tìm thấy nhóm', 404);
       if (group.status !== 'active') throw new AppError('Nhóm đã đóng', 400);
 
-      const member = await groupService.joinGroup(groupId, userId, tempName?.trim());
+      const member = await groupService.joinGroup(groupId, userId);
 
       // Populate để trả về đầy đủ thông tin
       await member.populate('userId', 'name email');
@@ -80,6 +77,27 @@ export class GroupController {
       }
 
       res.status(201).json({ success: true, data: member });
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  /** DELETE /api/groups/:id/members/:memberId — Thành viên rời nhóm */
+  leaveGroup = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const { id: groupId, memberId } = req.params;
+      const userId = req.user?.id;
+      if (!userId) throw new AppError('Unauthorized', 401);
+
+      const removed = await groupService.removeMember(groupId, memberId);
+      if (!removed) throw new AppError('Không tìm thấy thành viên hoặc bạn không có quyền rời nhóm này', 404);
+
+      // Phát sự kiện real-time cho tất cả trong room
+      try {
+        getIO().to(`group:${groupId}`).emit('member:left', memberId);
+      } catch (_) {}
+
+      res.json({ success: true, message: 'Rời nhóm thành công' });
     } catch (err) {
       next(err);
     }

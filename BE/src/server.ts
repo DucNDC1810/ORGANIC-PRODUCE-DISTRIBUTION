@@ -3,6 +3,7 @@ import http from 'http';
 import app from './app';
 import { connectDB } from './config/database';
 import { initSocket } from './socket';
+import { initSubscriptionCron } from './jobs/subscriptionCron';
 
 dotenv.config();
 
@@ -19,6 +20,9 @@ process.on('unhandledRejection', (reason, promise) => {
 
 // Connect to database
 connectDB();
+
+// Khởi tạo cron job đặt hàng định kỳ
+initSubscriptionCron();
 
 // Wrap Express với http.Server để Socket.io có thể dùng chung cổng
 const server = http.createServer(app);

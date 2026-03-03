@@ -1,53 +1,64 @@
 import { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { Users, CheckCircle, Loader2, ShoppingBag } from "lucide-react";
+import { Users, CheckCircle, Loader2, ShoppingBag, LogIn } from "lucide-react";
 import { groupService, type Group } from "../../services/groupService";
 import { useGroup } from "../../context/GroupContext";
+import { useAuth } from "../../context/AuthContext";
 
 const REDIRECT_SECONDS = 5;
+const STORAGE_KEY = "redirectAfterLogin";
 
 export default function JoinGroupPage() {
   const { groupId } = useParams<{ groupId: string }>();
-  const navigate    = useNavigate();
+  const navigate = useNavigate();
   const { setGroupSession } = useGroup();
+  const { user, isAuthenticated, loading: authLoading } = useAuth();
 
-  const [group,        setGroup]        = useState<Group | null>(null);
+  const [group, setGroup] = useState<Group | null>(null);
   const [loadingGroup, setLoadingGroup] = useState(true);
-  const [groupError,   setGroupError]   = useState("");
+  const [groupError, setGroupError] = useState("");
 
-  const [tempName, setTempName] = useState("");
-  const [joining,  setJoining]  = useState(false);
-  const [joined,   setJoined]   = useState(false);
-  const [error,    setError]    = useState("");
+  const [joining, setJoining] = useState(false);
+  const [joined, setJoined] = useState(false);
+  const [error, setError] = useState("");
 
   const [countdown, setCountdown] = useState(REDIRECT_SECONDS);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  // Lấy thông tin nhóm
+  // ── Bước 1: Kiểm tra xác thực – nếu chưa đăng nhập, lưu URL rồi chuyển về /login ──
   useEffect(() => {
-    if (!groupId) return;
+    if (authLoading) return; // chờ AuthContext khởi tạo xong
+    if (!isAuthenticated) {
+      // Lưu URL hiện tại vào sessionStorage để LoginPage có thể redirect lại sau khi đăng nhập
+      sessionStorage.setItem(STORAGE_KEY, `/join-group/${groupId}`);
+      navigate("/login", { replace: true });
+    }
+  }, [authLoading, isAuthenticated, groupId, navigate]);
+
+  // ── Bước 2: Lấy thông tin nhóm (chỉ khi đã đăng nhập) ──────────────────────
+  useEffect(() => {
+    if (!groupId || !isAuthenticated) return;
     groupService
       .getGroup(groupId)
       .then(setGroup)
       .catch(() => setGroupError("Không tìm thấy nhóm hoặc nhóm đã đóng."))
       .finally(() => setLoadingGroup(false));
-  }, [groupId]);
+  }, [groupId, isAuthenticated]);
 
-  const handleJoin = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!tempName.trim()) { setError("Vui lòng nhập tên của bạn."); return; }
-    if (!groupId || !group) return;
-
+  // ── Bước 3: Xử lý tham gia nhóm ──────────────────────────────────────────────
+  const handleJoin = async () => {
+    if (!groupId || !group || !user) return;
     setJoining(true);
     setError("");
     try {
-      const member = await groupService.joinGroup(groupId, { tempName: tempName.trim() });
-      // Lưu group session vào Context + localStorage (bao gồm memberId và displayName)
+      // Gọi API tham gia nhóm – không cần tempName vì đã đăng nhập
+      const member = await groupService.joinGroup(groupId);
+      // Lưu session nhóm vào Context & localStorage, dùng tên tài khoản thực
       setGroupSession({
         groupId,
         groupName: group.groupName,
         memberId: member._id,
-        displayName: tempName.trim(),
+        displayName: user.name,
       });
       setJoined(true);
     } catch (err: any) {
@@ -57,7 +68,7 @@ export default function JoinGroupPage() {
     }
   };
 
-  // Đếm ngược + tự động chuyển hướng sau khi join thành công
+  // ── Đếm ngược & tự động chuyển hướng sau khi join thành công ─────────────────
   useEffect(() => {
     if (!joined) return;
     timerRef.current = setInterval(() => {
@@ -73,7 +84,16 @@ export default function JoinGroupPage() {
     return () => { if (timerRef.current) clearInterval(timerRef.current); };
   }, [joined, navigate]);
 
-  // ── Loading group info ─────────────────────────────────────────────────────
+  // ── Loading: AuthContext đang khởi tạo ────────────────────────────────────────
+  if (authLoading || !isAuthenticated) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <Loader2 className="w-8 h-8 text-green-600 animate-spin" />
+      </div>
+    );
+  }
+
+  // ── Loading thông tin nhóm ────────────────────────────────────────────────────
   if (loadingGroup) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -82,7 +102,7 @@ export default function JoinGroupPage() {
     );
   }
 
-  // ── Group not found ────────────────────────────────────────────────────────
+  // ── Nhóm không tồn tại ────────────────────────────────────────────────────────
   if (groupError || !group) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
@@ -97,7 +117,7 @@ export default function JoinGroupPage() {
     );
   }
 
-  // ── Joined successfully ────────────────────────────────────────────────────
+  // ── Đã tham gia thành công ────────────────────────────────────────────────────
   if (joined) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
@@ -107,7 +127,7 @@ export default function JoinGroupPage() {
           </div>
           <h2 className="text-2xl font-extrabold text-gray-900 mb-2">Đã tham gia nhóm!</h2>
           <p className="text-sm text-gray-500 leading-relaxed">
-            Bạn đã được thêm vào nhóm{" "}
+            Bạn (<span className="font-bold text-gray-700">{user?.name}</span>) đã được thêm vào nhóm{" "}
             <span className="font-bold text-gray-700">"{group.groupName}"</span>.{" "}
             Chủ nhóm sẽ thấy tên bạn trong danh sách thành viên.
           </p>
@@ -131,7 +151,7 @@ export default function JoinGroupPage() {
     );
   }
 
-  // ── Join form ──────────────────────────────────────────────────────────────
+  // ── Màn hình xác nhận tham gia (đã đăng nhập) ────────────────────────────────
   return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
       <div className="bg-white rounded-3xl shadow-xl w-full max-w-sm overflow-hidden">
@@ -146,41 +166,35 @@ export default function JoinGroupPage() {
           </h1>
         </div>
 
-        {/* Form */}
-        <form onSubmit={handleJoin} className="px-8 py-8 space-y-5">
-          <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-2">
-              Tên của bạn
-            </label>
-            <input
-              autoFocus
-              type="text"
-              placeholder="Nhập tên để tham gia..."
-              value={tempName}
-              onChange={(e) => { setTempName(e.target.value); setError(""); }}
-              className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-300 focus:border-green-400 transition-all"
-              maxLength={50}
-            />
-            {error && (
-              <p className="mt-1.5 text-xs text-red-500 font-medium">{error}</p>
-            )}
+        {/* User info + join button */}
+        <div className="px-8 py-8 space-y-5">
+          {/* Hiển thị tên tài khoản đang đăng nhập */}
+          <div className="flex items-center gap-3 p-4 rounded-2xl bg-green-50 border border-green-100">
+            <div className="w-10 h-10 rounded-full bg-green-600 flex items-center justify-center text-white font-bold text-base flex-shrink-0">
+              {user?.name?.charAt(0).toUpperCase() ?? "?"}
+            </div>
+            <div className="min-w-0">
+              <p className="text-xs text-gray-500 font-medium">Tham gia với tên</p>
+              <p className="text-sm font-bold text-gray-800 truncate">{user?.name}</p>
+            </div>
           </div>
 
+          {error && (
+            <p className="text-xs text-red-500 font-medium text-center">{error}</p>
+          )}
+
           <button
-            type="submit"
-            disabled={joining || !tempName.trim()}
+            onClick={handleJoin}
+            disabled={joining}
             className="w-full py-3.5 rounded-2xl bg-green-600 text-white font-bold text-base hover:bg-green-700 active:scale-[0.98] transition-all disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2"
           >
             {joining ? (
               <><Loader2 className="w-4 h-4 animate-spin" /> Đang tham gia...</>
             ) : (
-              "Tham gia nhóm →"
+              <><LogIn className="w-4 h-4" /> Tham gia nhóm →</>
             )}
           </button>
-          <p className="text-center text-xs text-gray-400">
-            Bạn không cần tài khoản để tham gia nhóm này.
-          </p>
-        </form>
+        </div>
       </div>
     </div>
   );

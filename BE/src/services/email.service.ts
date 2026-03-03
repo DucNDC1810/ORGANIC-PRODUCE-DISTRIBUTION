@@ -177,4 +177,190 @@ export class EmailService {
       throw new Error('Failed to send password reset email');
     }
   }
+
+  // ────────────────────────────────────────────────────────────
+  // Subscription emails
+  // ────────────────────────────────────────────────────────────
+
+  /** Gửi xác nhận đơn hàng định kỳ COD đã được tạo tự động */
+  async sendSubscriptionOrderConfirmation(
+    to: string,
+    name: string,
+    orderId: string,
+    totalAmount: number,
+    nextDeliveryDate: Date
+  ): Promise<void> {
+    const formattedAmount = totalAmount.toLocaleString('vi-VN') + ' ₫';
+    const formattedDate = nextDeliveryDate.toLocaleDateString('vi-VN', {
+      weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
+    });
+
+    const mailOptions = {
+      from: `"Organic Produce Distribution" <${process.env.EMAIL_USER}>`,
+      to,
+      subject: `✅ Đơn hàng định kỳ #${orderId} đã được tạo tự động`,
+      html: `
+        <!DOCTYPE html><html><head>
+        <style>
+          body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+          .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+          .header { background-color: #4CAF50; color: white; padding: 20px; text-align: center; border-radius: 5px 5px 0 0; }
+          .content { background-color: #f9f9f9; padding: 30px; border-radius: 0 0 5px 5px; }
+          .info-box { background: #e8f5e9; border-left: 4px solid #4CAF50; padding: 12px 16px; margin: 16px 0; border-radius: 4px; }
+          .footer { text-align: center; margin-top: 20px; color: #666; font-size: 12px; }
+        </style>
+        </head><body>
+        <div class="container">
+          <div class="header"><h2>🌿 Đơn hàng định kỳ đã được tạo</h2></div>
+          <div class="content">
+            <p>Xin chào <strong>${name}</strong>,</p>
+            <p>Hệ thống đã tự động tạo đơn hàng định kỳ của bạn. Shipper sẽ giao hàng và thu tiền mặt (COD) khi đến nơi.</p>
+            <div class="info-box">
+              <p><strong>Mã đơn hàng:</strong> #${orderId}</p>
+              <p><strong>Tổng tiền:</strong> ${formattedAmount}</p>
+              <p><strong>Phương thức thanh toán:</strong> Thanh toán khi nhận hàng (COD)</p>
+              <p><strong>Lần giao tiếp theo:</strong> ${formattedDate}</p>
+            </div>
+            <p>Cảm ơn bạn đã tin tưởng sử dụng dịch vụ đặt hàng định kỳ của chúng tôi!</p>
+          </div>
+          <div class="footer"><p>© 2026 Organic Produce Distribution. All rights reserved.</p></div>
+        </div>
+        </body></html>
+      `,
+    };
+
+    try {
+      await this.transporter.sendMail(mailOptions);
+      console.log(`✅ Subscription confirmation email sent to ${to}`);
+    } catch (error) {
+      console.error('❌ Error sending subscription confirmation email:', error);
+    }
+  }
+
+  /** Gửi yêu cầu thanh toán online cho đơn hàng định kỳ MoMo/ZaloPay */
+  async sendSubscriptionPaymentRequest(
+    to: string,
+    name: string,
+    orderId: string,
+    totalAmount: number,
+    paymentMethod: string,
+    deliveryDate: Date
+  ): Promise<void> {
+    const formattedAmount = totalAmount.toLocaleString('vi-VN') + ' ₫';
+    const formattedDate = deliveryDate.toLocaleDateString('vi-VN', {
+      weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
+    });
+    const paymentUrl = `${process.env.FRONTEND_URL}/profile?tab=orders&highlight=${orderId}`;
+    const methodLabel = paymentMethod?.toLowerCase() === 'momo' ? 'MoMo' : paymentMethod?.toLowerCase() === 'zalopay' ? 'ZaloPay' : paymentMethod;
+
+    const mailOptions = {
+      from: `"Organic Produce Distribution" <${process.env.EMAIL_USER}>`,
+      to,
+      subject: `💳 Đơn hàng định kỳ #${orderId} — Vui lòng thanh toán trước ngày giao`,
+      html: `
+        <!DOCTYPE html><html><head>
+        <style>
+          body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+          .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+          .header { background-color: #FF6B35; color: white; padding: 20px; text-align: center; border-radius: 5px 5px 0 0; }
+          .content { background-color: #f9f9f9; padding: 30px; border-radius: 0 0 5px 5px; }
+          .info-box { background: #fff3e0; border-left: 4px solid #FF6B35; padding: 12px 16px; margin: 16px 0; border-radius: 4px; }
+          .button { display: inline-block; padding: 14px 36px; background-color: #FF6B35; color: white; text-decoration: none; border-radius: 6px; margin: 20px 0; font-weight: bold; font-size: 16px; }
+          .footer { text-align: center; margin-top: 20px; color: #666; font-size: 12px; }
+          .warning { background-color: #fff3cd; border: 1px solid #ffc107; padding: 10px 14px; border-radius: 5px; margin: 15px 0; }
+        </style>
+        </head><body>
+        <div class="container">
+          <div class="header"><h2>💳 Yêu cầu thanh toán đơn hàng định kỳ</h2></div>
+          <div class="content">
+            <p>Xin chào <strong>${name}</strong>,</p>
+            <p>Đơn hàng định kỳ của bạn đã được tạo tự động và đang chờ thanh toán. Nhấn vào nút bên dưới để xem chi tiết và hoàn tất thanh toán qua <strong>${methodLabel}</strong>.</p>
+            <div class="info-box">
+              <p><strong>Mã đơn hàng:</strong> #${orderId}</p>
+              <p><strong>Tổng tiền:</strong> ${formattedAmount}</p>
+              <p><strong>Phương thức thanh toán:</strong> ${methodLabel}</p>
+              <p><strong>Ngày giao hàng dự kiến:</strong> ${formattedDate}</p>
+            </div>
+            <div style="text-align:center;">
+              <a href="${paymentUrl}" class="button">🔍 Kiểm tra &amp; Thanh toán đơn định kỳ</a>
+            </div>
+            <p style="text-align:center;font-size:13px;color:#888;margin-top:8px;">Bạn sẽ được yêu cầu đăng nhập nếu chưa vào tài khoản.</p>
+            <div class="warning">
+              <p style="margin:0;"><strong>⚠️ Lưu ý:</strong> Nếu bạn không thanh toán trước ngày giao, đơn hàng sẽ bị tạm hoãn. Bạn có thể thanh toán bất kỳ lúc nào qua liên kết trên.</p>
+            </div>
+          </div>
+          <div class="footer"><p>© 2026 Organic Produce Distribution. All rights reserved.</p></div>
+        </div>
+        </body></html>
+      `,
+    };
+
+    try {
+      await this.transporter.sendMail(mailOptions);
+      console.log(`✅ Subscription payment request email sent to ${to}`);
+    } catch (error) {
+      console.error('❌ Error sending subscription payment request email:', error);
+    }
+  }
+
+  /** Nhắc nhở thanh toán đơn hàng định kỳ chưa thanh toán (giao ngày mai) */
+  async sendSubscriptionPaymentReminder(
+    to: string,
+    name: string,
+    orderId: string,
+    totalAmount: number,
+    paymentMethod: string
+  ): Promise<void> {
+    const formattedAmount = totalAmount.toLocaleString('vi-VN') + ' ₫';
+    const paymentUrl = `${process.env.FRONTEND_URL}/profile?tab=orders&highlight=${orderId}`;
+    const methodLabel = paymentMethod?.toLowerCase() === 'momo' ? 'MoMo' : paymentMethod?.toLowerCase() === 'zalopay' ? 'ZaloPay' : paymentMethod;
+
+    const mailOptions = {
+      from: `"Organic Produce Distribution" <${process.env.EMAIL_USER}>`,
+      to,
+      subject: `⏰ Nhắc nhở: Đơn hàng định kỳ #${orderId} của bạn sẽ được giao NGÀY MAI`,
+      html: `
+        <!DOCTYPE html><html><head>
+        <style>
+          body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+          .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+          .header { background-color: #9C27B0; color: white; padding: 20px; text-align: center; border-radius: 5px 5px 0 0; }
+          .content { background-color: #f9f9f9; padding: 30px; border-radius: 0 0 5px 5px; }
+          .info-box { background: #f3e5f5; border-left: 4px solid #9C27B0; padding: 12px 16px; margin: 16px 0; border-radius: 4px; }
+          .button { display: inline-block; padding: 14px 36px; background-color: #9C27B0; color: white; text-decoration: none; border-radius: 6px; margin: 20px 0; font-weight: bold; font-size: 16px; }
+          .footer { text-align: center; margin-top: 20px; color: #666; font-size: 12px; }
+          .urgent { background-color: #ffebee; border: 1px solid #ef5350; padding: 10px 14px; border-radius: 5px; margin: 15px 0; }
+        </style>
+        </head><body>
+        <div class="container">
+          <div class="header"><h2>⏰ Nhắc nhở thanh toán — Giao hàng ngày mai!</h2></div>
+          <div class="content">
+            <p>Xin chào <strong>${name}</strong>,</p>
+            <p>Đơn hàng định kỳ của bạn sẽ được giao vào <strong>ngày mai</strong> nhưng <strong>chưa được thanh toán</strong>. Vui lòng hoàn tất thanh toán sớm.</p>
+            <div class="info-box">
+              <p><strong>Mã đơn hàng:</strong> #${orderId}</p>
+              <p><strong>Tổng tiền:</strong> ${formattedAmount}</p>
+              <p><strong>Phương thức:</strong> ${methodLabel}</p>
+            </div>
+            <div style="text-align:center;">
+              <a href="${paymentUrl}" class="button">🔍 Kiểm tra &amp; Thanh toán đơn định kỳ</a>
+            </div>
+            <p style="text-align:center;font-size:13px;color:#888;margin-top:8px;">Bạn sẽ được yêu cầu đăng nhập nếu chưa vào tài khoản.</p>
+            <div class="urgent">
+              <p style="margin:0;"><strong>🚨 Quan trọng:</strong> Vui lòng thanh toán trước khi giao hàng. Nếu không thanh toán, đơn hàng sẽ bị tạm hoãn và bạn sẽ không nhận được hàng ngày mai.</p>
+            </div>
+          </div>
+          <div class="footer"><p>© 2026 Organic Produce Distribution. All rights reserved.</p></div>
+        </div>
+        </body></html>
+      `,
+    };
+
+    try {
+      await this.transporter.sendMail(mailOptions);
+      console.log(`✅ Subscription payment reminder email sent to ${to}`);
+    } catch (error) {
+      console.error('❌ Error sending subscription payment reminder email:', error);
+    }
+  }
 }

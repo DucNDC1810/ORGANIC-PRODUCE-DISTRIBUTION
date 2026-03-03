@@ -21,6 +21,11 @@ export function initSocket(server: http.Server): Server {
       socket.leave(`group:${groupId}`);
     });
 
+    // Thành viên rời nhóm: broadcast đến tất cả trong room
+    socket.on('member:left', ({ groupId, memberId }: { groupId: string; memberId: string }) => {
+      socket.to(`group:${groupId}`).emit('member:left', memberId);
+    });
+
     socket.on('disconnect', () => {});
   });
 

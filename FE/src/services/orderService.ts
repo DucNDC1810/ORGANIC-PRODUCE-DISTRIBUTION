@@ -21,7 +21,7 @@ export interface Order {
   status: 'pending' | 'confirmed' | 'processing' | 'shipped' | 'delivered' | 'cancelled' | 'refunded';
   items: OrderItem[];
   paymentMethod?: string;
-  paymentStatus?: 'pending' | 'paid' | 'failed';
+  paymentStatus?: 'pending' | 'paid' | 'failed' | 'unpaid';
   shippingCost?: number;
   discountAmount?: number;
   taxAmount?: number;

@@ -56,9 +56,9 @@ export default function App() {
             {/* Protected routes - require authentication */}
             <Route path="/group-order" element={<ProtectedRoute><GroupOrderPage /></ProtectedRoute>} />
             <Route path="/group-order/active" element={<ProtectedRoute><GroupOrderActivePage /></ProtectedRoute>} />
-            {/* Public invite link – không cần đăng nhập */}
+            {/* Invite link – requires authentication (handled inside component with sessionStorage redirect) */}
             <Route path="/join-group/:groupId" element={<JoinGroupPage />} />
-            {/* Trang xem nhóm cho thành viên – không cần đăng nhập */}
+            {/* Trang xem nhóm cho thành viên */}
             <Route path="/group/members" element={<GroupMemberPage />} />
             <Route path="/cart" element={<ProtectedRoute><CartPage /></ProtectedRoute>} />
             <Route path="/checkout" element={<ProtectedRoute><CheckoutPage /></ProtectedRoute>} />

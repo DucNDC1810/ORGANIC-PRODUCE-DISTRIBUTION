@@ -2,22 +2,27 @@ import api from './api';
 
 // ===== INTERFACES =====
 
+// Embedded item (stored inside each subscription document)
 export interface SubscriptionItem {
-  _id?: string;
-  subscriptionId?: string;
   productId: string;
   quantity: number;
+  /** Giá tại thời điểm đăng ký – bảo vệ quyền lợi khách */
+  priceAtSubscription?: number;
 }
 
 export interface Subscription {
   _id: string;
   userId: string;
-  addressId: string;
-  frequency: 'weekly' | 'monthly';
+  addressId?: string;
+  items: SubscriptionItem[];
+  frequency: 'weekly' | 'bi-weekly' | 'monthly';
+  /** 0–6 for weekly/bi-weekly, 1–28 for monthly */
+  deliveryDay: number;
+  startDate: string;
   nextDeliveryDate: string;
   status: 'active' | 'paused' | 'cancelled';
-  items?: any[];
-  startDate: string;
+  discountRate: number;
+  paymentMethod: string;
   endDate?: string;
   cancelledAt?: string;
   pausedAt?: string;
@@ -28,17 +33,23 @@ export interface Subscription {
 }
 
 export interface CreateSubscriptionPayload {
-  addressId: string;
-  frequency: 'weekly' | 'monthly';
+  addressId?: string;
+  frequency: 'weekly' | 'bi-weekly' | 'monthly';
+  deliveryDay: number;
   nextDeliveryDate: string;
   items: SubscriptionItem[];
+  discountRate?: number;
+  paymentMethod?: string;
   notes?: string;
 }
 
 export interface UpdateSubscriptionPayload {
   addressId?: string;
-  frequency?: string;
+  frequency?: 'weekly' | 'bi-weekly' | 'monthly';
+  deliveryDay?: number;
   nextDeliveryDate?: string;
+  discountRate?: number;
+  paymentMethod?: string;
   notes?: string;
 }
 

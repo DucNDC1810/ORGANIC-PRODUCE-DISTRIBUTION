@@ -1,11 +1,19 @@
-import { useState } from "react";
-import { X, Calendar } from "lucide-react";
+import { useState, useMemo } from "react";
+import { X, Calendar, Truck } from "lucide-react";
+import {
+  getFirstDeliveryDate,
+  getFirstMonthlyDeliveryDate,
+  isSameDeliveryDay,
+  formatDateVN,
+} from "../utils/deliveryDate";
 
 export interface RecurringData {
   recurringFrequency: "weekly" | "biweekly" | "monthly";
   recurringDay: string;
   recurringStartDate: string;
   recurringDuration: string;
+  /** Ngày nhận hàng đầu tiên thực tế – dùng cho nextDeliveryDate trong DB. */
+  firstDeliveryDate?: string;
 }
 
 interface RecurringDeliveryModalProps {
@@ -57,21 +65,73 @@ export default function RecurringDeliveryModal({
   const [data, setData] = useState<RecurringData>(
     initialData ?? DEFAULT_DATA
   );
+  /** Trường hợp đặc biệt: startDate trùng với deliveryDay → cho chọn hôm nay hay tuần sau */
+  const [sameDayChoice, setSameDayChoice] = useState<"today" | "next_week">("today");
 
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
   ) => {
-    setData((prev) => ({ ...prev, [e.target.name]: e.target.value }));
+    const { name, value } = e.target;
+    setData((prev) => {
+      // When switching frequency type, reset recurringDay to a sensible default
+      if (name === "recurringFrequency") {
+        const switchingToMonthly = value === "monthly";
+        const wasMonthly = prev.recurringFrequency === "monthly";
+        if (switchingToMonthly !== wasMonthly) {
+          return {
+            ...prev,
+            [name]: value as RecurringData["recurringFrequency"],
+            recurringDay: switchingToMonthly ? "15" : "monday",
+          };
+        }
+      }
+      return { ...prev, [name]: value };
+    });
+    // Reset choice khi đổi ngày bắt đầu hoặc thứ giao
+    if (name === "recurringStartDate" || name === "recurringDay") {
+      setSameDayChoice("today");
+    }
   };
 
+  /**
+   * Tính ngày nhận hàng đầu tiên thực tế (real-time, reactive).
+   * – weekly/biweekly: tìm thứ gần nhất >= startDate
+   * – monthly: tìm ngày trong tháng gần nhất >= startDate
+   */
+  const firstDelivery = useMemo((): Date | null => {
+    if (!data.recurringStartDate) return null;
+    const start = new Date(data.recurringStartDate);
+    if (isNaN(start.getTime())) return null;
+
+    if (data.recurringFrequency === "monthly") {
+      const dom = parseInt(data.recurringDay);
+      return getFirstMonthlyDeliveryDate(start, dom);
+    }
+    // weekly / biweekly
+    const skipToNextWeek = sameDayChoice === "next_week";
+    return getFirstDeliveryDate(start, data.recurringDay, skipToNextWeek);
+  }, [data.recurringStartDate, data.recurringDay, data.recurringFrequency, sameDayChoice]);
+
+  /** Kiểm tra trường hợp đặc biệt: ngày bắt đầu trùng với thứ giao */
+  const isEdgeCase = useMemo(() => {
+    if (!data.recurringStartDate || data.recurringFrequency === "monthly") return false;
+    const start = new Date(data.recurringStartDate);
+    if (isNaN(start.getTime())) return false;
+    return isSameDeliveryDay(start, data.recurringDay);
+  }, [data.recurringStartDate, data.recurringDay, data.recurringFrequency]);
+
   const handleConfirm = () => {
-    if (!data.recurringStartDate) return;
-    onConfirm(data);
+    if (!data.recurringStartDate || !firstDelivery) return;
+    onConfirm({
+      ...data,
+      firstDeliveryDate: firstDelivery.toISOString(),
+    });
     onClose();
   };
 
   const handleClose = () => {
     setData(initialData ?? DEFAULT_DATA);
+    setSameDayChoice("today");
     onClose();
   };
 
@@ -134,22 +194,37 @@ export default function RecurringDeliveryModal({
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-xs font-medium text-gray-600 mb-1">
-                Ngày giao hàng
+                {data.recurringFrequency === "monthly" ? "Ngày trong tháng" : "Thứ trong tuần"}
               </label>
-              <select
-                name="recurringDay"
-                value={data.recurringDay}
-                onChange={handleChange}
-                className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-gray-400 text-sm appearance-none bg-white"
-              >
-                <option value="monday">Thứ Hai</option>
-                <option value="tuesday">Thứ Ba</option>
-                <option value="wednesday">Thứ Tư</option>
-                <option value="thursday">Thứ Năm</option>
-                <option value="friday">Thứ Sáu</option>
-                <option value="saturday">Thứ Bảy</option>
-                <option value="sunday">Chủ Nhật</option>
-              </select>
+              {data.recurringFrequency === "monthly" ? (
+                <select
+                  name="recurringDay"
+                  value={data.recurringDay}
+                  onChange={handleChange}
+                  className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-gray-400 text-sm appearance-none bg-white"
+                >
+                  {Array.from({ length: 28 }, (_, i) => i + 1).map((d) => (
+                    <option key={d} value={String(d)}>
+                      Ngày {d}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <select
+                  name="recurringDay"
+                  value={data.recurringDay}
+                  onChange={handleChange}
+                  className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-gray-400 text-sm appearance-none bg-white"
+                >
+                  <option value="monday">Thứ Hai</option>
+                  <option value="tuesday">Thứ Ba</option>
+                  <option value="wednesday">Thứ Tư</option>
+                  <option value="thursday">Thứ Năm</option>
+                  <option value="friday">Thứ Sáu</option>
+                  <option value="saturday">Thứ Bảy</option>
+                  <option value="sunday">Chủ Nhật</option>
+                </select>
+              )}
             </div>
 
             <div>
@@ -186,6 +261,53 @@ export default function RecurringDeliveryModal({
             />
           </div>
 
+          {/* Edge-case: startDate == deliveryDay → cho chọn hôm nay hay tuần sau */}
+          {isEdgeCase && (
+            <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl space-y-2">
+              <p className="text-xs font-semibold text-amber-800">
+                Ngày bắt đầu bạn chọn đúng vào{" "}
+                {DAY_LABELS[data.recurringDay]} — bạn muốn:
+              </p>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="radio"
+                  name="sameDayChoice"
+                  value="today"
+                  checked={sameDayChoice === "today"}
+                  onChange={() => setSameDayChoice("today")}
+                  className="accent-green-600"
+                />
+                <span className="text-xs text-amber-900 font-medium">
+                  Giao ngay hôm nay ({data.recurringStartDate.split("-").reverse().join("/")})
+                </span>
+              </label>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="radio"
+                  name="sameDayChoice"
+                  value="next_week"
+                  checked={sameDayChoice === "next_week"}
+                  onChange={() => setSameDayChoice("next_week")}
+                  className="accent-green-600"
+                />
+                <span className="text-xs text-amber-900 font-medium">
+                  Bắt đầu từ {DAY_LABELS[data.recurringDay]} tuần sau
+                </span>
+              </label>
+            </div>
+          )}
+
+          {/* Ngày nhận hàng đầu tiên – hiển thị real-time */}
+          {firstDelivery && (
+            <div className="flex items-center gap-2.5 p-3 bg-green-50 border border-green-200 rounded-xl">
+              <Truck className="w-4 h-4 text-green-600 flex-shrink-0" />
+              <p className="text-sm text-green-800">
+                Ngày nhận hàng đầu tiên:{" "}
+                <span className="font-bold">{formatDateVN(firstDelivery)}</span>
+              </p>
+            </div>
+          )}
+
           {/* Live summary */}
           {data.recurringStartDate && (
             <div className="p-3 bg-gray-50 rounded-xl border border-gray-200">
@@ -197,16 +319,21 @@ export default function RecurringDeliveryModal({
                 <span className="font-semibold text-gray-900">
                   {FREQUENCY_LABELS[data.recurringFrequency]}
                 </span>{" "}
-                vào{" "}
-                <span className="font-semibold text-gray-900">
-                  {DAY_LABELS[data.recurringDay]}
-                </span>
-                , bắt đầu từ{" "}
-                <span className="font-semibold text-gray-900">
-                  {new Date(data.recurringStartDate).toLocaleDateString(
-                    "vi-VN"
-                  )}
-                </span>
+                {data.recurringFrequency === "monthly" ? (
+                  <>
+                    vào{" "}
+                    <span className="font-semibold text-gray-900">
+                      ngày {data.recurringDay} hàng tháng
+                    </span>
+                  </>
+                ) : (
+                  <>
+                    vào{" "}
+                    <span className="font-semibold text-gray-900">
+                      {DAY_LABELS[data.recurringDay]}
+                    </span>
+                  </>
+                )}
                 , trong{" "}
                 <span className="font-semibold text-gray-900">
                   {DURATION_LABELS[data.recurringDuration]}
