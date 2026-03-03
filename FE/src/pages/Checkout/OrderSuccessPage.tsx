@@ -93,6 +93,8 @@ export default function OrderSuccessPage() {
             try {
               const { orderData: data, orderId: savedDbOrderId, momoOrderId: savedMomoOrderId, subscriptionConfig } = JSON.parse(pendingMoMoOrder);
               console.log('✅ Found MoMo order data in sessionStorage');
+              // Remove immediately to prevent double-execution (React Strict Mode / double useEffect)
+              sessionStorage.removeItem("pendingMoMoOrder");
               resolvedFromSession = true;
               // Fetch fresh delivery info from DB (the actual address filled in by user)
               let mergedData = { ...data };
@@ -132,8 +134,6 @@ export default function OrderSuccessPage() {
               } else {
                 setVerificationStatus("verified");
               }
-
-              sessionStorage.removeItem("pendingMoMoOrder");
             } catch (parseError) {
               console.error('Error parsing pendingMoMoOrder:', parseError);
             }
@@ -184,6 +184,8 @@ export default function OrderSuccessPage() {
         const pendingOrderData = localStorage.getItem("pendingZaloPayOrder");
         if (pendingOrderData) {
           const { orderData: data, appTransId, subscriptionConfig } = JSON.parse(pendingOrderData);
+          // Remove immediately to prevent double-execution (React Strict Mode / double useEffect)
+          localStorage.removeItem("pendingZaloPayOrder");
           setOrderData(data);
           // Create subscription if this was a recurring order
           if (subscriptionConfig) {
@@ -218,7 +220,6 @@ export default function OrderSuccessPage() {
             }
           }
 
-          localStorage.removeItem("pendingZaloPayOrder");
         }
         
         setLoading(false);

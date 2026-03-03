@@ -1,18 +1,43 @@
 import { useState, useEffect, useRef } from 'react';
-import { User, ShoppingBag, LogOut, Phone, Mail, Home, Edit2, Save, X, Camera } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { User, ShoppingBag, LogOut, Phone, Mail, Home, Edit2, Save, X, Camera, CalendarClock } from 'lucide-react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useCart } from '../../context/CartContext';
 import Header from '../../components/Header';
 import { userAPI } from '../Axios/Axios';
 import { toast } from 'sonner';
 import OrderHistoryTab from './OrderHistoryTab';
+import SubscriptionTab from './SubscriptionTab';
 
 export default function Profile() {
   const { user, logout, setUser } = useAuth();
   const { clearLocalCart } = useCart();
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState<'account' | 'orders'>('account');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [activeTab, setActiveTab] = useState<'account' | 'orders' | 'subscriptions'>(
+    (searchParams.get('tab') as any) || 'account'
+  );
+
+  // Redirect to login if not authenticated, preserve full return URL
+  useEffect(() => {
+    if (user === null) {
+      const returnUrl = encodeURIComponent(window.location.pathname + window.location.search);
+      navigate(`/login?redirect=${returnUrl}`, { replace: true });
+    }
+  }, [user, navigate]);
+
+  // Sync tab from URL param
+  useEffect(() => {
+    const t = searchParams.get('tab');
+    if (t === 'orders' || t === 'subscriptions' || t === 'account') {
+      setActiveTab(t);
+    }
+  }, [searchParams]);
+
+  const handleTabChange = (tab: 'account' | 'orders' | 'subscriptions') => {
+    setActiveTab(tab);
+    setSearchParams(tab !== 'account' ? { tab } : {});
+  };
   const [isEditing, setIsEditing] = useState(false);
   const [loading, setLoading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -152,7 +177,7 @@ export default function Profile() {
               {/* Navigation Menu */}
               <nav className="p-4">
                 <button
-                  onClick={() => setActiveTab('account')}
+                  onClick={() => handleTabChange('account')}
                   className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-left transition-all mb-2 ${
                     activeTab === 'account'
                       ? 'bg-[#EDF2EE] text-[#00B207]'
@@ -164,7 +189,7 @@ export default function Profile() {
                 </button>
 
                 <button
-                  onClick={() => setActiveTab('orders')}
+                  onClick={() => handleTabChange('orders')}
                   className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-left transition-all mb-2 ${
                     activeTab === 'orders'
                       ? 'bg-[#EDF2EE] text-[#00B207]'
@@ -173,6 +198,18 @@ export default function Profile() {
                 >
                   <ShoppingBag className="w-5 h-5" />
                   <span className="font-medium">Order History</span>
+                </button>
+
+                <button
+                  onClick={() => handleTabChange('subscriptions')}
+                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-left transition-all mb-2 ${
+                    activeTab === 'subscriptions'
+                      ? 'bg-violet-50 text-violet-700'
+                      : 'text-[#364153] hover:bg-[#F3F4F6]'
+                  }`}
+                >
+                  <CalendarClock className="w-5 h-5" />
+                  <span className="font-medium">Đặt hàng định kỳ</span>
                 </button>
 
                 <button
@@ -402,9 +439,13 @@ export default function Profile() {
             {/* Order History Tab */}
             {activeTab === 'orders' && (
               <div>
-
-                <OrderHistoryTab />
+                <OrderHistoryTab highlightOrderId={searchParams.get('highlight') ?? undefined} />
               </div>
+            )}
+
+            {/* Subscription Tab */}
+            {activeTab === 'subscriptions' && (
+              <SubscriptionTab />
             )}
           </div>
         </div>

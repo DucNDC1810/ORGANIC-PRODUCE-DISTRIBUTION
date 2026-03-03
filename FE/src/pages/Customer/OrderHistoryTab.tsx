@@ -1,13 +1,15 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   ShoppingCart, Package, MapPin, ChevronLeft, ChevronRight,
   Eye, RotateCcw, X, FileText, Ban, AlertTriangle, RefreshCw, Tag, CreditCard,
-  ShoppingBag
+  ShoppingBag, CalendarClock, Repeat2
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useCart } from '../../context/CartContext';
 import { cartService } from '../../services/cartService';
 import { orderService, Order } from '../../services/orderService';
+import momoService from '../../services/momoService';
+import zalopayService from '../../services/zaloPayService';
 import { toast } from 'sonner';
 
 // ─── Extended Order type (includes populated deliveryInfo) ─────
@@ -19,6 +21,8 @@ interface ExtendedOrder extends Order {
     address?: string;
     type?: 'delivery' | 'pickup';
   };
+  // Cron-created subscription orders use 'unpaid' status
+  paymentStatus?: 'pending' | 'paid' | 'failed' | 'unpaid';
 }
 
 // ─── Status / Tab config ────────────────────────────────────────
@@ -197,9 +201,20 @@ function OrderCard({
             <Package className="w-4 h-4 text-[#00B207]" />
           </div>
           <div>
-            <p className="text-sm font-bold text-[#101828] font-mono tracking-wide">
-              #{order._id.slice(-10).toUpperCase()}
-            </p>
+            <div className="flex items-center gap-1.5">
+              <p className="text-sm font-bold text-[#101828] font-mono tracking-wide">
+                #{order._id.slice(-10).toUpperCase()}
+              </p>
+              {order.subscriptionId && (
+                <span
+                  className="inline-flex items-center gap-0.5 text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-violet-50 text-violet-600 border border-violet-200 select-none"
+                  title="Đơn thuộc gói định kỳ"
+                >
+                  <CalendarClock className="w-3 h-3" />
+                  🔁 Định kỳ
+                </span>
+              )}
+            </div>
             <p className="text-xs text-[#9CA3AF] mt-0.5">{formatDate(order.createdAt)}</p>
           </div>
         </div>
@@ -326,9 +341,20 @@ function OrderDetailModal({
         <div className="flex items-start justify-between px-6 py-4 border-b border-[#E5E7EB]">
           <div>
             <h3 className="text-lg font-bold text-[#101828]">Chi tiết đơn hàng</h3>
-            <p className="text-xs text-[#9CA3AF] font-mono mt-0.5">
-              #{order._id.toUpperCase()}
-            </p>
+            <div className="flex items-center gap-1.5 mt-0.5">
+              <p className="text-xs text-[#9CA3AF] font-mono">
+                #{order._id.toUpperCase()}
+              </p>
+              {order.subscriptionId && (
+                <span
+                  className="inline-flex items-center gap-0.5 text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-violet-50 text-violet-600 border border-violet-200 select-none"
+                  title="Đơn thuộc gói định kỳ"
+                >
+                  <CalendarClock className="w-3 h-3" />
+                  🔁 Định kỳ
+                </span>
+              )}
+            </div>
           </div>
           <div className="flex items-center gap-2.5 mt-0.5">
             <StatusBadge status={order.status} />
@@ -606,21 +632,351 @@ function CancelModal({
   );
 }
 
+// ─── Subscription Payment Modal ──────────────────────────────────
+function SubscriptionPaymentModal({
+  order,
+  onClose,
+}: {
+  order: ExtendedOrder;
+  onClose: () => void;
+}) {
+  const [paying, setPaying] = useState(false);
+  const [error, setError] = useState('');
+  const method = (order.paymentMethod ?? '').toLowerCase();
+  const items = order.items ?? [];
+
+  const handleMomo = async () => {
+    setPaying(true);
+    setError('');
+    try {
+      const res = await momoService.createPayment({
+        orderId: order._id,
+        amount: order.totalAmount,
+        description: `Thanh toán đơn định kỳ #${order._id.slice(-8).toUpperCase()}`,
+      }) as any;
+      const data = res?.data?.data ?? res?.data;
+      if (data?.payUrl) {
+        sessionStorage.setItem('pendingMoMoOrder', JSON.stringify({
+          orderData: { orderId: order._id, amount: order.totalAmount, paymentMethod: 'momo' },
+          orderId: data.orderId,
+          paymentId: data.paymentId,
+          momoOrderId: data.momoOrderId,
+          requestId: data.requestId,
+          fromMoMo: true,
+          subscriptionConfig: null,
+        }));
+        window.location.href = data.payUrl;
+      } else {
+        setError('Không lấy được link thanh toán MoMo.');
+      }
+    } catch (err: any) {
+      setError(err?.response?.data?.message ?? 'Lỗi khởi tạo thanh toán MoMo.');
+    } finally {
+      setPaying(false);
+    }
+  };
+
+  const handleZaloPay = async () => {
+    setPaying(true);
+    setError('');
+    try {
+      const res = await zalopayService.initPayment({
+        orderId: order._id,
+        amount: order.totalAmount,
+        description: `Thanh toán đơn định kỳ #${order._id.slice(-8).toUpperCase()}`,
+      }) as any;
+      const data = res?.data?.data ?? res?.data;
+      const redirectUrl = data?.orderUrl ?? data?.checkoutUrl;
+      if (redirectUrl) {
+        localStorage.setItem('pendingZaloPayOrder', JSON.stringify({
+          orderData: { orderId: order._id, amount: order.totalAmount, paymentMethod: 'zalopay' },
+          orderId: data.orderId,
+          paymentId: data.paymentId,
+          apptransid: data.apptransid ?? data.transactionId,
+          subscriptionConfig: null,
+        }));
+        window.location.href = redirectUrl;
+      } else {
+        setError('Không lấy được link thanh toán ZaloPay.');
+      }
+    } catch (err: any) {
+      setError(err?.response?.data?.message ?? 'Lỗi khởi tạo thanh toán ZaloPay.');
+    } finally {
+      setPaying(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-[70] flex items-end sm:items-center justify-center p-0 sm:p-4">
+      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={paying ? undefined : onClose} />
+      <div className="relative bg-white w-full sm:max-w-md sm:rounded-2xl rounded-t-3xl shadow-2xl flex flex-col max-h-[92vh] overflow-hidden animate-in slide-in-from-bottom-6 fade-in duration-300">
+        {/* Drag handle (mobile) */}
+        <div className="flex justify-center pt-3 pb-0 sm:hidden">
+          <div className="w-10 h-1 rounded-full bg-[#E5E7EB]" />
+        </div>
+        {/* Header */}
+        <div className="flex items-center justify-between px-6 py-4 border-b border-[#E5E7EB]">
+          <div>
+            <div className="flex items-center gap-2">
+              <div className="w-7 h-7 rounded-lg bg-violet-100 flex items-center justify-center">
+                <CalendarClock className="w-4 h-4 text-violet-600" />
+              </div>
+              <h3 className="text-base font-bold text-[#101828]">Thanh toán đơn định kỳ</h3>
+            </div>
+            <p className="text-xs text-violet-500 font-mono mt-1 ml-9">
+              #{order._id.slice(-10).toUpperCase()}
+            </p>
+          </div>
+          <button
+            onClick={onClose}
+            disabled={paying}
+            className="w-8 h-8 rounded-xl bg-[#F3F4F6] flex items-center justify-center hover:bg-[#E5E7EB] transition-colors"
+          >
+            <X className="w-4 h-4 text-[#6A7282]" />
+          </button>
+        </div>
+
+        <div className="overflow-y-auto flex-1 px-6 py-4 space-y-4">
+          {/* Items */}
+          <div>
+            <p className="text-xs font-semibold text-[#9CA3AF] uppercase tracking-wide mb-2">
+              Sản phẩm ({items.length})
+            </p>
+            <div className="space-y-2">
+              {items.map((item: any, i: number) => (
+                <div key={i} className="flex items-center gap-3 p-2.5 rounded-xl bg-[#F9FAFB] border border-[#F3F4F6]">
+                  <div className="w-10 h-10 rounded-lg bg-white border border-[#E5E7EB] flex-shrink-0 overflow-hidden">
+                    {getItemImage(item) ? (
+                      <img src={getItemImage(item)} alt={getItemName(item)} className="w-full h-full object-cover" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center">
+                        <Package className="w-4 h-4 text-[#D1D5DB]" />
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-[#101828] truncate">{getItemName(item)}</p>
+                    <p className="text-xs text-[#9CA3AF]">x{item.quantity} · {formatCurrency(item.price)}</p>
+                  </div>
+                  <p className="text-sm font-bold text-[#101828] flex-shrink-0">
+                    {formatCurrency(item.subtotal ?? item.price * item.quantity)}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Total */}
+          <div className="flex items-center justify-between bg-violet-50 border border-violet-100 rounded-xl px-4 py-3">
+            <span className="font-bold text-[#101828]">Tổng thanh toán</span>
+            <span className="text-xl font-extrabold text-violet-600">{formatCurrency(order.totalAmount)}</span>
+          </div>
+
+          {error && (
+            <div className="flex items-center gap-2 bg-red-50 border border-red-100 rounded-xl px-4 py-3">
+              <AlertTriangle className="w-4 h-4 text-red-500 flex-shrink-0" />
+              <p className="text-sm text-red-600">{error}</p>
+            </div>
+          )}
+        </div>
+
+        {/* Payment Buttons */}
+        <div className="px-6 py-4 border-t border-[#E5E7EB] space-y-2.5">
+          {method === 'momo' && (
+            <button
+              onClick={handleMomo}
+              disabled={paying}
+              className="w-full flex items-center justify-center gap-2.5 py-3.5 rounded-xl font-bold text-white text-sm bg-[#AE2070] hover:bg-[#8f1a5c] active:scale-[0.98] transition-all disabled:opacity-60 disabled:cursor-not-allowed shadow-sm"
+            >
+              {paying
+                ? <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                : <img src="https://upload.wikimedia.org/wikipedia/vi/f/fe/MoMo_Logo.png" className="w-5 h-5 rounded-full object-cover" alt="MoMo" />
+              }
+              {paying ? 'Đang xử lý...' : 'Thanh toán qua MoMo'}
+            </button>
+          )}
+          {method === 'zalopay' && (
+            <button
+              onClick={handleZaloPay}
+              disabled={paying}
+              className="w-full flex items-center justify-center gap-2.5 py-3.5 rounded-xl font-bold text-white text-sm bg-[#0068FF] hover:bg-[#0055cc] active:scale-[0.98] transition-all disabled:opacity-60 disabled:cursor-not-allowed shadow-sm"
+            >
+              {paying
+                ? <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                : <span className="w-5 h-5 rounded-full bg-white text-[#0068FF] flex items-center justify-center font-black text-xs">Z</span>
+              }
+              {paying ? 'Đang xử lý...' : 'Thanh toán qua ZaloPay'}
+            </button>
+          )}
+          {method !== 'momo' && method !== 'zalopay' && (
+            <div className="bg-green-50 border border-green-100 rounded-xl px-4 py-3 text-center">
+              <p className="text-sm font-semibold text-green-700">✅ Đơn này thanh toán khi nhận hàng (COD)</p>
+              <p className="text-xs text-green-600 mt-0.5">Không cần thanh toán trước.</p>
+            </div>
+          )}
+          <button
+            onClick={onClose}
+            disabled={paying}
+            className="w-full py-2.5 text-sm font-semibold text-[#6A7282] bg-[#F3F4F6] rounded-xl hover:bg-[#E5E7EB] transition-colors disabled:opacity-50"
+          >
+            Đóng
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Subscription Order Card ──────────────────────────────────────
+function SubscriptionOrderCard({
+  order,
+  onViewDetail,
+  onPay,
+  isHighlighted,
+  cardRef,
+}: {
+  order: ExtendedOrder;
+  onViewDetail: (order: ExtendedOrder) => void;
+  onPay: (order: ExtendedOrder) => void;
+  isHighlighted: boolean;
+  cardRef?: (el: HTMLDivElement | null) => void;
+}) {
+  const firstItem = (order.items ?? [])[0] as any;
+  const extraCount = Math.max(0, (order.items ?? []).length - 1);
+  const thumbnail = firstItem ? getItemImage(firstItem) : '';
+  const firstName = firstItem ? getItemName(firstItem) : 'Sản phẩm';
+  const isUnpaid = order.paymentStatus === 'unpaid';
+
+  return (
+    <div
+      ref={cardRef}
+      className={`rounded-2xl border-2 shadow-sm hover:shadow-md transition-all duration-300 overflow-hidden group
+        ${isHighlighted
+          ? 'border-violet-500 ring-4 ring-violet-100'
+          : 'border-violet-200 hover:border-violet-400'
+        }`}
+    >
+      {/* ── Subscription Banner ── */}
+      <div className="px-5 py-2 bg-gradient-to-r from-violet-600 to-purple-500 flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <Repeat2 className="w-4 h-4 text-white" />
+          <span className="text-xs font-bold text-white tracking-wide">Đơn hàng định kỳ</span>
+        </div>
+        {isUnpaid && (
+          <span className="text-[10px] font-bold text-amber-900 bg-amber-300 px-2 py-0.5 rounded-full">
+            ⚠️ Chưa thanh toán
+          </span>
+        )}
+      </div>
+
+      {/* ── Row 1: ID + Date + Status ── */}
+      <div className="flex items-center justify-between px-5 py-3.5 border-b border-violet-50 bg-violet-50/50">
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8 rounded-lg bg-violet-100 flex items-center justify-center flex-shrink-0">
+            <CalendarClock className="w-4 h-4 text-violet-600" />
+          </div>
+          <div>
+            <p className="text-sm font-bold text-[#101828] font-mono tracking-wide">
+              #{order._id.slice(-10).toUpperCase()}
+            </p>
+            <p className="text-xs text-[#9CA3AF] mt-0.5">{formatDate(order.createdAt)}</p>
+          </div>
+        </div>
+        <StatusBadge status={order.status} />
+      </div>
+
+      {/* ── Unpaid Warning Bar ── */}
+      {isUnpaid && (
+        <div className="flex items-center gap-2 px-5 py-2.5 bg-amber-50 border-b border-amber-100">
+          <AlertTriangle className="w-4 h-4 text-amber-500 flex-shrink-0" />
+          <p className="text-xs font-semibold text-amber-700">
+            Vui lòng thanh toán trước ngày giao để đảm bảo đơn được xử lý.
+          </p>
+        </div>
+      )}
+
+      {/* ── Row 2: Product Preview ── */}
+      <div className="flex items-center gap-4 px-5 py-4 border-b border-[#F3F4F6] bg-white">
+        <div className="w-16 h-16 rounded-xl bg-[#F9FAFB] flex-shrink-0 overflow-hidden border border-[#E5E7EB]">
+          {thumbnail ? (
+            <img
+              src={thumbnail}
+              alt={firstName}
+              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+              onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+            />
+          ) : (
+            <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-violet-50 to-purple-50">
+              <Package className="w-7 h-7 text-violet-200" />
+            </div>
+          )}
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-semibold text-[#101828] truncate">{firstName}</p>
+          <p className="text-xs text-[#6A7282] mt-1">
+            Số lượng:&nbsp;
+            <span className="font-semibold text-[#364153]">{firstItem?.quantity}</span>
+            {extraCount > 0 && (
+              <span className="ml-1.5 text-violet-600 font-semibold">...và {extraCount} sản phẩm khác</span>
+            )}
+          </p>
+          <p className="text-xs text-[#9CA3AF] mt-1 flex items-center gap-1">
+            <CreditCard className="w-3 h-3" />
+            {getPaymentLabel(order.paymentMethod)}
+          </p>
+        </div>
+      </div>
+
+      {/* ── Row 3: Total + Actions ── */}
+      <div className="flex items-end justify-between px-5 py-4 bg-white">
+        <div>
+          <p className="text-xs text-[#9CA3AF] mb-0.5 uppercase tracking-wide">Tổng thanh toán</p>
+          <p className="text-2xl font-extrabold text-violet-600 leading-none">
+            {formatCurrency(order.totalAmount)}
+          </p>
+        </div>
+        <div className="flex flex-col gap-2 items-end">
+          {isUnpaid && (
+            <button
+              onClick={() => onPay(order)}
+              className="flex items-center gap-1.5 px-5 py-2.5 text-sm font-bold text-white bg-violet-600 rounded-xl hover:bg-violet-700 active:scale-95 transition-all shadow-sm shadow-violet-200"
+            >
+              <CreditCard className="w-4 h-4" />
+              Thanh toán ngay
+            </button>
+          )}
+          <button
+            onClick={() => onViewDetail(order)}
+            className="flex items-center gap-1.5 px-4 py-2 text-sm font-semibold text-violet-600 border-2 border-violet-200 rounded-xl hover:bg-violet-50 active:scale-95 transition-all"
+          >
+            <Eye className="w-4 h-4" />
+            Xem chi tiết
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Main Export: OrderHistoryTab ─────────────────────────────────
-export default function OrderHistoryTab() {
+export default function OrderHistoryTab({ highlightOrderId }: { highlightOrderId?: string } = {}) {
   const { refreshCart, openCart } = useCart();
 
-  const [activeStatus, setActiveStatus] = useState('');
-  const [orders, setOrders]             = useState<ExtendedOrder[]>([]);
-  const [loading, setLoading]           = useState(false);
-  const [page, setPage]                 = useState(1);
-  const [totalPages, setTotalPages]     = useState(1);
-  const [detailOrder, setDetailOrder]   = useState<ExtendedOrder | null>(null);
-  const [cancelState, setCancelState]   = useState<{
+  const [activeStatus, setActiveStatus]   = useState('');
+  const [orders, setOrders]               = useState<ExtendedOrder[]>([]);
+  const [loading, setLoading]             = useState(false);
+  const [page, setPage]                   = useState(1);
+  const [totalPages, setTotalPages]       = useState(1);
+  const [detailOrder, setDetailOrder]     = useState<ExtendedOrder | null>(null);
+  const [paymentOrder, setPaymentOrder]   = useState<ExtendedOrder | null>(null);
+  const [cancelState, setCancelState]     = useState<{
     order: ExtendedOrder | null;
     cancelling: boolean;
   }>({ order: null, cancelling: false });
-  const [reordering, setReordering]     = useState(false);
+  const [reordering, setReordering]       = useState(false);
+
+  // Refs for auto-scroll to highlighted card
+  const cardRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
   const fetchOrders = useCallback(async () => {
     try {
@@ -639,10 +995,34 @@ export default function OrderHistoryTab() {
     fetchOrders();
   }, [fetchOrders]);
 
+  // Auto-scroll and open payment modal for highlighted subscription order
+  useEffect(() => {
+    if (!highlightOrderId || loading || orders.length === 0) return;
+    const el = cardRefs.current[highlightOrderId];
+    if (el) {
+      setTimeout(() => {
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        // If the order is a subscription with unpaid status, auto-open payment modal
+        const order = orders.find(o => o._id === highlightOrderId);
+        if (order && (order as any).subscriptionId && order.paymentStatus === 'unpaid') {
+          setTimeout(() => setPaymentOrder(order), 600);
+        }
+      }, 300);
+    }
+  }, [highlightOrderId, loading, orders]);
+
   const handleTabChange = (status: string) => {
     setActiveStatus(status);
     setPage(1);
   };
+
+  // When a highlight link arrives, reset to page 1 so the order is visible
+  useEffect(() => {
+    if (highlightOrderId) {
+      setActiveStatus('');
+      setPage(1);
+    }
+  }, [highlightOrderId]);
 
   const handleReorder = async (order: ExtendedOrder) => {
     if (reordering) return;
@@ -734,14 +1114,26 @@ export default function OrderHistoryTab() {
         <div className="space-y-4">
           {/* Order Cards */}
           {orders.map(order => (
-            <OrderCard
-              key={order._id}
-              order={order}
-              onViewDetail={setDetailOrder}
-              onReorder={handleReorder}
-              onCancel={o => setCancelState({ order: o, cancelling: false })}
-              reordering={reordering}
-            />
+            (order as any).subscriptionId ? (
+              <SubscriptionOrderCard
+                key={order._id}
+                order={order}
+                onViewDetail={setDetailOrder}
+                onPay={setPaymentOrder}
+                isHighlighted={highlightOrderId === order._id}
+                cardRef={(el) => { cardRefs.current[order._id] = el; }}
+              />
+            ) : (
+              <div key={order._id} ref={(el) => { cardRefs.current[order._id] = el; }}>
+                <OrderCard
+                  order={order}
+                  onViewDetail={setDetailOrder}
+                  onReorder={handleReorder}
+                  onCancel={o => setCancelState({ order: o, cancelling: false })}
+                  reordering={reordering}
+                />
+              </div>
+            )
           ))}
 
           {/* ── Pagination ── */}
@@ -786,6 +1178,14 @@ export default function OrderHistoryTab() {
         <OrderDetailModal
           order={detailOrder}
           onClose={() => setDetailOrder(null)}
+        />
+      )}
+
+      {/* ── Subscription Payment Modal ── */}
+      {paymentOrder && (
+        <SubscriptionPaymentModal
+          order={paymentOrder}
+          onClose={() => setPaymentOrder(null)}
         />
       )}
 
