@@ -33,15 +33,4 @@ router.post(
   MoMoController.queryPayment as any
 );
 
-/**
- * @route   POST /api/momo/test-callback
- * @desc    Test callback (simulate MoMo callback) - FOR TESTING ONLY
- * @access  Private
- */
-router.post(
-  '/test-callback',
-  authenticate as any,
-  MoMoController.testCallback as any
-);
-
 export default router;

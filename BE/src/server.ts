@@ -1,6 +1,8 @@
 import dotenv from 'dotenv';
+import http from 'http';
 import app from './app';
 import { connectDB } from './config/database';
+import { initSocket } from './socket';
 
 dotenv.config();
 
@@ -18,7 +20,13 @@ process.on('unhandledRejection', (reason, promise) => {
 // Connect to database
 connectDB();
 
-const server = app.listen(PORT, () => {
+// Wrap Express với http.Server để Socket.io có thể dùng chung cổng
+const server = http.createServer(app);
+
+// Khởi tạo Socket.io
+initSocket(server);
+
+server.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
 });
 

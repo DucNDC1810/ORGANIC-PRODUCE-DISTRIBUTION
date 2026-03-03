@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Star, ThumbsUp } from 'lucide-react';
+import { Star, ThumbsUp, ShoppingBag } from 'lucide-react';
 import { Review, RatingStats } from '../types';
 import { reviewService } from '../services/reviewService';
 import { useAuth } from '../context/AuthContext';
@@ -28,11 +28,15 @@ export const ProductReviews: React.FC<ProductReviewsProps> = ({ productId }) => 
   const [comment, setComment] = useState('');
   const [hoveredRating, setHoveredRating] = useState(0);
 
+  // Can review state
+  const [canReviewData, setCanReviewData] = useState<{ canReview: boolean; reason?: string; hasPurchased: boolean } | null>(null);
+
   useEffect(() => {
     loadReviews();
     loadStats();
     if (user) {
       loadMyReview();
+      loadCanReview();
     }
   }, [productId, page, user]);
 
@@ -72,28 +76,35 @@ export const ProductReviews: React.FC<ProductReviewsProps> = ({ productId }) => 
     }
   };
 
+  const loadCanReview = async () => {
+    try {
+      const data = await reviewService.canReview(productId);
+      setCanReviewData(data);
+    } catch (error: any) {
+      // Silently fail
+    }
+  };
+
   const handleSubmitReview = async (e: React.FormEvent) => {
     e.preventDefault();
     
     if (!user) {
-      toast.error('Vui lòng đăng nhập để đánh giá sản phẩm');
+      toast.error('Please log in to review this product');
       return;
     }
 
     if (!comment.trim()) {
-      toast.error('Vui lòng nhập nội dung đánh giá');
+      toast.error('Please enter your review comment');
       return;
     }
 
     try {
       if (myReview) {
-        // Update existing review
         await reviewService.updateReview(myReview._id, { rating, comment });
-        toast.success('Cập nhật đánh giá thành công!');
+        toast.success('Review updated successfully!');
       } else {
-        // Create new review
         await reviewService.createReview(productId, { rating, comment });
-        toast.success('Đánh giá của bạn đã được gửi!');
+        toast.success('Your review has been submitted!');
       }
       
       setShowForm(false);
@@ -102,23 +113,25 @@ export const ProductReviews: React.FC<ProductReviewsProps> = ({ productId }) => 
       loadReviews();
       loadStats();
       loadMyReview();
+      loadCanReview();
     } catch (error: any) {
-      toast.error(error.response?.data?.error || 'Có lỗi xảy ra');
+      toast.error(error.response?.data?.message || error.response?.data?.error || 'Something went wrong');
     }
   };
 
   const handleDeleteReview = async () => {
-    if (!myReview || !window.confirm('Bạn có chắc muốn xóa đánh giá này?')) return;
+    if (!myReview || !window.confirm('Are you sure you want to delete this review?')) return;
 
     try {
       await reviewService.deleteReview(myReview._id);
-      toast.success('Đã xóa đánh giá');
+      toast.success('Review deleted successfully');
       setMyReview(null);
       setShowForm(false);
       loadReviews();
       loadStats();
+      loadCanReview();
     } catch (error: any) {
-      toast.error(error.response?.data?.error || 'Có lỗi xảy ra');
+      toast.error(error.response?.data?.message || error.response?.data?.error || 'Something went wrong');
     }
   };
 
@@ -152,7 +165,7 @@ export const ProductReviews: React.FC<ProductReviewsProps> = ({ productId }) => 
   };
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('vi-VN', {
+    return new Date(dateString).toLocaleDateString('en-US', {
       year: 'numeric',
       month: 'long',
       day: 'numeric'
@@ -165,7 +178,7 @@ export const ProductReviews: React.FC<ProductReviewsProps> = ({ productId }) => 
       {stats && (
         <Card>
           <CardHeader>
-            <CardTitle>Đánh giá sản phẩm</CardTitle>
+            <CardTitle>Product Reviews</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -177,22 +190,21 @@ export const ProductReviews: React.FC<ProductReviewsProps> = ({ productId }) => 
                   {renderStars(Math.round(stats.averageRating))}
                 </div>
                 <div className="text-gray-600">
-                  {stats.totalReviews} đánh giá
+                  {stats.totalReviews} {stats.totalReviews === 1 ? 'review' : 'reviews'}
                 </div>
               </div>
               
               <div className="space-y-2">
                 {[5, 4, 3, 2, 1].map((stars) => (
                   <div key={stars} className="flex items-center gap-2">
-                    <span className="text-sm w-12">{stars} sao</span>
+                    <span className="text-sm w-16">{stars} {stars === 1 ? 'star' : 'stars'}</span>
                     <div className="flex-1 h-2 bg-gray-200 rounded-full overflow-hidden">
                       <div
                         className="h-full bg-yellow-400"
                         style={{
-                          width: `${
-                            stats.totalReviews > 0
-                              ? (stats.ratingDistribution[stars as keyof typeof stats.ratingDistribution] / stats.totalReviews) * 100
-                              : 0
+                          width: `${stats.totalReviews > 0
+                            ? (stats.ratingDistribution[stars as keyof typeof stats.ratingDistribution] / stats.totalReviews) * 100
+                            : 0
                           }%`
                         }}
                       />
@@ -212,29 +224,41 @@ export const ProductReviews: React.FC<ProductReviewsProps> = ({ productId }) => 
       {user && (
         <Card>
           <CardContent className="pt-6">
-            {!showForm && !myReview && (
+            {/* Not purchased yet - show static message */}
+            {canReviewData && !canReviewData.hasPurchased && !myReview && (
+              <div className="flex items-center gap-3 text-gray-500">
+                <ShoppingBag className="w-5 h-5 flex-shrink-0" />
+                <p className="text-sm">
+                  Purchase this product to leave a review.
+                </p>
+              </div>
+            )}
+
+            {/* Has purchased, not reviewed yet, form not open */}
+            {canReviewData && canReviewData.hasPurchased && !myReview && !showForm && (
               <Button onClick={() => setShowForm(true)} className="w-full">
-                Viết đánh giá
+                Write a Review
               </Button>
             )}
 
+            {/* My existing review */}
             {!showForm && myReview && (
               <div className="space-y-4">
                 <div className="flex justify-between items-start">
                   <div>
-                    <p className="font-semibold">Đánh giá của bạn</p>
+                    <p className="font-semibold">Your Review</p>
                     {renderStars(myReview.rating)}
                   </div>
                   <div className="flex gap-2">
                     <Button variant="outline" size="sm" onClick={() => setShowForm(true)}>
-                      Sửa
+                      Edit
                     </Button>
                     <Button 
                       size="sm" 
                       onClick={handleDeleteReview}
                       className="bg-red-600 hover:bg-red-700 text-white"
                     >
-                      Xóa
+                      Delete
                     </Button>
                   </div>
                 </div>
@@ -242,23 +266,24 @@ export const ProductReviews: React.FC<ProductReviewsProps> = ({ productId }) => 
               </div>
             )}
 
+            {/* Review form */}
             {showForm && (
               <form onSubmit={handleSubmitReview} className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium mb-2">
-                    Đánh giá của bạn
+                    Your Rating
                   </label>
                   {renderStars(rating, true)}
                 </div>
 
                 <div>
                   <label className="block text-sm font-medium mb-2">
-                    Nhận xét
+                    Comment
                   </label>
                   <Textarea
                     value={comment}
                     onChange={(e) => setComment(e.target.value)}
-                    placeholder="Chia sẻ trải nghiệm của bạn về sản phẩm này..."
+                    placeholder="Share your experience with this product..."
                     rows={4}
                     required
                   />
@@ -266,7 +291,7 @@ export const ProductReviews: React.FC<ProductReviewsProps> = ({ productId }) => 
 
                 <div className="flex gap-2">
                   <Button type="submit">
-                    {myReview ? 'Cập nhật' : 'Gửi đánh giá'}
+                    {myReview ? 'Update Review' : 'Submit Review'}
                   </Button>
                   <Button
                     type="button"
@@ -282,7 +307,7 @@ export const ProductReviews: React.FC<ProductReviewsProps> = ({ productId }) => 
                       }
                     }}
                   >
-                    Hủy
+                    Cancel
                   </Button>
                 </div>
               </form>
@@ -294,15 +319,15 @@ export const ProductReviews: React.FC<ProductReviewsProps> = ({ productId }) => 
       {/* Reviews List */}
       <div className="space-y-4">
         <h3 className="text-xl font-semibold">
-          Tất cả đánh giá ({stats?.totalReviews || 0})
+          All Reviews ({stats?.totalReviews || 0})
         </h3>
 
         {loading ? (
-          <div className="text-center py-8">Đang tải...</div>
+          <div className="text-center py-8">Loading...</div>
         ) : reviews.length === 0 ? (
           <Card>
             <CardContent className="py-8 text-center text-gray-500">
-              Chưa có đánh giá nào. Hãy là người đầu tiên đánh giá sản phẩm này!
+              No reviews yet. Be the first to review this product!
             </CardContent>
           </Card>
         ) : (
@@ -325,7 +350,7 @@ export const ProductReviews: React.FC<ProductReviewsProps> = ({ productId }) => 
                           {renderStars(review.rating)}
                           {review.isVerifiedPurchase && (
                             <span className="text-xs text-green-600 bg-green-50 px-2 py-0.5 rounded">
-                              Đã mua hàng
+                              Verified Purchase
                             </span>
                           )}
                         </div>
@@ -356,7 +381,7 @@ export const ProductReviews: React.FC<ProductReviewsProps> = ({ productId }) => 
                         className="flex items-center gap-1 text-sm text-gray-600 hover:text-blue-600"
                       >
                         <ThumbsUp className="w-4 h-4" />
-                        <span>Hữu ích ({review.helpfulCount})</span>
+                        <span>Helpful ({review.helpfulCount})</span>
                       </button>
                     </div>
                   </div>

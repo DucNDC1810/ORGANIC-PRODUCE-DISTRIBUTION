@@ -1,5 +1,6 @@
 import Review, { IReview } from '../models/Review.model';
 import Product from '../models/Product.model';
+import { Order } from '../models/Order.model';
 import { AppError } from '../utils/AppError';
 import mongoose from 'mongoose';
 
@@ -64,8 +65,11 @@ export class ReviewService {
       throw new AppError('You have already reviewed this product', 400);
     }
 
-    // TODO: Kiểm tra user đã mua sản phẩm này chưa (optional)
-    // const hasPurchased = await this.checkUserPurchase(userId, productId);
+    // Kiểm tra user đã mua và nhận sản phẩm này chưa
+    const hasPurchased = await this.checkUserPurchase(userId, productId);
+    if (!hasPurchased) {
+      throw new AppError('You can only review products that you have purchased and received', 403);
+    }
 
     const review = await Review.create({
       user: userId,
@@ -73,12 +77,62 @@ export class ReviewService {
       rating,
       comment,
       images: images || [],
-      isVerifiedPurchase: false // Có thể cập nhật logic này sau
+      isVerifiedPurchase: true // User đã mua và nhận hàng thành công
     });
 
     await review.populate('user', 'name email avatar');
 
     return review;
+  }
+
+  // Kiểm tra user đã mua và nhận sản phẩm chưa
+  private async checkUserPurchase(userId: string, productId: string): Promise<boolean> {
+    const order = await Order.findOne({
+      userId: userId,
+      'items.productId': productId,
+      status: 'delivered' // Chỉ cho phép review khi đơn hàng đã giao thành công
+    });
+
+    return !!order;
+  }
+
+  // Kiểm tra user có thể review sản phẩm không (public method)
+  async canUserReview(userId: string, productId: string): Promise<{ canReview: boolean; reason?: string; hasPurchased: boolean; hasReviewed: boolean }> {
+    // Validate IDs
+    if (!mongoose.Types.ObjectId.isValid(productId)) {
+      throw new AppError('Invalid product ID', 400);
+    }
+    if (!mongoose.Types.ObjectId.isValid(userId)) {
+      throw new AppError('Invalid user ID', 400);
+    }
+
+    // Kiểm tra đã review chưa
+    const existingReview = await Review.findOne({ user: userId, product: productId });
+    if (existingReview) {
+      return {
+        canReview: false,
+        reason: 'You have already reviewed this product',
+        hasPurchased: true,
+        hasReviewed: true
+      };
+    }
+
+    // Kiểm tra đã mua chưa
+    const hasPurchased = await this.checkUserPurchase(userId, productId);
+    if (!hasPurchased) {
+      return {
+        canReview: false,
+        reason: 'You can only review products that you have purchased and received',
+        hasPurchased: false,
+        hasReviewed: false
+      };
+    }
+
+    return {
+      canReview: true,
+      hasPurchased: true,
+      hasReviewed: false
+    };
   }
 
   // Cập nhật review

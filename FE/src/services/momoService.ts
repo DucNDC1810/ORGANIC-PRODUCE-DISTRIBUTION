@@ -60,12 +60,6 @@ export const momoService = {
   // Query payment status
   queryPayment: (payload: MoMoQueryPaymentPayload) =>
     api.post<MoMoQueryPaymentResponse>('/momo/query-payment', payload),
-
-  // Test callback for sandbox/development
-  testCallback: (momoOrderId: string) =>
-    api.post<any>('/momo/test-callback', {
-      momoOrderId,
-    }),
 };
 
 export default momoService;

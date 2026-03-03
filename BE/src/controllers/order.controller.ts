@@ -1,5 +1,6 @@
 import { Response, NextFunction } from 'express';
 import { Order } from '../models/Order.model';
+import { Address } from '../models/Address.model';
 import { AuthRequest } from '../middlewares/auth.middleware';
 import { AppError } from '../utils/AppError';
 
@@ -27,6 +28,8 @@ export class OrderController {
         subtotal += item.subtotal;
       });
 
+      const isCOD = paymentMethod === 'cod';
+
       const order = await Order.create({
         userId,
         addressId: addressId || null,
@@ -34,6 +37,7 @@ export class OrderController {
         voucherId: voucherId || null,
         items,
         paymentMethod: paymentMethod || 'credit_card',
+        paymentStatus: isCOD ? 'unpaid' : 'pending',
         totalAmount: subtotal,
         notes,
         status: 'pending',
@@ -171,7 +175,9 @@ export class OrderController {
       }
 
       // Check if user is owner or admin
-      if (req.user?.role !== 'admin' && req.user?.id !== order.userId.toString()) {
+      // After populate(), userId becomes a User object, so use _id to get the actual ID
+      const orderUserId = (order.userId as any)?._id?.toString() ?? order.userId.toString();
+      if (req.user?.role !== 'admin' && req.user?.id !== orderUserId) {
         throw new AppError('You do not have permission to view this order', 403);
       }
 

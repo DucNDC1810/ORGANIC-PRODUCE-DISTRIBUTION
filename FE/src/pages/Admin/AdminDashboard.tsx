@@ -206,7 +206,15 @@ export default function AdminDashboard() {
                     <p className="text-xs text-gray-500">Administrator</p>
                   </div>
                   <div className="relative">
-                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center text-white font-bold shadow-md ring-2 ring-white">
+                    {user?.avatar ? (
+                      <img
+                        src={user.avatar}
+                        alt={user?.name || 'Admin'}
+                        className="w-10 h-10 rounded-full object-cover shadow-md ring-2 ring-white"
+                        onError={(e) => { e.currentTarget.style.display = 'none'; e.currentTarget.nextElementSibling?.classList.remove('hidden'); }}
+                      />
+                    ) : null}
+                    <div className={`w-10 h-10 rounded-full bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center text-white font-bold shadow-md ring-2 ring-white ${user?.avatar ? 'hidden' : ''}`}>
                       {user?.name?.charAt(0).toUpperCase() || 'A'}
                     </div>
                     <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-green-500 rounded-full border-2 border-white"></div>
@@ -221,7 +229,15 @@ export default function AdminDashboard() {
                   {/* User Info */}
                   <div className="px-4 py-3 border-b border-gray-100">
                     <div className="flex items-center gap-3 mb-2">
-                      <div className="w-12 h-12 rounded-full bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center text-white font-bold shadow-md">
+                      {user?.avatar ? (
+                        <img
+                          src={user.avatar}
+                          alt={user?.name || 'Admin'}
+                          className="w-12 h-12 rounded-full object-cover shadow-md"
+                          onError={(e) => { e.currentTarget.style.display = 'none'; e.currentTarget.nextElementSibling?.classList.remove('hidden'); }}
+                        />
+                      ) : null}
+                      <div className={`w-12 h-12 rounded-full bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center text-white font-bold shadow-md ${user?.avatar ? 'hidden' : ''}`}>
                         {user?.name?.charAt(0).toUpperCase() || 'A'}
                       </div>
                       <div className="flex-1 min-w-0">
@@ -300,6 +316,7 @@ export default function AdminDashboard() {
           onClose={() => setSidebarOpen(false)}
           userName={user?.name || 'Admin User'}
           userRole={user?.role || 'Administrator'}
+          userAvatar={user?.avatar}
           onLogout={handleLogout}
         />
 

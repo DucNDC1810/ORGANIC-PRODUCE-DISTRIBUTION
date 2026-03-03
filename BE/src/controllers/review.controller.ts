@@ -57,6 +57,27 @@ export class ReviewController {
     }
   }
 
+  // GET /api/products/:productId/reviews/can-review - Kiểm tra user có thể review không
+  async canReview(req: Request, res: Response, next: NextFunction) {
+    try {
+      const { productId } = req.params;
+      const userId = (req as any).user?.id;
+
+      if (!userId) {
+        throw new AppError('User not authenticated', 401);
+      }
+
+      const canReview = await reviewService.canUserReview(userId, productId);
+
+      res.status(200).json({
+        success: true,
+        data: canReview
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
   // POST /api/products/:productId/reviews - Tạo review mới
   async createReview(req: Request, res: Response, next: NextFunction) {
     try {

@@ -77,15 +77,6 @@ class MoMoService {
   }
 
   /**
-   * Tạo requestId duy nhất
-   */
-  private generateRequestId(): string {
-    const timestamp = Date.now();
-    const random = Math.floor(Math.random() * 1000000);
-    return `${timestamp}${random}`;
-  }
-
-  /**
    * Tạo link thanh toán MoMo
    * POST /create
    */
@@ -104,34 +95,8 @@ class MoMoService {
       const notifyUrl = `${process.env.API_BASE_URL || 'http://localhost:5000'}/api/momo/callback`;
       const extraData = '';
 
-      console.log('📤 MoMo createPayment request:');
-      console.log('  OrderId:', motoOrderId);
-      console.log('  RequestId:', requestId);
-      console.log('  Amount:', amount, 'VND');
-      console.log('  Description:', description);
-      console.log('  📍 RedirectUrl:', redirectUrl);
-      console.log('  📍 NotifyUrl:', notifyUrl);
-
-      // MoMo v2 gateway signature format (query string):
-      // signature = HmacSHA256(accessKey=xxx&amount=xxx&extraData=xxx&ipnUrl=xxx&orderId=xxx&orderInfo=xxx&partnerCode=xxx&redirectUrl=xxx&requestId=xxx&requestType=xxx, secretKey)
       const rawSignature = `accessKey=${this.config.accessKey}&amount=${amount}&extraData=${extraData}&ipnUrl=${notifyUrl}&orderId=${motoOrderId}&orderInfo=${orderInfo}&partnerCode=${this.config.partnerCode}&redirectUrl=${redirectUrl}&requestId=${requestId}&requestType=${requestType}`;
-
       const signature = this.generateSignature(rawSignature);
-
-      console.log('📝 Signature Debug:');
-      console.log('  accessKey:', this.config.accessKey);
-      console.log('  amount:', amount);
-      console.log('  extraData:', extraData);
-      console.log('  ipnUrl:', notifyUrl);
-      console.log('  orderId:', motoOrderId);
-      console.log('  orderInfo:', orderInfo);
-      console.log('  partnerCode:', this.config.partnerCode);
-      console.log('  redirectUrl:', redirectUrl);
-      console.log('  requestId:', requestId);
-      console.log('  requestType:', requestType);
-      console.log('📝 Full Raw Signature:');
-      console.log('  ', rawSignature);
-      console.log('🔐 Generated Signature:', signature);
 
       const payload = {
         partnerCode: this.config.partnerCode,
@@ -151,9 +116,6 @@ class MoMoService {
         signature,
       };
 
-      console.log('🔐 Signature generated');
-      console.log('📋 Payload:', JSON.stringify(payload, null, 2));
-
       const response = await axios.post<MoMoCreatePaymentResponse>(
         `${this.config.endpoint}/create`,
         payload,
@@ -164,11 +126,6 @@ class MoMoService {
           timeout: 30000, // 30 second timeout to prevent hanging requests
         }
       );
-
-      console.log('📥 MoMo createPayment response:');
-      console.log('  ResultCode:', response.data.resultCode);
-      console.log('  Message:', response.data.message);
-      console.log('  PayUrl:', response.data.payUrl ? response.data.payUrl.substring(0, 50) + '...' : 'N/A');
 
       if (response.data.resultCode !== 0) {
         throw new AppError(
@@ -187,47 +144,6 @@ class MoMoService {
       console.error('❌ MoMo createPayment error:', errorMessage);
       console.error('❌ Error response data:', JSON.stringify(error.response?.data, null, 2));
       console.error('❌ Error status:', error.response?.status);
-      throw new AppError(errorMessage, 500);
-    }
-  }
-
-
-
-  /**
-   * Mock payment for testing (returns fake success response)
-   */
-  async createPaymentMock(
-    amount: number,
-    description: string,
-    orderInfo: string,
-    redirectUrl: string,
-    orderId?: string
-  ): Promise<MoMoCreatePaymentResponse> {
-    try {
-      const motoOrderId = orderId || this.generateOrderId();
-      const requestId = this.generateRequestId();
-
-      console.log('🧪 MOCK MODE - Returning fake MoMo response');
-      console.log('  OrderId:', motoOrderId);
-      console.log('  Amount:', amount);
-
-      // Return mock response with valid structure
-      return {
-        partnerCode: this.config.partnerCode,
-        orderId: motoOrderId,
-        requestId,
-        amount,
-        responseTime: Date.now(),
-        message: 'MOCK SUCCESS',
-        resultCode: 0,
-        payUrl: `https://test-payment.momo.vn/v3/gateway?token=mock_${motoOrderId}`,
-        deeplink: `momo://transaction/payment/mock_${motoOrderId}`,
-        deeplinkWebInApp: `momo://transaction/payment/mock_${motoOrderId}`,
-        qrCodeUrl: 'https://api.momo.vn/qr/mock_qr.png',
-      };
-    } catch (error: any) {
-      const errorMessage = error.message || 'Failed to create mock MoMo payment';
-      console.error('❌ Mock payment error:', errorMessage);
       throw new AppError(errorMessage, 500);
     }
   }
@@ -309,30 +225,6 @@ class MoMoService {
     }
   }
 
-  /**
-   * Parse extraData (base64 encoded JSON)
-   */
-  parseExtraData(extraData: string): any {
-    try {
-      const decoded = Buffer.from(extraData, 'base64').toString('utf-8');
-      return JSON.parse(decoded);
-    } catch (error) {
-      console.error('❌ Error parsing extraData:', error);
-      return null;
-    }
-  }
-
-  /**
-   * Debug method - tính signature để so sánh
-   */
-  calculateSignature(rawSignature: string): string {
-    try {
-      return this.generateSignature(rawSignature);
-    } catch (error) {
-      console.error('❌ Error calculating signature:', error);
-      return '';
-    }
-  }
 }
 
 export default new MoMoService();

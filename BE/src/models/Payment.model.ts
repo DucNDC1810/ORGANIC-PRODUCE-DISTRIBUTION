@@ -64,18 +64,8 @@ const paymentSchema = new Schema<IPayment>(
       min: 0
     },
     metadata: {
-      bankName: {
-        type: String,
-        trim: true
-      },
-      cardLast4: {
-        type: String,
-        trim: true
-      },
-      walletProvider: {
-        type: String,
-        trim: true
-      }
+      type: Schema.Types.Mixed,
+      default: {}
     }
   },
   {

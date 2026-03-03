@@ -15,45 +15,136 @@ import {
 import { motion } from 'framer-motion';
 import Header from '../../components/Header';
 import zalopayService from "../../services/zaloPayService";
+import { orderService } from "../../services/orderService";
+import momoService from "../../services/momoService";
 
 export default function OrderSuccessPage() {
   const location = useLocation();
   const [orderData, setOrderData] = useState<any>(null);
   const [verificationStatus, setVerificationStatus] = useState<"idle" | "verifying" | "verified">("idle");
-  const orderId = location.state?.orderId;
-  const [paymentType, setPaymentType] = useState<"zalopay" | "momo" | null>(null);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string>("");
   
   // Check if coming from ZaloPay return (either from state or localStorage)
   const searchParams = new URLSearchParams(location.search);
+  
+  // Get orderId from URL params (MoMo) or location state
+  const orderIdFromUrl = searchParams.get('orderId');
+  const orderId = orderIdFromUrl || location.state?.orderId;
+  
+  const [paymentType, setPaymentType] = useState<"zalopay" | "momo" | null>(null);
+  
   const isZaloPayReturn = !!searchParams.toString() || location.state?.fromZaloPay;
-  const isMoMoReturn = !!searchParams.get('resultCode') || !!sessionStorage.getItem('pendingMoMoOrder');
+  // Check for MoMo return by checking partnerCode or orderId in URL
+  const isMoMoReturn = searchParams.get('partnerCode') === 'MOMO' || !!searchParams.get('orderId') || !!sessionStorage.getItem('pendingMoMoOrder');
 
   useEffect(() => {
     const verifyAndLoadOrder = async () => {
       try {
+        setLoading(true);
+
+        // ── COD: navigated directly from CheckoutPage ──────────────────────
+        if (location.state?.paymentMethod === "COD") {
+          setPaymentType(null);
+          setVerificationStatus("verified");
+          setOrderData({
+            orderId: location.state.orderId,
+            amount: location.state.totalAmount,
+            paymentMethod: "COD",
+          });
+          setLoading(false);
+          return;
+        }
+
         // Check for MoMo payment first
         const pendingMoMoOrder = sessionStorage.getItem("pendingMoMoOrder");
-        const momoResultCode = searchParams.get('resultCode');
+        const momoOrderIdFromUrl = searchParams.get('orderId');
+        const momoRequestIdFromUrl = searchParams.get('requestId');
+        const partnerCode = searchParams.get('partnerCode');
 
-        if (pendingMoMoOrder) {
+        // If this is a MoMo return
+        if (partnerCode === 'MOMO' || momoOrderIdFromUrl || pendingMoMoOrder) {
           console.log('🔵 Processing MoMo payment...');
-          const { orderData: data, orderId: momoOrderId } = JSON.parse(pendingMoMoOrder);
-          setOrderData(data);
           setPaymentType('momo');
+          setVerificationStatus("verifying");
 
-          // Check result code
-          if (momoResultCode === '0') {
-            console.log('✅ MoMo payment successful');
-            setVerificationStatus("verified");
-          } else if (momoResultCode) {
-            console.log('❌ MoMo payment failed with code:', momoResultCode);
-            setVerificationStatus("verified");
-          } else {
-            // Still processing
-            setVerificationStatus("verifying");
+          // Try to get data from sessionStorage first
+          let resolvedFromSession = false;
+          if (pendingMoMoOrder) {
+            try {
+              const { orderData: data, momoOrderId: savedMomoOrderId } = JSON.parse(pendingMoMoOrder);
+              console.log('✅ Found MoMo order data in sessionStorage');
+              setOrderData(data);
+              resolvedFromSession = true;
+
+              // Query payment status from MoMo
+              const queryId = savedMomoOrderId || momoOrderIdFromUrl;
+              const requestIdForQuery = momoRequestIdFromUrl || queryId;
+              if (queryId) {
+                try {
+                  const statusResponse = await momoService.queryPayment({
+                    momoOrderId: queryId,
+                    requestId: requestIdForQuery,
+                  });
+                  const paymentStatus = (statusResponse as any).data?.paymentStatus || (statusResponse as any).data?.data?.paymentStatus;
+                  console.log('📊 MoMo payment status:', paymentStatus);
+                  setVerificationStatus("verified");
+                } catch (err) {
+                  console.warn('Could not verify MoMo payment status:', err);
+                  setVerificationStatus("verified");
+                }
+              } else {
+                setVerificationStatus("verified");
+              }
+
+              sessionStorage.removeItem("pendingMoMoOrder");
+            } catch (parseError) {
+              console.error('Error parsing pendingMoMoOrder:', parseError);
+            }
           }
+          
+          // If no data from sessionStorage, try to fetch from backend + verify via URL params
+          if (!resolvedFromSession && momoOrderIdFromUrl) {
+            console.log('⚠️ No data in sessionStorage, fetching order:', momoOrderIdFromUrl);
+            try {
+              const orderResponse = await orderService.getOrderById(momoOrderIdFromUrl);
+              if (orderResponse.data?.data) {
+                const order = orderResponse.data.data;
+                setOrderData({
+                  orderId: order._id,
+                  amount: order.totalAmount,
+                  deliveryInfo: order.addressId ? {
+                    address: 'Đang tải...',
+                    phone: 'Đang tải...',
+                    email: 'Đang tải...',
+                  } : null,
+                  notes: order.notes,
+                });
+                console.log('✅ Fetched order from backend');
+              }
+            } catch (err) {
+              console.error('Error fetching order:', err);
+              setError('Không thể tải thông tin đơn hàng');
+            }
 
-          sessionStorage.removeItem("pendingMoMoOrder");
+            // Gọi queryPayment dùng params từ URL (requestId === orderId với MoMo của hệ thống này)
+            const requestIdForQuery = momoRequestIdFromUrl || momoOrderIdFromUrl;
+            try {
+              console.log('🔍 Verifying MoMo payment via URL params...');
+              const statusResponse = await momoService.queryPayment({
+                momoOrderId: momoOrderIdFromUrl,
+                requestId: requestIdForQuery,
+              });
+              const paymentStatus = (statusResponse as any).data?.paymentStatus || (statusResponse as any).paymentStatus;
+              console.log('📊 Payment status from query:', paymentStatus);
+              setVerificationStatus("verified");
+            } catch (err) {
+              console.warn('Could not verify MoMo payment via URL params:', err);
+              setVerificationStatus("verified");
+            }
+          }
+          
+          setLoading(false);
           return;
         }
 
@@ -91,8 +182,12 @@ export default function OrderSuccessPage() {
 
           localStorage.removeItem("pendingZaloPayOrder");
         }
+        
+        setLoading(false);
       } catch (error) {
         console.error("Error loading order data:", error);
+        setError('Có lỗi xảy ra khi tải thông tin đơn hàng');
+        setLoading(false);
       }
     };
 
@@ -134,8 +229,35 @@ export default function OrderSuccessPage() {
     <div className="min-h-screen bg-gradient-to-br from-primary/5 to-transparent">
       <Header />
 
+      {/* Loading overlay */}
+      {loading && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl p-8 text-center shadow-lg">
+            <Loader className="w-12 h-12 text-primary animate-spin mx-auto mb-4" />
+            <p className="text-lg text-gray-600">Đang tải thông tin đơn hàng...</p>
+          </div>
+        </div>
+      )}
+
+      {/* Error overlay */}
+      {error && !loading && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl p-8 text-center shadow-lg max-w-md">
+            <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
+            <p className="text-lg text-gray-800 mb-4">{error}</p>
+            <Link
+              to="/"
+              className="inline-flex items-center justify-center gap-2 px-6 py-2 bg-primary text-white rounded-lg font-semibold hover:bg-primary-dark transition-all"
+            >
+              Về trang chủ
+              <Home className="w-5 h-5" />
+            </Link>
+          </div>
+        </div>
+      )}
+
       {/* Payment verification overlay */}
-      {(isZaloPayReturn || isMoMoReturn) && verificationStatus === "verifying" && (
+      {(isZaloPayReturn || isMoMoReturn) && verificationStatus === "verifying" && !loading && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
           <div className="bg-white rounded-xl p-8 text-center shadow-lg">
             <Loader className="w-12 h-12 text-primary animate-spin mx-auto mb-4" />
@@ -145,6 +267,7 @@ export default function OrderSuccessPage() {
       )}
 
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+        {!loading && !error && orderData && (
         <motion.div
           variants={containerVariants}
           initial="hidden"
@@ -270,10 +393,20 @@ export default function OrderSuccessPage() {
                     <div className="bg-primary/5 rounded-lg p-4 border border-primary/20">
                       <div className="flex items-center justify-between">
                         <span className="text-foreground font-medium">
-                          {paymentType === 'momo' ? 'MoMo' : paymentType === 'zalopay' ? 'ZaloPay' : 'Chưa xác định'}
+                          {orderData?.paymentMethod === "COD"
+                            ? "🚚 Tiền mặt khi giao hàng (COD)"
+                            : paymentType === "momo"
+                              ? "MoMo"
+                              : paymentType === "zalopay"
+                                ? "ZaloPay"
+                                : "Chưa xác định"}
                         </span>
-                        <span className="inline-flex items-center gap-1 text-sm font-medium text-primary bg-primary/10 px-3 py-1 rounded-full">
-                          ✓ Đã Thanh Toán
+                        <span className={`inline-flex items-center gap-1 text-sm font-medium px-3 py-1 rounded-full ${
+                          orderData?.paymentMethod === "COD"
+                            ? "text-orange-600 bg-orange-100"
+                            : "text-primary bg-primary/10"
+                        }`}>
+                          {orderData?.paymentMethod === "COD" ? "⏳ Thanh toán khi nhận hàng" : "✓ Đã Thanh Toán"}
                         </span>
                       </div>
                     </div>
@@ -358,6 +491,7 @@ export default function OrderSuccessPage() {
             </Link>
           </motion.div>
         </motion.div>
+        )}
       </div>
     </div>
   );

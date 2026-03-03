@@ -39,6 +39,9 @@ router.get('/:productId/reviews', reviewController.getProductReviews as any);
 // Get product rating stats (public)
 router.get('/:productId/reviews/stats', reviewController.getProductRatingStats as any);
 
+// Check if user can review (protected)
+router.get('/:productId/reviews/can-review', authenticate as any, reviewController.canReview as any);
+
 // Get my review for a product (protected)
 router.get('/:productId/reviews/my', authenticate as any, reviewController.getMyProductReview as any);
 

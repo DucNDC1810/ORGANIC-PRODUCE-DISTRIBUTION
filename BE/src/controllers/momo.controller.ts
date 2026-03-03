@@ -175,11 +175,13 @@ export class MoMoController {
         console.log('⚠️ MoMo payment failed with resultCode:', resultCode);
         
         // Cập nhật trạng thái thanh toán và đơn hàng thành "failed"
-        const payment = await Payment.findOne({ 'metadata.momoOrderId': orderId });
+        let payment = await Payment.findOne({ 'metadata.momoOrderId': orderId });
+        if (!payment) payment = await Payment.findOne({ transactionId: orderId });
+        if (!payment) payment = await Payment.findOne({ orderId: orderId });
         
         if (payment) {
-          await Payment.findOneAndUpdate(
-            { 'metadata.momoOrderId': orderId },
+          await Payment.findByIdAndUpdate(
+            payment._id,
             { $set: { paymentStatus: 'failed' } },
             { new: true }
           );
@@ -206,8 +208,13 @@ export class MoMoController {
       let payment = await Payment.findOne({ 'metadata.momoOrderId': orderId });
 
       if (!payment) {
-        // Thử tìm từ transactionId
+        // Fallback: tìm từ transactionId
         payment = await Payment.findOne({ transactionId: orderId });
+      }
+
+      if (!payment) {
+        // Fallback: momoOrderId === MongoDB orderId (service dùng finalOrderId làm momo orderId)
+        payment = await Payment.findOne({ orderId: orderId });
       }
 
       if (!payment) {
@@ -227,6 +234,7 @@ export class MoMoController {
           callbackTime: new Date(),
           callbackData: req.body,
         } as any;
+        payment.markModified('metadata');
         await payment.save();
 
         // Cập nhật order status thành "confirmed"
@@ -294,7 +302,15 @@ export class MoMoController {
 
       // Cập nhật payment status nếu thanh toán thành công
       if (paymentStatus === 'paid') {
-        const payment = await Payment.findOne({ 'metadata.momoOrderId': momoOrderId });
+        let payment = await Payment.findOne({ 'metadata.momoOrderId': momoOrderId });
+        // Fallback: momoOrderId === MongoDB orderId (vì service dùng finalOrderId làm momo orderId)
+        if (!payment) {
+          payment = await Payment.findOne({ orderId: momoOrderId });
+        }
+        // Fallback: tìm theo transactionId (requestId === orderId trong service)
+        if (!payment) {
+          payment = await Payment.findOne({ transactionId: momoOrderId });
+        }
         if (payment && payment.paymentStatus !== 'paid') {
           payment.paymentStatus = 'paid';
           payment.metadata = {
@@ -302,6 +318,7 @@ export class MoMoController {
             momoTransId: statusResponse.transId,
             queryTime: new Date(),
           } as any;
+          payment.markModified('metadata');
           await payment.save();
 
           // Cập nhật order status
@@ -336,81 +353,6 @@ export class MoMoController {
     }
   };
 
-  /**
-   * Test callback - Simulate MoMo callback (for testing purposes)
-   * POST /api/momo/test-callback
-   * Body: { momoOrderId: "string" }
-   */
-  testCallback = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
-    try {
-      const { momoOrderId } = req.body;
-
-      if (!momoOrderId) {
-        throw new AppError('momoOrderId is required', 400);
-      }
-
-      console.log('🧪 TEST CALLBACK - Simulating MoMo callback');
-      console.log('  MoMo OrderId:', momoOrderId);
-
-      // Tìm payment
-      const payment = await Payment.findOne({ 'metadata.momoOrderId': momoOrderId });
-
-      if (!payment) {
-        throw new AppError(`Payment not found for momoOrderId: ${momoOrderId}`, 404);
-      }
-
-      console.log('✅ Payment found:', payment._id);
-
-      // Update payment status
-      if (payment.paymentStatus !== 'paid') {
-        payment.paymentStatus = 'paid';
-        payment.metadata = {
-          ...(payment.metadata || {}),
-          momoTransId: 999999999,
-          callbackTime: new Date(),
-          testMode: true,
-        } as any;
-        await payment.save();
-
-        // Update order status
-        const order = await Order.findByIdAndUpdate(
-          payment.orderId,
-          {
-            status: 'confirmed',
-            paymentStatus: 'paid',
-          },
-          { new: true }
-        );
-
-        console.log('✅ TEST - Payment and Order updated to PAID');
-        console.log('  PaymentId:', payment._id);
-        console.log('  OrderId:', order?._id);
-
-        res.status(200).json({
-          success: true,
-          message: 'Test callback successful - Payment status updated to PAID',
-          data: {
-            paymentId: payment._id,
-            orderId: order?._id,
-            paymentStatus: 'paid',
-            orderStatus: order?.status,
-          },
-        });
-      } else {
-        res.status(200).json({
-          success: true,
-          message: 'Payment already paid',
-          data: {
-            paymentId: payment._id,
-            paymentStatus: 'paid',
-          },
-        });
-      }
-    } catch (error) {
-      console.error('❌ Test callback error:', error);
-      next(error);
-    }
-  };
 }
 
 export default new MoMoController();

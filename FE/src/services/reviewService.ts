@@ -44,6 +44,12 @@ export const reviewService = {
     return response.data;
   },
 
+  // Kiểm tra user có thể review sản phẩm không
+  canReview: async (productId: string) => {
+    const response = await api.get<{ canReview: boolean; reason?: string; hasPurchased: boolean; hasReviewed: boolean }>(`/products/${productId}/reviews/can-review`);
+    return response.data;
+  },
+
   // Tạo review cho sản phẩm
   createReview: async (productId: string, data: CreateReviewData) => {
     const response = await api.post<Review>(`/products/${productId}/reviews`, data);

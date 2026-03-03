@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { Toaster } from 'sonner';
 import { CartProvider } from './context/CartContext';
 import { AuthProvider } from './context/AuthContext';
+import { GroupProvider } from './context/GroupContext';
 import { ProtectedRoute, CustomerRoute, AdminRoute, ManagerRoute } from './components/ProtectedRoute';
 import MiniCart from './components/MiniCart';
 import HomePage from './pages/HomePage/Home';
@@ -14,21 +15,26 @@ import ForgotPasswordPage from './pages/HomePage/ForgotPasswordPage';
 import ResetPasswordPage from './pages/HomePage/ResetPasswordPage';
 import AuthCallbackPage from './pages/HomePage/AuthCallbackPage';
 import VerifyEmailPage from './pages/HomePage/VerifyEmailPage';
-import RecipesCooking from './pages/HomePage/RecipesCooking';
 import FarmStories from './pages/HomePage/FarmStories';
-import MarketNewsTips from './pages/HomePage/MarketNewsTips';
+import BlogsPage from './pages/HomePage/BlogsPage';
 import AboutUs from './pages/HomePage/AboutUs';
 import Profile from './pages/Customer/Profile';
 import AdminDashboard from './pages/Admin/AdminDashboard';
 import ManagerDashboard from './pages/Manager/ManagerDashboard';
 import ProductsPage from './pages/HomePage/ProductsPage';
 import ProductDetailPage from './pages/HomePage/ProductDetailPage';
+import ChatWidget from './components/ChatWidget';
+import GroupOrderPage from './pages/GroupOrder/GroupOrderPage';
+import GroupOrderActivePage from './pages/GroupOrder/GroupOrderActivePage';
+import JoinGroupPage from './pages/GroupOrder/JoinGroupPage';
+import GroupMemberPage from './pages/GroupOrder/GroupMemberPage';
 
 export default function App() {
   return (
     <AuthProvider>
       <CartProvider>
-        <BrowserRouter>
+        <GroupProvider>
+          <BrowserRouter>
           <Toaster position="bottom-right" richColors />
           <MiniCart />
           <Routes>
@@ -40,18 +46,24 @@ export default function App() {
             <Route path="/reset-password" element={<ResetPasswordPage />} />
             <Route path="/auth/callback" element={<AuthCallbackPage />} />
             <Route path="/verify-email" element={<VerifyEmailPage />} />
-            <Route path="/blogs/cooking-tips" element={<RecipesCooking />} />
-            <Route path="/blogs/green-living" element={<FarmStories />} />
-            <Route path="/blogs/news-offers" element={<MarketNewsTips />} />
+            <Route path="/blogs/green-living" element={<BlogsPage />} />
+            <Route path="/blogs/news-offers" element={<FarmStories />} />
             <Route path="/about" element={<AboutUs />} />
             <Route path="/products" element={<ProductsPage />} />
             <Route path="/products/:category" element={<ProductsPage />} />
             <Route path="/product/:id" element={<ProductDetailPage />} />
 
             {/* Protected routes - require authentication */}
+            <Route path="/group-order" element={<ProtectedRoute><GroupOrderPage /></ProtectedRoute>} />
+            <Route path="/group-order/active" element={<ProtectedRoute><GroupOrderActivePage /></ProtectedRoute>} />
+            {/* Public invite link – không cần đăng nhập */}
+            <Route path="/join-group/:groupId" element={<JoinGroupPage />} />
+            {/* Trang xem nhóm cho thành viên – không cần đăng nhập */}
+            <Route path="/group/members" element={<GroupMemberPage />} />
             <Route path="/cart" element={<ProtectedRoute><CartPage /></ProtectedRoute>} />
             <Route path="/checkout" element={<ProtectedRoute><CheckoutPage /></ProtectedRoute>} />
             <Route path="/order-success" element={<ProtectedRoute><OrderSuccessPage /></ProtectedRoute>} />
+            <Route path="/payment-result" element={<ProtectedRoute><OrderSuccessPage /></ProtectedRoute>} />
             {/* Customer-only routes */}
             <Route path="/profile" element={<CustomerRoute> <Profile /></CustomerRoute>} />
 
@@ -60,7 +72,9 @@ export default function App() {
             {/* Manager-only routes */}
             <Route path="/manager" element={<ManagerRoute><ManagerDashboard /></ManagerRoute>} />
           </Routes>
-        </BrowserRouter>
+          <ChatWidget />
+          </BrowserRouter>
+        </GroupProvider>
       </CartProvider>
     </AuthProvider>
   );
