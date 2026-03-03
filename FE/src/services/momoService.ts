@@ -13,6 +13,14 @@ export interface MoMoCreatePaymentPayload {
     address: string;
     type: 'delivery' | 'pickup';
   };
+  items?: Array<{
+    productId: string;
+    quantity: number;
+    price: number;
+    subtotal: number;
+  }>;
+  notes?: string;
+  pickupLocation?: { name: string; address: string };
 }
 
 export interface MoMoCreatePaymentResponse {

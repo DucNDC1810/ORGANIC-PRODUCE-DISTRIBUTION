@@ -11,7 +11,10 @@ import {
   ArrowRight,
   Loader,
   AlertCircle,
-  User
+  User,
+  Navigation2,
+  Store,
+  Repeat
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import Header from '../../components/Header';
@@ -20,12 +23,45 @@ import { orderService } from "../../services/orderService";
 import momoService from "../../services/momoService";
 import subscriptionService from "../../services/subscriptionService";
 
+const CONFETTI_COLORS = [
+  '#22c55e', '#16a34a', '#4ade80', '#86efac',
+  '#fbbf24', '#f59e0b', '#60a5fa', '#a78bfa', '#f472b6',
+];
+
+const WEEKDAYS = ['Chủ Nhật', 'Thứ Hai', 'Thứ Ba', 'Thứ Tư', 'Thứ Năm', 'Thứ Sáu', 'Thứ Bảy'];
+
+function getDeliveryScheduleLabel(config: any): string {
+  if (!config) return '';
+  if (config.frequency === 'weekly')
+    return `Hàng tuần vào ${WEEKDAYS[config.deliveryDay] ?? ''}`;
+  if (config.frequency === 'bi-weekly')
+    return `Mỗi 2 tuần vào ${WEEKDAYS[config.deliveryDay] ?? ''}`;
+  if (config.frequency === 'monthly')
+    return `Hàng tháng vào ngày ${config.deliveryDay}`;
+  return config.frequency ?? '';
+}
+
 export default function OrderSuccessPage() {
   const location = useLocation();
   const [orderData, setOrderData] = useState<any>(null);
+  const [subscriptionConfig, setSubscriptionConfig] = useState<any>(null);
   const [verificationStatus, setVerificationStatus] = useState<"idle" | "verifying" | "verified">("idle");
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string>("");
+
+  // Generate confetti particles once on mount
+  const [confettiPieces] = useState(() =>
+    Array.from({ length: 55 }, (_, i) => ({
+      id: i,
+      x: Math.random() * 100,
+      delay: Math.random() * 1.0,
+      color: CONFETTI_COLORS[Math.floor(Math.random() * CONFETTI_COLORS.length)],
+      duration: 2.4 + Math.random() * 1.6,
+      rotate: Math.random() > 0.5 ? 360 : -360,
+      drift: (Math.random() - 0.5) * 120,
+      isCircle: Math.random() > 0.6,
+    }))
+  );
   
   // Check if coming from ZaloPay return (either from state or localStorage)
   const searchParams = new URLSearchParams(location.search);
@@ -50,26 +86,42 @@ export default function OrderSuccessPage() {
           setPaymentType(null);
           setVerificationStatus("verified");
           const codOrderId = location.state.orderId;
-          // Fetch full order to populate deliveryInfo
+
+          // Capture subscription config if this was a recurring COD order
+          if (location.state.subscriptionConfig) {
+            setSubscriptionConfig(location.state.subscriptionConfig);
+          }
+
+          // Seed immediately from navigate state so the page renders right away
+          const stateDeliveryInfo = location.state.deliveryInfo || null;
+          const statePickupLocation = location.state.pickupLocation || null;
+          setOrderData({
+            orderId: codOrderId,
+            amount: location.state.totalAmount,
+            paymentMethod: "COD",
+            deliveryInfo: stateDeliveryInfo,
+            pickupLocation: statePickupLocation,
+          });
+
+          // Also fetch full order from DB to confirm and fill any missing fields
           if (codOrderId) {
             try {
               const orderRes = await orderService.getOrderById(codOrderId);
               if (orderRes.data?.data) {
                 const order = orderRes.data.data;
+                const dbDeliveryInfo = (order as any).deliveryInfo || stateDeliveryInfo;
+                // Prefer DB address (contains full province/district/ward text), but fall back to state
                 setOrderData({
                   orderId: order._id,
                   amount: order.totalAmount,
                   paymentMethod: "COD",
-                  deliveryInfo: (order as any).deliveryInfo || null,
+                  deliveryInfo: dbDeliveryInfo,
+                  pickupLocation: (order as any).pickupLocation || statePickupLocation,
                 });
-              } else {
-                setOrderData({ orderId: codOrderId, amount: location.state.totalAmount, paymentMethod: "COD" });
               }
             } catch {
-              setOrderData({ orderId: codOrderId, amount: location.state.totalAmount, paymentMethod: "COD" });
+              // Non-fatal — already seeded from state above
             }
-          } else {
-            setOrderData({ orderId: location.state.orderId, amount: location.state.totalAmount, paymentMethod: "COD" });
           }
           setLoading(false);
           return;
@@ -103,11 +155,19 @@ export default function OrderSuccessPage() {
                 try {
                   const orderRes = await orderService.getOrderById(fetchId);
                   if (orderRes.data?.data) {
-                    mergedData = { ...mergedData, deliveryInfo: (orderRes.data.data as any).deliveryInfo || data.deliveryInfo };
+                    mergedData = {
+                      ...mergedData,
+                      deliveryInfo: (orderRes.data.data as any).deliveryInfo || data.deliveryInfo,
+                      pickupLocation: (orderRes.data.data as any).pickupLocation || data.pickupLocation,
+                    };
                   }
                 } catch { /* non-fatal — fall back to cached data */ }
               }
               setOrderData(mergedData);
+              // Capture subscription config for UI display
+              if (subscriptionConfig) {
+                setSubscriptionConfig(subscriptionConfig);
+              }
               // Create subscription if this was a recurring order
               if (subscriptionConfig) {
                 subscriptionService.createSubscription(subscriptionConfig).catch((err) =>
@@ -149,8 +209,7 @@ export default function OrderSuccessPage() {
                 setOrderData({
                   orderId: order._id,
                   amount: order.totalAmount,
-                  deliveryInfo: (order as any).deliveryInfo || null,
-                  notes: order.notes,
+                  deliveryInfo: (order as any).deliveryInfo || null,                  pickupLocation: (order as any).pickupLocation || null,                  notes: order.notes,
                 });
                 console.log('✅ Fetched order from backend');
               }
@@ -183,13 +242,17 @@ export default function OrderSuccessPage() {
         // Get pending order data from localStorage if exists (ZaloPay)
         const pendingOrderData = localStorage.getItem("pendingZaloPayOrder");
         if (pendingOrderData) {
-          const { orderData: data, appTransId, subscriptionConfig } = JSON.parse(pendingOrderData);
+          const { orderData: data, appTransId, subscriptionConfig: zaloSubConfig } = JSON.parse(pendingOrderData);
           // Remove immediately to prevent double-execution (React Strict Mode / double useEffect)
           localStorage.removeItem("pendingZaloPayOrder");
           setOrderData(data);
+          // Capture subscription config for UI display
+          if (zaloSubConfig) {
+            setSubscriptionConfig(zaloSubConfig);
+          }
           // Create subscription if this was a recurring order
-          if (subscriptionConfig) {
-            subscriptionService.createSubscription(subscriptionConfig).catch((err) =>
+          if (zaloSubConfig) {
+            subscriptionService.createSubscription(zaloSubConfig).catch((err) =>
               console.warn('Subscription creation failed (ZaloPay):', err)
             );
           }
@@ -233,6 +296,8 @@ export default function OrderSuccessPage() {
     verifyAndLoadOrder();
   }, [isZaloPayReturn]);
 
+  const isPickup = orderData?.deliveryInfo?.type === 'pickup';
+
   const getEstimatedDeliveryDate = () => {
     const deliveryDate = new Date();
     deliveryDate.setDate(deliveryDate.getDate() + 3);
@@ -268,7 +333,34 @@ export default function OrderSuccessPage() {
     <div className="min-h-screen bg-gradient-to-br from-primary/5 to-transparent">
       <Header />
 
-      {/* Loading overlay */}
+      {/* Confetti — shown once page finishes loading */}
+      {!loading && !error && orderData && confettiPieces.map((piece) => (
+        <motion.div
+          key={piece.id}
+          className="fixed pointer-events-none z-[60]"
+          style={{
+            left: `${piece.x}%`,
+            top: -14,
+            width: piece.isCircle ? '9px' : '6px',
+            height: piece.isCircle ? '9px' : '13px',
+            borderRadius: piece.isCircle ? '50%' : '3px',
+            backgroundColor: piece.color,
+          }}
+          initial={{ y: 0, rotate: 0, opacity: 1, x: 0 }}
+          animate={{
+            y: '110vh',
+            rotate: piece.rotate,
+            x: piece.drift,
+            opacity: [1, 1, 0.8, 0],
+          }}
+          transition={{
+            duration: piece.duration,
+            delay: piece.delay,
+            ease: 'easeIn',
+          }}
+        />
+      ))}
+
       {loading && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
           <div className="bg-white rounded-xl p-8 text-center shadow-lg">
@@ -338,12 +430,14 @@ export default function OrderSuccessPage() {
               Đơn Hàng Đã Xác Nhận!
             </h1>
             <p className="text-lg text-muted-foreground max-w-xl mx-auto">
-              Cảm ơn bạn đã đặt hàng. Chúng tôi sẽ sớm xử lý và gửi đơn hàng của bạn.
+              {isPickup
+                ? 'Cảm ơn bạn đã đặt hàng. Đơn hàng của bạn đã sẵn sàng để nhận tại cửa hàng.'
+                : 'Cảm ơn bạn đã đặt hàng. Chúng tôi sẽ sớm xử lý và gửi đơn hàng của bạn.'}
             </p>
           </motion.div>
 
           {/* Order Confirmation Cards */}
-          <motion.div variants={itemVariants} className="grid md:grid-cols-3 gap-4">
+          <motion.div variants={itemVariants} className={`grid gap-4 ${subscriptionConfig ? 'md:grid-cols-4' : 'md:grid-cols-3'}`}>
             {/* Order Number */}
             <div className="bg-white rounded-xl p-6 shadow-sm border border-border hover:shadow-md transition-shadow">
               <div className="text-sm text-muted-foreground mb-2">Mã Đơn Hàng</div>
@@ -363,16 +457,34 @@ export default function OrderSuccessPage() {
               </div>
             </div>
 
-            {/* Estimated Delivery */}
+            {/* Estimated Delivery / Pickup Time */}
             <div className="bg-white rounded-xl p-6 shadow-sm border border-border hover:shadow-md transition-shadow">
               <div className="flex items-center gap-2 text-sm text-muted-foreground mb-2">
-                <Package className="w-4 h-4" />
-                Giao Hàng Dự Kiến
+                {isPickup ? <Store className="w-4 h-4" /> : <Package className="w-4 h-4" />}
+                {isPickup ? 'Thời Gian Nhận Hàng' : 'Giao Hàng Dự Kiến'}
               </div>
               <div className="text-lg font-semibold text-primary">
-                {getEstimatedDeliveryDate()}
+                {isPickup ? 'Hôm nay, 8:00 – 20:00' : getEstimatedDeliveryDate()}
               </div>
             </div>
+
+            {/* Subscription delivery schedule card */}
+            {subscriptionConfig && (
+              <div className="bg-green-50 rounded-xl p-6 shadow-sm border border-green-200 hover:shadow-md transition-shadow">
+                <div className="flex items-center gap-2 text-sm text-green-700 mb-2">
+                  <Repeat className="w-4 h-4" />
+                  Chu kỳ giao hàng
+                </div>
+                <div className="text-base font-semibold text-green-800 leading-snug">
+                  {getDeliveryScheduleLabel(subscriptionConfig)}
+                </div>
+                {subscriptionConfig.nextDeliveryDate && (
+                  <div className="text-xs text-green-600 mt-1">
+                    Giao lần tiếp: {new Date(subscriptionConfig.nextDeliveryDate).toLocaleDateString('vi-VN')}
+                  </div>
+                )}
+              </div>
+            )}
           </motion.div>
 
           {/* Main Content Cards */}
@@ -417,16 +529,52 @@ export default function OrderSuccessPage() {
                             </div>
                           </div>
                         )}
-                        {orderData.deliveryInfo.address && (
-                          <div className="flex items-start gap-3">
-                            <MapPin className="w-5 h-5 text-primary flex-shrink-0 mt-0.5" />
-                            <div>
-                              <div className="text-muted-foreground">Địa Chỉ</div>
-                              <div className="text-foreground font-medium">
-                                {orderData.deliveryInfo.address}
+                        {isPickup ? (
+                          <>
+                            {orderData.pickupLocation?.name && (
+                              <div className="flex items-start gap-3">
+                                <Store className="w-5 h-5 text-primary flex-shrink-0 mt-0.5" />
+                                <div>
+                                  <div className="text-muted-foreground">Cửa Hàng</div>
+                                  <div className="text-foreground font-medium">
+                                    {orderData.pickupLocation.name}
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+                            {orderData.pickupLocation?.address && (
+                              <div className="flex items-start gap-3">
+                                <MapPin className="w-5 h-5 text-primary flex-shrink-0 mt-0.5" />
+                                <div>
+                                  <div className="text-muted-foreground">Địa Chỉ Cửa Hàng</div>
+                                  <div className="text-foreground font-medium">
+                                    {orderData.pickupLocation.address}
+                                  </div>
+                                  <a
+                                    href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(orderData.pickupLocation.address)}`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="inline-flex items-center gap-1.5 mt-2 text-sm font-semibold text-primary hover:underline"
+                                  >
+                                    <Navigation2 className="w-4 h-4" />
+                                    Xem đường đi
+                                  </a>
+                                </div>
+                              </div>
+                            )}
+                          </>
+                        ) : (
+                          orderData.deliveryInfo.address && (
+                            <div className="flex items-start gap-3">
+                              <MapPin className="w-5 h-5 text-primary flex-shrink-0 mt-0.5" />
+                              <div>
+                                <div className="text-muted-foreground">Địa Chỉ</div>
+                                <div className="text-foreground font-medium">
+                                  {orderData.deliveryInfo.address}
+                                </div>
                               </div>
                             </div>
-                          </div>
+                          )
                         )}
                         {orderData.deliveryInfo.email && (
                           <div className="flex items-start gap-3">
@@ -492,7 +640,7 @@ export default function OrderSuccessPage() {
                   <div className="space-y-3 text-sm">
                     <div className="flex justify-between text-muted-foreground">
                       <span>Tạm Tính</span>
-                      <span>{orderData?.amount ? (orderData.amount * 0.9).toLocaleString('vi-VN') : '0'} ₫</span>
+                      <span>{orderData?.amount ? (orderData.amount * (subscriptionConfig ? (1 / 0.95) * 0.9 : 0.9)).toLocaleString('vi-VN') : '0'} ₫</span>
                     </div>
                     <div className="flex justify-between text-muted-foreground">
                       <span>Phí Vận Chuyển</span>
@@ -502,6 +650,15 @@ export default function OrderSuccessPage() {
                       <span>VAT (4.76%)</span>
                       <span>{orderData?.amount ? (orderData.amount * 0.048).toLocaleString('vi-VN') : '0'} ₫</span>
                     </div>
+                    {subscriptionConfig && (
+                      <div className="flex justify-between text-green-600 font-medium">
+                        <span className="flex items-center gap-1">
+                          <Repeat className="w-3 h-3" />
+                          Chiết khấu định kỳ (5%)
+                        </span>
+                        <span>-{orderData?.amount ? (orderData.amount * 0.05).toLocaleString('vi-VN') : '0'} ₫</span>
+                      </div>
+                    )}
                   </div>
                   <div className="border-t border-border pt-4">
                     <div className="flex justify-between">
@@ -526,6 +683,21 @@ export default function OrderSuccessPage() {
             </motion.div>
           </div>
 
+          {/* Pickup Counter Instruction */}
+          {isPickup && (
+            <motion.div variants={itemVariants}>
+              <div className="bg-amber-50 border border-amber-300 rounded-xl p-4 flex items-start gap-3">
+                <span className="text-2xl leading-none">🏪</span>
+                <div>
+                  <p className="text-sm font-semibold text-amber-800 mb-1">Lưu ý khi nhận hàng tại cửa hàng</p>
+                  <p className="text-sm text-amber-700 leading-relaxed">
+                    Vui lòng đưa mã đơn hàng <span className="font-bold text-amber-900">{orderId?.substring(0, 12)}</span> cho nhân viên tại quầy để nhận hàng.
+                  </p>
+                </div>
+              </div>
+            </motion.div>
+          )}
+
           {/* Action Buttons */}
           <motion.div
             variants={itemVariants}
@@ -539,11 +711,11 @@ export default function OrderSuccessPage() {
               <ArrowRight className="w-5 h-5" />
             </Link>
             <Link
-              to="/profile"
+              to="/profile?tab=orders"
               className="inline-flex items-center justify-center gap-2 px-8 py-3 bg-white border-2 border-primary text-primary rounded-xl font-semibold hover:bg-primary/5 transition-all"
             >
               Xem Lịch Sử Đơn Hàng
-              <Home className="w-5 h-5" />
+              <Package className="w-5 h-5" />
             </Link>
           </motion.div>
         </motion.div>

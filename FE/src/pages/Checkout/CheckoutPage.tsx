@@ -311,10 +311,16 @@ export default function CheckoutPage() {
       recurringData.recurringFrequency === "monthly"
         ? parseInt(recurringData.recurringDay)
         : weekdayToNum[recurringData.recurringDay] ?? 1;
+    // Ưu tiên dùng firstDeliveryDate đã được tính sẵn trong Modal;
+    // fallback về recurringStartDate nếu chưa có (tương thích ngược).
+    const nextDelivery = recurringData.firstDeliveryDate
+      ? new Date(recurringData.firstDeliveryDate)
+      : new Date(recurringData.recurringStartDate);
+
     return {
       frequency: frequencyMap[recurringData.recurringFrequency],
       deliveryDay,
-      nextDeliveryDate: new Date(recurringData.recurringStartDate).toISOString(),
+      nextDeliveryDate: nextDelivery.toISOString(),
       items: cart.map((item) => ({
         productId: item.id,
         quantity: item.quantity,
@@ -349,6 +355,9 @@ export default function CheckoutPage() {
             address: builtAddress,
             type: deliveryType,
           },
+          ...(deliveryType === 'pickup' && selectedStore
+            ? { pickupLocation: { name: selectedStore.name, address: selectedStore.address } }
+            : {}),
           items: cart.map((item) => ({
             productId: item.id,
             quantity: item.quantity,
@@ -449,6 +458,9 @@ export default function CheckoutPage() {
             address: momoBuiltAddress,
             type: deliveryType,
           },
+          ...(deliveryType === 'pickup' && selectedStore
+            ? { pickupLocation: { name: selectedStore.name, address: selectedStore.address } }
+            : {}),
           items: cart.map((item) => ({
             productId: item.id,
             quantity: item.quantity,
@@ -475,6 +487,16 @@ export default function CheckoutPage() {
             address: momoBuiltAddress,
             type: deliveryType,
           },
+          items: cart.map((item) => ({
+            productId: item.id,
+            quantity: item.quantity,
+            price: item.price,
+            subtotal: item.price * item.quantity,
+          })),
+          notes: formData.notes || undefined,
+          ...(deliveryType === 'pickup' && selectedStore
+            ? { pickupLocation: { name: selectedStore.name, address: selectedStore.address } }
+            : {}),
         });
 
         const momoResponse = response as any;
@@ -534,6 +556,9 @@ export default function CheckoutPage() {
             address: codBuiltAddress,
             type: deliveryType,
           },
+          ...(deliveryType === 'pickup' && selectedStore
+            ? { pickupLocation: { name: selectedStore.name, address: selectedStore.address } }
+            : {}),
           items: cart.map((item) => ({
             productId: item.id,
             quantity: item.quantity,
@@ -571,10 +596,23 @@ export default function CheckoutPage() {
           }
           navigate("/order-success", {
             state: {
-              orderId: result?.data?._id,
+              orderId: result?._id || result?.data?._id,
               paymentMethod: "COD",
               totalAmount: total,
               isRecurring: isRecurringOrder,
+              subscriptionConfig: isRecurringOrder ? buildSubscriptionPayload() : null,
+              deliveryType,
+              pickupLocation:
+                deliveryType === "pickup" && selectedStore
+                  ? { name: selectedStore.name, address: selectedStore.address }
+                  : null,
+              deliveryInfo: {
+                fullName: formData.fullName,
+                phone: formData.phone,
+                email: formData.email,
+                address: codBuiltAddress,
+                type: deliveryType,
+              },
             },
           });
         } else {

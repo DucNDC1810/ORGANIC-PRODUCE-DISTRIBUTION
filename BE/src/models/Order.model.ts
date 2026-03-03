@@ -22,6 +22,10 @@ export interface IOrder extends Document {
     address?: string;
     type?: 'delivery' | 'pickup';
   };
+  pickupLocation?: {
+    name?: string;
+    address?: string;
+  };
   paymentMethod?: string;
   paymentStatus?: 'pending' | 'paid' | 'failed' | 'unpaid';
   shippingCost?: number;
@@ -131,6 +135,16 @@ const orderSchema = new Schema<IOrder>(
         type: String,
         enum: ['delivery', 'pickup'],
         default: 'delivery'
+      }
+    },
+    pickupLocation: {
+      name: {
+        type: String,
+        trim: true
+      },
+      address: {
+        type: String,
+        trim: true
       }
     },
     shippingCost: {

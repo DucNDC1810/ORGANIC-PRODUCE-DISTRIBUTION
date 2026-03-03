@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   ShoppingCart, Package, MapPin, ChevronLeft, ChevronRight,
   Eye, RotateCcw, X, FileText, Ban, AlertTriangle, RefreshCw, Tag, CreditCard,
-  ShoppingBag, CalendarClock, Repeat2
+  ShoppingBag, CalendarClock, Repeat2, Store, Navigation2
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useCart } from '../../context/CartContext';
@@ -20,6 +20,10 @@ interface ExtendedOrder extends Order {
     email?: string;
     address?: string;
     type?: 'delivery' | 'pickup';
+  };
+  pickupLocation?: {
+    name?: string;
+    address?: string;
   };
   // Cron-created subscription orders use 'unpaid' status
   paymentStatus?: 'pending' | 'paid' | 'failed' | 'unpaid';
@@ -59,7 +63,7 @@ const PAYMENT_LABELS: Record<string, string> = {
 
 // ─── Utility helpers ────────────────────────────────────────────
 const getItemName  = (item: any) => item?.name    || item?.productId?.name            || 'Sản phẩm';
-const getItemImage = (item: any) => item?.image   || item?.productId?.imageUrls?.[0] || item?.productId?.image || '';
+const getItemImage = (item: any) => item?.image || item?.productId?.thumbnail || item?.productId?.imageUrls?.[0] || item?.productId?.image || '';
 const getProductId = (item: any) =>
   !item ? null : typeof item.productId === 'object' ? item.productId?._id : item.productId;
 
@@ -186,10 +190,11 @@ function OrderCard({
   onCancel: (order: ExtendedOrder) => void;
   reordering: boolean;
 }) {
-  const firstItem = (order.items ?? [])[0] as any;
-  const extraCount = Math.max(0, (order.items ?? []).length - 1);
+  const hasItems = order.items && order.items.length > 0;
+  const firstItem = hasItems ? (order.items as any[])[0] : null;
+  const extraCount = hasItems ? Math.max(0, (order.items ?? []).length - 1) : 0;
   const thumbnail = firstItem ? getItemImage(firstItem) : '';
-  const firstName = firstItem ? getItemName(firstItem) : 'Sản phẩm';
+  const firstName = firstItem ? getItemName(firstItem) : '';
 
   return (
     <div className="bg-white rounded-2xl border border-[#E5E7EB] shadow-sm hover:shadow-md transition-all duration-200 overflow-hidden group">
@@ -225,7 +230,7 @@ function OrderCard({
       <div className="flex items-center gap-4 px-5 py-4 border-b border-[#F3F4F6]">
         {/* Thumbnail */}
         <div className="w-16 h-16 rounded-xl bg-[#F9FAFB] flex-shrink-0 overflow-hidden border border-[#E5E7EB]">
-          {thumbnail ? (
+          {hasItems && thumbnail ? (
             <img
               src={thumbnail}
               alt={firstName}
@@ -240,16 +245,25 @@ function OrderCard({
         </div>
 
         <div className="flex-1 min-w-0">
-          <p className="text-sm font-semibold text-[#101828] truncate">{firstName}</p>
-          <p className="text-xs text-[#6A7282] mt-1">
-            Số lượng:&nbsp;
-            <span className="font-semibold text-[#364153]">{firstItem?.quantity}</span>
-            {extraCount > 0 && (
-              <span className="ml-1.5 text-[#00B207] font-semibold">
-                ...và {extraCount} sản phẩm khác
-              </span>
-            )}
-          </p>
+          {hasItems ? (
+            <>
+              <p className="text-sm font-semibold text-[#101828] truncate">{firstName}</p>
+              <p className="text-xs text-[#6A7282] mt-1">
+                Số lượng:&nbsp;
+                <span className="font-semibold text-[#364153]">{firstItem?.quantity}</span>
+                {extraCount > 0 && (
+                  <span className="ml-1.5 text-[#00B207] font-semibold">
+                    ...và {extraCount} sản phẩm khác
+                  </span>
+                )}
+              </p>
+            </>
+          ) : (
+            <p className="text-sm text-[#9CA3AF] flex items-center gap-1.5">
+              <Package className="w-3.5 h-3.5" />
+              Sản phẩm
+            </p>
+          )}
           {order.notes && (
             <p className="text-xs text-[#9CA3AF] mt-1.5 italic truncate flex items-center gap-1">
               <FileText className="w-3 h-3 flex-shrink-0" />
@@ -271,6 +285,19 @@ function OrderCard({
             <CreditCard className="w-3 h-3" />
             {getPaymentLabel(order.paymentMethod)}
           </p>
+          {(order as any).deliveryInfo?.type === 'pickup' && (
+            <span className="inline-flex items-center gap-1 mt-2 text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
+              <Store className="w-3 h-3" />
+              Nhận tại cửa hàng
+            </span>
+          )}
+          {((order as any).deliveryInfo?.type === 'delivery' ||
+            ((order as any).deliveryInfo && (order as any).deliveryInfo.type !== 'pickup')) && (
+            <span className="inline-flex items-center gap-1 mt-2 text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200">
+              <MapPin className="w-3 h-3" />
+              Giao tận nơi
+            </span>
+          )}
         </div>
 
         {/* Right: Action Buttons */}
@@ -319,7 +346,28 @@ function OrderDetailModal({
   order: ExtendedOrder;
   onClose: () => void;
 }) {
-  const delivery = order.deliveryInfo as any;
+  const [fullOrder, setFullOrder] = useState<ExtendedOrder>(order);
+  const [loadingDetail, setLoadingDetail] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    const fetchFull = async () => {
+      try {
+        const res: any = await orderService.getOrderById(order._id);
+        if (!cancelled) setFullOrder((res.data ?? res) as ExtendedOrder);
+      } catch {
+        // fall back to list data silently
+      } finally {
+        if (!cancelled) setLoadingDetail(false);
+      }
+    };
+    fetchFull();
+    return () => { cancelled = true; };
+  }, [order._id]);
+
+  const delivery = fullOrder.deliveryInfo as any;
+  const isPickup = delivery?.type === 'pickup';
+  const pickup = fullOrder.pickupLocation as any;
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
@@ -370,40 +418,117 @@ function OrderDetailModal({
         {/* Scrollable Content */}
         <div className="overflow-y-auto flex-1 divide-y divide-[#F3F4F6]">
 
+          {/* ── Full-order loading skeleton ── */}
+          {loadingDetail && (
+            <div className="px-6 py-6 space-y-3">
+              {[1,2,3].map(i => (
+                <div key={i} className="h-14 bg-[#F3F4F6] rounded-xl animate-pulse" />
+              ))}
+            </div>
+          )}
+
           {/* ── Delivery Info ── */}
-          {delivery && (delivery.fullName || delivery.phone || delivery.address) && (
+          {!loadingDetail && delivery && (delivery.fullName || delivery.phone || delivery.address || isPickup) && (
             <div className="px-6 py-5">
               <h4 className="text-sm font-bold text-[#364153] flex items-center gap-2 mb-4">
-                <div className="w-6 h-6 rounded-lg bg-[#EDF2EE] flex items-center justify-center">
-                  <MapPin className="w-3.5 h-3.5 text-[#00B207]" />
+                <div className={`w-6 h-6 rounded-lg flex items-center justify-center ${isPickup ? 'bg-emerald-50' : 'bg-[#EDF2EE]'}`}>
+                  {isPickup
+                    ? <Store className="w-3.5 h-3.5 text-emerald-600" />
+                    : <MapPin className="w-3.5 h-3.5 text-[#00B207]" />}
                 </div>
-                Thông tin giao hàng
+                {isPickup ? 'Thông tin nhận tại cửa hàng' : 'Thông tin giao hàng'}
               </h4>
-              <div className="bg-[#F9FAFB] rounded-xl border border-[#E5E7EB] px-4 py-3 space-y-2.5">
-                {delivery.fullName && (
-                  <InfoRow label="Người nhận" value={delivery.fullName} bold />
-                )}
-                {delivery.phone && (
-                  <InfoRow label="Điện thoại" value={delivery.phone} />
-                )}
-                {delivery.email && (
-                  <InfoRow label="Email" value={delivery.email} />
-                )}
-                {delivery.address && (
-                  <InfoRow label="Địa chỉ" value={delivery.address} multiline />
-                )}
-                {delivery.type && (
-                  <InfoRow
-                    label="Hình thức"
-                    value={delivery.type === 'pickup' ? 'Tự lấy hàng' : 'Giao tận nơi'}
-                  />
-                )}
-              </div>
+
+              {isPickup ? (
+                /* ─── PICKUP LAYOUT ─── */
+                <div className="space-y-3">
+                  {/* Recipient */}
+                  {(delivery.fullName || delivery.phone || delivery.email) && (
+                    <div className="bg-[#F9FAFB] rounded-xl border border-[#E5E7EB] px-4 py-3 space-y-2.5">
+                      <p className="text-xs font-semibold text-[#6A7282] uppercase tracking-wide mb-1">Người nhận</p>
+                      {delivery.fullName && <InfoRow label="Họ tên" value={delivery.fullName} bold />}
+                      {delivery.phone && <InfoRow label="Điện thoại" value={delivery.phone} />}
+                      {delivery.email && <InfoRow label="Email" value={delivery.email} />}
+                    </div>
+                  )}
+
+                  {/* Store details */}
+                  <div className="bg-emerald-50 border border-emerald-200 rounded-xl px-4 py-3 space-y-2.5">
+                    <p className="text-xs font-semibold text-emerald-700 uppercase tracking-wide mb-1">Cửa hàng</p>
+                    {pickup?.name && <InfoRow label="Tên" value={pickup.name} bold />}
+                    {pickup?.address && (
+                      <div className="flex items-start gap-2 text-sm">
+                        <span className="text-[#9CA3AF] w-24 flex-shrink-0">Địa chỉ</span>
+                        <div>
+                          <span className="font-medium text-[#101828] leading-relaxed">{pickup.address}</span>
+                          <a
+                            href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(pickup.address)}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex items-center gap-1 mt-1.5 text-xs font-semibold text-[#00B207] hover:underline w-fit"
+                          >
+                            <Navigation2 className="w-3.5 h-3.5" />
+                            Xem đường đi
+                          </a>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Pickup instruction */}
+                  <div className="flex items-start gap-3 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3">
+                    <span className="text-xl leading-none">🏪</span>
+                    <div>
+                      <p className="text-xs font-bold text-amber-800 mb-0.5">Lưu ý</p>
+                      <p className="text-xs text-amber-700 leading-relaxed">
+                        Vui lòng đưa mã đơn hàng{' '}
+                        <span className="font-bold text-amber-900 font-mono">#{order._id.slice(-10).toUpperCase()}</span>{' '}
+                        cho nhân viên tại quầy để nhận hàng.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                /* ─── HOME DELIVERY LAYOUT ─── */
+                <div className="space-y-3">
+                  {/* Recipient card */}
+                  {(delivery.fullName || delivery.phone || delivery.email) && (
+                    <div className="bg-[#F9FAFB] rounded-xl border border-[#E5E7EB] px-4 py-3 space-y-2.5">
+                      <p className="text-xs font-semibold text-[#6A7282] uppercase tracking-wide mb-1">Người nhận</p>
+                      {delivery.fullName && <InfoRow label="Họ tên" value={delivery.fullName} bold />}
+                      {delivery.phone && <InfoRow label="Điện thoại" value={delivery.phone} />}
+                      {delivery.email && <InfoRow label="Email" value={delivery.email} />}
+                    </div>
+                  )}
+
+                  {/* Address card */}
+                  {delivery.address && (
+                    <div className="bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 space-y-2.5">
+                      <p className="text-xs font-semibold text-blue-700 uppercase tracking-wide mb-1">Địa chỉ giao hàng</p>
+                      <div className="flex items-start gap-2 text-sm">
+                        <MapPin className="w-4 h-4 text-blue-500 flex-shrink-0 mt-0.5" />
+                        <div>
+                          <span className="font-medium text-[#101828] leading-relaxed">{delivery.address}</span>
+                          <a
+                            href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(delivery.address)}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex items-center gap-1 mt-1.5 text-xs font-semibold text-blue-600 hover:underline w-fit"
+                          >
+                            <Navigation2 className="w-3.5 h-3.5" />
+                            Xem trên bản đồ
+                          </a>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           )}
 
           {/* ── Notes ── */}
-          {order.notes && (
+          {!loadingDetail && fullOrder.notes && (
             <div className="px-6 py-5">
               <h4 className="text-sm font-bold text-[#364153] flex items-center gap-2 mb-3">
                 <div className="w-6 h-6 rounded-lg bg-amber-50 flex items-center justify-center">
@@ -412,12 +537,13 @@ function OrderDetailModal({
                 Ghi chú
               </h4>
               <div className="bg-amber-50 border border-amber-100 rounded-xl px-4 py-3">
-                <p className="text-sm text-amber-800 leading-relaxed">{order.notes}</p>
+                <p className="text-sm text-amber-800 leading-relaxed">{fullOrder.notes}</p>
               </div>
             </div>
           )}
 
           {/* ── Items ── */}
+          {!loadingDetail && (
           <div className="px-6 py-5">
             <h4 className="text-sm font-bold text-[#364153] flex items-center gap-2 mb-4">
               <div className="w-6 h-6 rounded-lg bg-[#EDF2EE] flex items-center justify-center">
@@ -425,11 +551,11 @@ function OrderDetailModal({
               </div>
               Sản phẩm
               <span className="ml-1 px-1.5 py-0.5 bg-[#F3F4F6] text-[#6A7282] text-xs rounded-md font-medium">
-                {order.items.length}
+                {fullOrder.items.length}
               </span>
             </h4>
             <div className="space-y-2.5">
-              {order.items.map((item: any, idx: number) => {
+              {fullOrder.items.map((item: any, idx: number) => {
                 const img  = getItemImage(item);
                 const name = getItemName(item);
                 return (
@@ -468,8 +594,10 @@ function OrderDetailModal({
               })}
             </div>
           </div>
+          )}
 
           {/* ── Payment Summary ── */}
+          {!loadingDetail && (
           <div className="px-6 py-5">
             <h4 className="text-sm font-bold text-[#364153] flex items-center gap-2 mb-4">
               <div className="w-6 h-6 rounded-lg bg-[#EDF2EE] flex items-center justify-center">
@@ -479,29 +607,29 @@ function OrderDetailModal({
             </h4>
             <div className="bg-[#F9FAFB] rounded-xl border border-[#E5E7EB] overflow-hidden">
               <div className="px-4 py-3 space-y-2.5">
-                {(order.shippingCost ?? 0) > 0 && (
-                  <SummaryRow label="Phí vận chuyển" value={formatCurrency(order.shippingCost!)} />
+                {(fullOrder.shippingCost ?? 0) > 0 && (
+                  <SummaryRow label="Phí vận chuyển" value={formatCurrency(fullOrder.shippingCost!)} />
                 )}
-                {(order.discountAmount ?? 0) > 0 && (
+                {(fullOrder.discountAmount ?? 0) > 0 && (
                   <SummaryRow
                     label={<span className="flex items-center gap-1"><Tag className="w-3 h-3" />Giảm giá</span>}
-                    value={`-${formatCurrency(order.discountAmount!)}`}
+                    value={`-${formatCurrency(fullOrder.discountAmount!)}`}
                     valueClass="text-[#00B207]"
                   />
                 )}
-                {(order.taxAmount ?? 0) > 0 && (
-                  <SummaryRow label="Thuế" value={formatCurrency(order.taxAmount!)} />
+                {(fullOrder.taxAmount ?? 0) > 0 && (
+                  <SummaryRow label="Thuế" value={formatCurrency(fullOrder.taxAmount!)} />
                 )}
-                <SummaryRow label="Phương thức TT" value={getPaymentLabel(order.paymentMethod)} />
+                <SummaryRow label="Phương thức TT" value={getPaymentLabel(fullOrder.paymentMethod)} />
                 <SummaryRow
                   label="Trạng thái TT"
                   value={
-                    order.paymentStatus === 'paid' ? 'Đã thanh toán' :
-                    order.paymentStatus === 'failed' ? 'Thất bại' : 'Chờ thanh toán'
+                    fullOrder.paymentStatus === 'paid' ? 'Đã thanh toán' :
+                    fullOrder.paymentStatus === 'failed' ? 'Thất bại' : 'Chờ thanh toán'
                   }
                   valueClass={
-                    order.paymentStatus === 'paid' ? 'text-green-600' :
-                    order.paymentStatus === 'failed' ? 'text-red-600' : 'text-amber-600'
+                    fullOrder.paymentStatus === 'paid' ? 'text-green-600' :
+                    fullOrder.paymentStatus === 'failed' ? 'text-red-600' : 'text-amber-600'
                   }
                 />
               </div>
@@ -509,20 +637,21 @@ function OrderDetailModal({
               <div className="flex items-center justify-between px-4 py-3 bg-[#EDF2EE] border-t border-[#E5E7EB]">
                 <span className="font-bold text-[#101828]">Tổng cộng</span>
                 <span className="text-xl font-extrabold text-[#00B207]">
-                  {formatCurrency(order.totalAmount)}
+                  {formatCurrency(fullOrder.totalAmount)}
                 </span>
               </div>
             </div>
           </div>
+          )}
 
           {/* ── Cancel reason (if cancelled) ── */}
-          {order.status === 'cancelled' && order.cancelReason && (
+          {!loadingDetail && fullOrder.status === 'cancelled' && (fullOrder as any).cancelReason && (
             <div className="px-6 py-4">
               <div className="flex items-start gap-3 bg-red-50 border border-red-100 rounded-xl px-4 py-3">
                 <Ban className="w-4 h-4 text-red-500 flex-shrink-0 mt-0.5" />
                 <div>
                   <p className="text-xs font-semibold text-red-700 mb-0.5">Lý do hủy</p>
-                  <p className="text-sm text-red-600">{order.cancelReason}</p>
+                  <p className="text-sm text-red-600">{(fullOrder as any).cancelReason}</p>
                 </div>
               </div>
             </div>
