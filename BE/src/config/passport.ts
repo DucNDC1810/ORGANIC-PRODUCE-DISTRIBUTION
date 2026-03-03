@@ -35,6 +35,7 @@ export const configurePassport = () => {
           };
           const user = {
             id: result.user._id?.toString() || '',
+            token: result.token,
             role: roleMap[result.user.role as string] || UserRole.CUSTOMER,
             email: result.user.email || '',
             isEmailVerified: result.user.isEmailVerified || false,
