@@ -61,12 +61,9 @@ export const groupService = {
     return res.data;
   },
 
-  /** POST /api/groups/:id/join — Tham gia nhóm (khách vãng lai hoặc user đã đăng nhập) */
-  joinGroup: async (
-    groupId: string,
-    data: { tempName?: string }
-  ): Promise<GroupMember> => {
-    const res: any = await api.post(`/groups/${groupId}/join`, data);
+  /** POST /api/groups/:id/join — Tham gia nhóm (bắt buộc đăng nhập, dùng thông tin tài khoản) */
+  joinGroup: async (groupId: string): Promise<GroupMember> => {
+    const res: any = await api.post(`/groups/${groupId}/join`);
     return res.data;
   },
 

@@ -30,8 +30,17 @@ export default function LoginPage() {
       if (userStr) {
         const user = JSON.parse(userStr);
         
-        // Redirect based on user role
         toast.success('Login successful! Welcome back!');
+
+        // Kiểm tra nếu có URL cần redirect lại (ví dụ: link mời nhóm)
+        const pendingRedirect = sessionStorage.getItem('redirectAfterLogin');
+        if (pendingRedirect && (user.role === 'customer' || !user.role)) {
+          sessionStorage.removeItem('redirectAfterLogin');
+          navigate(pendingRedirect, { replace: true });
+          return;
+        }
+
+        // Redirect based on user role
         switch (user.role) {
           case 'admin':
             navigate('/admin');

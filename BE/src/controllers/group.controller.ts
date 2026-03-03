@@ -50,23 +50,20 @@ export class GroupController {
     }
   };
 
-  /** POST /api/groups/:id/join — Tham gia nhóm */
+  /** POST /api/groups/:id/join — Tham gia nhóm (bắt buộc đăng nhập) */
   joinGroup = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
     try {
       const groupId = req.params.id;
-      const userId = req.user?.id ?? null;
-      const { tempName } = req.body;
+      const userId = req.user?.id;
 
-      if (!userId && !tempName?.trim()) {
-        throw new AppError('tempName là bắt buộc cho khách vãng lai', 400);
-      }
+      if (!userId) throw new AppError('Unauthorized – vui lòng đăng nhập', 401);
 
       // Kiểm tra nhóm tồn tại
       const group = await groupService.getGroupById(groupId);
       if (!group) throw new AppError('Không tìm thấy nhóm', 404);
       if (group.status !== 'active') throw new AppError('Nhóm đã đóng', 400);
 
-      const member = await groupService.joinGroup(groupId, userId, tempName?.trim());
+      const member = await groupService.joinGroup(groupId, userId);
 
       // Populate để trả về đầy đủ thông tin
       await member.populate('userId', 'name email');
