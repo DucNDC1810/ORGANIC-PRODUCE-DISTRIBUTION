@@ -153,8 +153,21 @@ export default function GroupOrderActivePage() {
     return () => { socket.disconnect(); };
   }, [groupId]);
 
+  // ── Helpers: owner's items live in local `cart` state, others in m.cartItems ──
+  // The owner's member record on the server has empty cartItems; local cart is source of truth.
+  const getMemberTotalQty = (m: APIMember): number => {
+    if (m.role === "owner")
+      return cart.reduce((s, i) => s + i.qty, 0);
+    return (m.cartItems ?? []).reduce((s, i) => s + i.qty, 0);
+  };
+
+  const isMemberOrdered = (m: APIMember): boolean => {
+    if (m.role === "owner") return cart.length > 0;
+    return m.isReady;
+  };
+
   // derived
-  const joinedCount   = members.filter((m) => m.isReady).length;
+  const joinedCount   = members.filter(isMemberOrdered).length;
   const activeTierIdx = TIERS.reduce((acc, t, i) => (joinedCount >= t.members ? i : acc), -1);
   const activePct     = activeTierIdx >= 0 ? TIERS[activeTierIdx].pct : 0;
   const nextTier      = TIERS[activeTierIdx + 1];
@@ -163,7 +176,7 @@ export default function GroupOrderActivePage() {
   const subtotal = cart.reduce((s, i) => s + i.price * i.qty, 0);
   const discount = Math.round(subtotal * activePct / 100);
   const total    = subtotal - discount;
-  const allOrdered = members.length > 0 && members.every((m) => m.isReady);
+  const allOrdered = members.length > 0 && members.every(isMemberOrdered);
 
   const handleCopy = () => {
     navigator.clipboard.writeText(inviteLink).catch(() => {});
@@ -533,19 +546,23 @@ export default function GroupOrderActivePage() {
             <div className="space-y-2.5">
               {membersLoading ? (
                 <div className="py-6 text-center text-sm text-gray-400">Đang tải...</div>
-              ) : members.map((m, idx) => (
-                <div key={m._id} className="flex items-center gap-3">
-                  <div className="w-7 h-7 rounded-full bg-gray-100 flex items-center justify-center text-base flex-shrink-0">
-                    {getMemberAvatar(idx)}
+              ) : members.map((m, idx) => {
+                const ordered  = isMemberOrdered(m);
+                const itemsQty = getMemberTotalQty(m);
+                return (
+                  <div key={m._id} className="flex items-center gap-3">
+                    <div className="w-7 h-7 rounded-full bg-gray-100 flex items-center justify-center text-base flex-shrink-0">
+                      {getMemberAvatar(idx)}
+                    </div>
+                    <p className="flex-1 text-xs text-gray-600 truncate">{getMemberName(m)}</p>
+                    <span className={`text-xs font-semibold flex-shrink-0 ${
+                      ordered ? "text-green-600" : "text-gray-400"
+                    }`}>
+                      {ordered ? `${itemsQty} món` : "Đang chọn"}
+                    </span>
                   </div>
-                  <p className="flex-1 text-xs text-gray-600 truncate">{getMemberName(m)}</p>
-                  <span className={`text-xs font-semibold flex-shrink-0 ${
-                    m.isReady ? "text-green-600" : "text-gray-400"
-                  }`}>
-                    {m.isReady ? `${(m.cartItems ?? []).length} món` : "Đang chọn"}
-                  </span>
-                </div>
-              ))}
+                );
+              })}
             </div>
 
             <div className="border-t border-gray-100 pt-4 space-y-2.5 text-sm text-gray-600">
@@ -574,22 +591,25 @@ export default function GroupOrderActivePage() {
           <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
             <h3 className="text-sm font-bold text-gray-900 mb-3">Trạng thái thành viên</h3>
             <div className="flex items-center gap-2 flex-wrap">
-              {members.map((m, idx) => (
-                <div key={m._id} title={getMemberName(m)} className="relative">
-                  <div className={`w-10 h-10 rounded-full border-2 flex items-center justify-center text-xl ${
-                    m.isReady
-                      ? "border-green-400 bg-green-50"
-                      : "border-yellow-400 bg-yellow-50"
-                  }`}>
-                    {getMemberAvatar(idx)}
-                  </div>
-                  {m.isReady && (
-                    <div className="absolute -bottom-0.5 -right-0.5 w-4 h-4 bg-green-500 rounded-full border-2 border-white flex items-center justify-center">
-                      <Check className="w-2 h-2 text-white" />
+              {members.map((m, idx) => {
+                const ordered = isMemberOrdered(m);
+                return (
+                  <div key={m._id} title={getMemberName(m)} className="relative">
+                    <div className={`w-10 h-10 rounded-full border-2 flex items-center justify-center text-xl ${
+                      ordered
+                        ? "border-green-400 bg-green-50"
+                        : "border-yellow-400 bg-yellow-50"
+                    }`}>
+                      {getMemberAvatar(idx)}
                     </div>
-                  )}
-                </div>
-              ))}
+                    {ordered && (
+                      <div className="absolute -bottom-0.5 -right-0.5 w-4 h-4 bg-green-500 rounded-full border-2 border-white flex items-center justify-center">
+                        <Check className="w-2 h-2 text-white" />
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
               <button
                 onClick={() => setShowQRModal(true)}
                 className="w-10 h-10 rounded-full border-2 border-dashed border-gray-300 flex items-center justify-center text-gray-400 hover:border-green-400 hover:text-green-500 transition-colors"
@@ -608,7 +628,21 @@ export default function GroupOrderActivePage() {
 
           {/* ── Checkout button ── */}
           <button
-            onClick={() => navigate("/checkout")}
+            onClick={() =>
+              navigate("/checkout", {
+                state: {
+                  groupCheckout: {
+                    groupId,
+                    groupName,
+                    activePct,
+                    discount,
+                    subtotal,
+                    shipping: 25000,
+                    total: subtotal - discount + 25000,
+                  },
+                },
+              })
+            }
             className="w-full py-4 rounded-2xl bg-gradient-to-r from-green-600 to-emerald-500 text-white text-base font-extrabold shadow-lg hover:from-green-700 hover:to-emerald-600 active:scale-[0.98] transition-all duration-150 flex items-center justify-center gap-2"
           >
             <ShoppingCart className="w-5 h-5" />

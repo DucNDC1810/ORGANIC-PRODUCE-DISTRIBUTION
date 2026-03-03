@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useLocation } from "react-router-dom";
+import { useGroup } from "../../context/GroupContext";
 import {
   Plus,
   Minus,
@@ -20,7 +21,6 @@ import momoService from "../../services/momoService";
 import voucherService from "../../services/voucherService";
 import { orderService } from "../../services/orderService";
 import StorePickupModal, { type Store as StoreData } from "../../components/StorePickupModal";
-import { type GroupOrderData } from "../../components/GroupOrderModal";
 import RecurringDeliveryModal, {
   type RecurringData,
   FREQUENCY_LABELS,
@@ -32,14 +32,33 @@ export default function CheckoutPage() {
   const { cart, getTotalPrice, removeFromCart, updateQuantity } = useCart();
   const { user } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+  const { groupSession } = useGroup();
+
+  // ── Group checkout detection ─────────────────────────────────────────────
+  // Populated when navigating from the Active Group page
+  const navGroupData = (location.state as any)?.groupCheckout as {
+    groupId: string;
+    groupName: string;
+    activePct: number;
+    discount: number;
+    subtotal: number;
+    shipping: number;
+    total: number;
+  } | null | undefined;
+
+  // isGroupOrder = true if we arrived from the group page OR there is an
+  // active group session saved in localStorage
+  const isGroupOrder = navGroupData != null || groupSession != null;
+  const activeGroupId = navGroupData?.groupId ?? groupSession?.groupId ?? null;
+  const groupDiscountPct = navGroupData?.activePct ?? 0;
+  // ─────────────────────────────────────────────────────────────────────────
 
   const [deliveryType, setDeliveryType] = useState<"delivery" | "pickup">(
     "delivery",
   );
-  const [groupOrderData] = useState<GroupOrderData | null>(null);
   const [showRecurringModal, setShowRecurringModal] = useState(false);
   const [recurringData, setRecurringData] = useState<RecurringData | null>(null);
-  const isGroupOrder = groupOrderData !== null;
   const isRecurringOrder = recurringData !== null;
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -184,11 +203,21 @@ export default function CheckoutPage() {
   };
   // ----------------------------------------------------------------
 
-  const subtotal = getTotalPrice();
-  const shipping = deliveryType === "pickup" ? 0 : 25000; // 25k for delivery
-  const recurringDiscount = isRecurringOrder ? subtotal * 0.05 : 0; // 5% discount for recurring
-  const vat = (subtotal + shipping - recurringDiscount) * 0.0476; // 4.76% VAT
-  const total = subtotal + shipping - recurringDiscount - voucherDiscount + vat;
+  const baseSubtotal = getTotalPrice();
+  // For group orders, honour the subtotal/shipping/discount from the Active Group page
+  const subtotal = isGroupOrder && navGroupData ? navGroupData.subtotal : baseSubtotal;
+  const shipping = isGroupOrder
+    ? (navGroupData?.shipping ?? 25000)
+    : deliveryType === "pickup" ? 0 : 25000;
+  const groupDiscount = isGroupOrder && navGroupData
+    ? navGroupData.discount
+    : Math.round(baseSubtotal * groupDiscountPct / 100);
+  const recurringDiscount = isRecurringOrder ? subtotal * 0.05 : 0;
+  // Group orders use the exact total from Active Group page (no separate VAT)
+  const vat = isGroupOrder ? 0 : (subtotal + shipping - recurringDiscount) * 0.0476;
+  const total = isGroupOrder && navGroupData
+    ? navGroupData.total - recurringDiscount - voucherDiscount
+    : subtotal + shipping - groupDiscount - recurringDiscount - voucherDiscount + vat;
 
   const validateForm = (): boolean => {
     if (!formData.fullName.trim()) {
@@ -221,7 +250,7 @@ export default function CheckoutPage() {
         return false;
       }
     }
-    if (isGroupOrder && !groupOrderData?.groupName?.trim()) {
+    if (isGroupOrder && navGroupData && !navGroupData.groupName?.trim()) {
       setError("Please enter a group name");
       return false;
     }
@@ -297,6 +326,9 @@ export default function CheckoutPage() {
           paymentMethod: "zalopay",
           amount: total,
           description: `Order payment from FreshMarket - ${formData.fullName}`,
+          ...(activeGroupId
+            ? { groupId: activeGroupId, isGroupOrder: true, groupDiscount, groupDiscountPct }
+            : {}),
         };
 
         const response = await zalopayService.initPayment({
@@ -390,6 +422,9 @@ export default function CheckoutPage() {
           paymentMethod: "momo",
           amount: total,
           description: `Order payment from FreshMarket - ${formData.fullName}`,
+          ...(activeGroupId
+            ? { groupId: activeGroupId, isGroupOrder: true, groupDiscount, groupDiscountPct }
+            : {}),
         };
 
         const response = await momoService.createPayment({
@@ -468,6 +503,14 @@ export default function CheckoutPage() {
           notes: formData.notes,
           paymentMethod: "cod",
           totalAmount: total,
+          ...(activeGroupId
+            ? {
+                groupId: activeGroupId,
+                isGroupOrder: true,
+                groupDiscount,
+                groupDiscountPct,
+              }
+            : {}),
         };
 
         const response = await orderService.createOrder(orderPayload as any);
@@ -844,20 +887,12 @@ export default function CheckoutPage() {
                         </span>
                       )}
                     </div>
-                    {isGroupOrder && groupOrderData ? (
+                    {isGroupOrder && navGroupData ? (
                       <div className="mt-1 space-y-0.5">
                         <p className="text-xs text-gray-700">
                           <span className="font-medium">Nhóm:</span>{" "}
-                          {groupOrderData.groupName}
-                          {groupOrderData.groupMembers
-                            ? ` · ${groupOrderData.groupMembers} thành viên`
-                            : ""}
+                          {navGroupData.groupName}
                         </p>
-                        {groupOrderData.groupAddress && (
-                          <p className="text-xs text-gray-500">
-                            📍 {groupOrderData.groupAddress}
-                          </p>
-                        )}
                       </div>
                     ) : (
                       <p className="text-xs text-gray-500 mt-0.5">
@@ -1007,6 +1042,23 @@ export default function CheckoutPage() {
           {/* Right Column - Order Summary */}
           <div className="lg:col-span-1">
             <div className="bg-white rounded-lg p-5 shadow-sm sticky top-6 space-y-5">
+
+              {/* Group order badge */}
+              {isGroupOrder && (
+                <div className="flex items-center gap-2 px-3 py-2.5 bg-green-50 border border-green-200 rounded-lg">
+                  <Users className="w-4 h-4 text-green-600 flex-shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-semibold text-green-700">
+                      Đặt theo nhóm{navGroupData?.groupName ? ` · ${navGroupData.groupName}` : ""}
+                    </p>
+                    {groupDiscountPct > 0 && (
+                      <p className="text-xs text-green-600">
+                        Đang áp dụng ưu đãi nhóm {groupDiscountPct}%
+                      </p>
+                    )}
+                  </div>
+                </div>
+              )}
               {/* Giỏ hàng */}
               <div>
                 <h3 className="text-base font-semibold text-gray-800 mb-4">
@@ -1140,18 +1192,16 @@ export default function CheckoutPage() {
                   </div>
                   <div className="flex justify-between text-sm">
                     <span className="text-gray-600">Shipping</span>
-                    {isGroupOrder ? (
-                      <span className="font-medium text-green-600">
-                        Free
-                      </span>
-                    ) : (
-                      <span className="font-medium text-gray-800">-</span>
-                    )}
+                    <span className="font-medium text-gray-800">
+                      {shipping === 0 ? "Free" : `${shipping.toLocaleString("vi-VN")}₫`}
+                    </span>
                   </div>
-                  {isGroupOrder && (
+                  {isGroupOrder && groupDiscount > 0 && (
                     <div className="flex justify-between text-sm">
-                      <span className="text-green-600">Group discount</span>
-                      <span className="font-medium text-green-600">-0₫</span>
+                      <span className="text-green-600">Ưu đãi nhóm ({groupDiscountPct}%)</span>
+                      <span className="font-medium text-green-600">
+                        −{groupDiscount.toLocaleString("vi-VN")}₫
+                      </span>
                     </div>
                   )}
                   {isRecurringOrder && (
@@ -1183,9 +1233,11 @@ export default function CheckoutPage() {
                         {total.toLocaleString("vi-VN")}₫
                       </span>
                     </div>
-                    <p className="text-xs text-gray-400 text-right">
-                      Price includes VAT {vat.toLocaleString("vi-VN")}₫
-                    </p>
+                    {!isGroupOrder && (
+                      <p className="text-xs text-gray-400 text-right">
+                        Price includes VAT {vat.toLocaleString("vi-VN")}₫
+                      </p>
+                    )}
                   </div>
                 </div>
 
@@ -1281,15 +1333,15 @@ export default function CheckoutPage() {
               </div>
 
               {/* 2. Optional features */}
-              {(groupOrderData || recurringData) && (
+              {(isGroupOrder || recurringData) && (
                 <div className="bg-gray-50 rounded-xl px-3 py-2 space-y-1.5">
-                  {groupOrderData && (
+                  {isGroupOrder && (
                     <div className="flex items-center gap-2">
                       <Users className="w-3.5 h-3.5 text-green-600 flex-shrink-0" />
                       <p className="text-xs text-gray-700 truncate">
                         <span className="font-semibold">Nhóm: </span>
-                        {groupOrderData.groupName}
-                        {groupOrderData.groupMembers ? ` · ${groupOrderData.groupMembers} TV` : ""}
+                        {navGroupData?.groupName ?? groupSession?.groupName ?? ""}
+                        {groupDiscountPct > 0 ? ` · ưu đãi ${groupDiscountPct}%` : ""}
                       </p>
                     </div>
                   )}
