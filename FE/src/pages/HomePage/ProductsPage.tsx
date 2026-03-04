@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Search, Filter, ChevronDown, X, Users, ShoppingBag } from 'lucide-react';
+import { Search, Filter, ChevronDown, X, ShoppingBag } from 'lucide-react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import Header from '../../components/Header';
 import ProductCard from '../../components/ProductCard';

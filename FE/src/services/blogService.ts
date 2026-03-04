@@ -36,22 +36,6 @@ export interface BlogPagination {
   pages: number;
 }
 
-interface BlogFeedResponse {
-  success: boolean;
-  data: BlogPost[];
-  pagination: BlogPagination;
-}
-
-interface BlogSingleResponse {
-  success: boolean;
-  data: BlogPost;
-}
-
-interface LikeResponse {
-  success: boolean;
-  data: { liked: boolean; likeCount: number };
-}
-
 // NOTE: Axios interceptor auto-unwraps response.data, so `res` is already the API body.
 
 const blogService = {
