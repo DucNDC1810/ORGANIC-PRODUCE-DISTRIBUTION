@@ -35,8 +35,15 @@ const app: Application = express();
 configurePassport();
 
 // Middlewares
+const allowedOrigins = (process.env.CORS_ORIGIN || 'https://organic-produce-distribution.vercel.app').split(',').map(o => o.trim());
 app.use(cors({
-  origin: process.env.CORS_ORIGIN || 'http://localhost:5173',
+  origin: (origin, callback) => {
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error(`CORS policy: origin ${origin} not allowed`));
+    }
+  },
   credentials: true
 }));
 // Increase payload limit for base64 images 
