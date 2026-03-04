@@ -177,9 +177,15 @@ export default function GroupOrderActivePage() {
   const nextTier      = TIERS[activeTierIdx + 1];
   const progress      = calcProgress(joinedCount);
 
-  const subtotal = cart.reduce((s, i) => s + i.price * i.qty, 0);
-  const discount = Math.round(subtotal * activePct / 100);
-  const total    = subtotal - discount;
+  const ownerCartSubtotal = cart.reduce((s, i) => s + i.price * i.qty, 0);
+  const hasOwnerInMembers  = members.some((m) => m.role === "owner");
+  const groupSubtotal = members.reduce((s, m) => {
+    const memberCart = m.role === "owner" ? cart : (m.cartItems ?? []);
+    return s + memberCart.reduce((cs, i) => cs + i.price * i.qty, 0);
+  }, 0) + (hasOwnerInMembers ? 0 : ownerCartSubtotal);
+  const subtotal = groupSubtotal;
+  const discount = Math.round(groupSubtotal * activePct / 100);
+  const total    = groupSubtotal - discount;
   const allOrdered = members.length > 0 && members.every(isMemberOrdered);
 
   const handleCopy = () => {
@@ -506,7 +512,10 @@ export default function GroupOrderActivePage() {
                                 <span className="text-base">🛒</span>
                               )}
                             </div>
-                            <p className="flex-1 text-xs text-gray-700 truncate">{item.name}</p>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-xs text-gray-700 truncate">{item.name}</p>
+                              <p className="text-xs text-gray-400">{fmtVND(item.price)} / phần</p>
+                            </div>
                             <span className="text-xs text-gray-400 flex-shrink-0">×{item.qty}</span>
                             <span className="text-xs font-semibold text-gray-900 flex-shrink-0 w-16 text-right">
                               {fmtVND(item.price * item.qty)}
@@ -564,14 +573,21 @@ export default function GroupOrderActivePage() {
               {membersLoading ? (
                 <div className="py-6 text-center text-sm text-gray-400">Đang tải...</div>
               ) : members.map((m, idx) => {
-                const ordered  = isMemberOrdered(m);
-                const itemsQty = getMemberTotalQty(m);
+                const ordered      = isMemberOrdered(m);
+                const itemsQty     = getMemberTotalQty(m);
+                const memberCart   = m.role === "owner" ? cart : (m.cartItems ?? []);
+                const memberAmount = memberCart.reduce((s, i) => s + i.price * i.qty, 0);
                 return (
                   <div key={m._id} className="flex items-center gap-3">
                     <div className="w-7 h-7 rounded-full bg-gray-100 flex items-center justify-center text-base flex-shrink-0">
                       {getMemberAvatar(idx)}
                     </div>
-                    <p className="flex-1 text-xs text-gray-600 truncate">{getMemberName(m)}</p>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs text-gray-600 truncate">{getMemberName(m)}</p>
+                      {ordered && memberAmount > 0 && (
+                        <p className="text-xs text-green-600 font-medium">{fmtVND(memberAmount)}</p>
+                      )}
+                    </div>
                     <span className={`text-xs font-semibold flex-shrink-0 ${
                       ordered ? "text-green-600" : "text-gray-400"
                     }`}>

@@ -567,16 +567,23 @@ export default function GroupMemberPage() {
             {/* Per-member rows */}
             <div className="space-y-2.5 mb-4">
               {members.map((m, idx) => {
-                const items = m._id === memberId ? myCart : (m.cartItems ?? []);
-                const qty   = items.reduce((s, i) => s + i.qty, 0);
+                const items         = m._id === memberId ? myCart : (m.cartItems ?? []);
+                const qty           = items.reduce((s, i) => s + i.qty, 0);
+                const memberAmount  = items.reduce((s, i) => s + i.price * i.qty, 0);
+                const hasOrdered    = m.isReady || (m._id === memberId && myCart.length > 0);
                 return (
                   <div key={m._id} className="flex items-center gap-3">
                     <div className="w-7 h-7 rounded-full bg-gray-100 flex items-center justify-center text-base flex-shrink-0">
                       {getAvatar(idx)}
                     </div>
-                    <p className="flex-1 text-xs text-gray-600 truncate">{getMemberName(m)}</p>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs text-gray-600 truncate">{getMemberName(m)}</p>
+                      {hasOrdered && memberAmount > 0 && (
+                        <p className="text-xs text-green-600 font-medium">{fmtVND(memberAmount)}</p>
+                      )}
+                    </div>
                     <span className={`text-xs font-semibold flex-shrink-0 ${
-                      m.isReady || (m._id === memberId && myCart.length > 0) ? "text-green-600" : "text-gray-400"
+                      hasOrdered ? "text-green-600" : "text-gray-400"
                     }`}>
                       {qty > 0 ? `${qty} món` : "Đang chọn"}
                     </span>
