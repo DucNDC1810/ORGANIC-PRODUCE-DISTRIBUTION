@@ -249,7 +249,7 @@ export default function LoginPage() {
               {/* Google */}
               <button
                 type="button"
-                onClick={() => window.location.href = `${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/auth/google`}
+                onClick={() => window.location.href = `${import.meta.env.VITE_API_URL || 'https://organic-produce-be.onrender.com/api'}/auth/google`}
                 className="w-16 h-16 bg-white border-2 border-border rounded-full hover:border-primary hover:shadow-lg transition-all flex items-center justify-center group"
                 title="Sign in with Google"
               >
