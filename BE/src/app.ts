@@ -45,6 +45,10 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use(passport.initialize());
 
 // Routes
+app.get('/', (req: Request, res: Response) => {
+  res.json({ status: 'OK', message: 'Organic Produce API is running' });
+});
+
 app.get('/api/health', (req: Request, res: Response) => {
   res.json({ status: 'OK', message: 'Server is running' });
 });
