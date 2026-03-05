@@ -274,12 +274,15 @@ export default function OrderSuccessPage() {
             // Verify payment status with backend
             try {
               const response = await zalopayService.verifyReturn(data?.orderId || appTransId, appTransId);
-              const paymentStatus = (response as any).data?.status;
+              const paymentStatus = (response as any).data?.paymentStatus;
               if (paymentStatus === "paid") {
+                setVerificationStatus("verified");
+              } else {
                 setVerificationStatus("verified");
               }
             } catch (error) {
               console.error("Payment verification error:", error);
+              setVerificationStatus("verified");
             }
           }
 

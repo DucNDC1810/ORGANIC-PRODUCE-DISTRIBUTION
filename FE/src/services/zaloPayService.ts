@@ -31,8 +31,7 @@ export interface ZaloPayPaymentResponse {
 }
 
 export interface ZaloPayCheckStatusPayload {
-  orderId: string;
-  transactionId?: string;
+  apptransid: string;
 }
 
 export interface ZaloPayCheckStatusResponse {
@@ -66,13 +65,12 @@ export const zalopayService = {
 
   // Check payment status
   checkPaymentStatus: (payload: ZaloPayCheckStatusPayload) =>
-    api.post<ZaloPayCheckStatusResponse>('/zalopay/check-status', payload),
+    api.post<any>('/zalopay/check-order-status', payload),
 
-  // Verify payment after user returns from ZaloPay
+  // Verify payment after user returns from ZaloPay (uses same check-order-status endpoint)
   verifyReturn: (orderId: string, appTransId?: string) =>
-    api.post<ZaloPayCheckStatusResponse>('/zalopay/verify-return', {
-      orderId,
-      appTransId,
+    api.post<any>('/zalopay/check-order-status', {
+      apptransid: appTransId || orderId,
     }),
 
   // Get payment details
