@@ -14,6 +14,8 @@ import {
   Zap,
   Check,
   Lock,
+  Wallet,
+  Loader2,
 } from "lucide-react";
 import { io, type Socket } from "socket.io-client";
 import { motion, AnimatePresence } from "framer-motion";
@@ -21,6 +23,7 @@ import { toast } from "sonner";
 import { groupService, type Group, type GroupMember, type GroupCartItem } from "../../services/groupService";
 import { useGroup } from "../../context/GroupContext";
 import { useAuth } from "../../context/AuthContext";
+import walletService from "../../services/walletService";
 
 // ── Constants ──────────────────────────────────────────────────────────────────
 const TIERS = [
@@ -72,6 +75,10 @@ export default function GroupMemberPage() {
   const [myCart,     setMyCart]     = useState<GroupCartItem[]>([]);
   const [confirming, setConfirming] = useState(false);
   const [leaving,    setLeaving]    = useState(false);
+
+  // Pay-via-wallet to group owner
+  const [payConfirm, setPayConfirm] = useState<{ ownerUserId: string; ownerName: string; amount: number } | null>(null);
+  const [payLoading, setPayLoading] = useState(false);
 
   const socketRef = useRef<Socket | null>(null);
 
@@ -171,6 +178,31 @@ export default function GroupMemberPage() {
     } finally {
       clearGroupSession();
       navigate("/products");
+    }
+  };
+
+  // ── Pay owner via wallet ───────────────────────────────────────────────────
+  const handlePayOwner = async () => {
+    if (!payConfirm) return;
+    setPayLoading(true);
+    try {
+      const res = await walletService.transfer({
+        toUserId: payConfirm.ownerUserId,
+        amount:   payConfirm.amount,
+        description: `Trả tiền nhóm "${group?.groupName}" cho ${payConfirm.ownerName}`,
+      });
+      const newBalance = (res as any)?.data?.walletBalance;
+      toast.success(
+        `Đã trả ${fmtVND(payConfirm.amount)} cho ${payConfirm.ownerName} thành công! 🎉` +
+        (newBalance !== undefined ? ` Số dư ví: ${fmtVND(newBalance)}` : ''),
+        { duration: 5000 }
+      );
+      setPayConfirm(null);
+    } catch (err: any) {
+      const msg = err?.response?.data?.message || 'Thanh toán thất bại. Vui lòng thử lại.';
+      toast.error(msg);
+    } finally {
+      setPayLoading(false);
     }
   };
 
@@ -540,6 +572,21 @@ export default function GroupMemberPage() {
                         Đang chọn
                       </span>
                     )}
+
+                    {/* Pay-via-wallet button — only for owner row, shown to non-owner members */}
+                    {isOwner && !isMe && mySubtotal > 0 && m.userId?._id && (
+                      <button
+                        onClick={() => setPayConfirm({
+                          ownerUserId: m.userId!._id,
+                          ownerName:   getMemberName(m),
+                          amount:      mySubtotal,
+                        })}
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 text-white text-xs font-semibold shadow-sm hover:from-emerald-600 hover:to-teal-600 active:scale-95 transition-all flex-shrink-0"
+                      >
+                        <Wallet className="w-3.5 h-3.5" />
+                        Trả tiền qua ví
+                      </button>
+                    )}
                   </div>
                   </motion.div>
                 );
@@ -690,6 +737,61 @@ export default function GroupMemberPage() {
           </button>
         </div>
       </div>
+
+      {/* ══════════════ PAY-VIA-WALLET MODAL ══════════════ */}
+      {payConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
+             onClick={() => !payLoading && setPayConfirm(null)}>
+          <div
+            className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="flex items-center gap-2 px-6 py-4 bg-gradient-to-r from-emerald-500 to-teal-500 text-white">
+              <Wallet className="w-5 h-5" />
+              <h3 className="text-lg font-bold flex-1">Trả tiền qua ví</h3>
+            </div>
+
+            <div className="p-6 space-y-4">
+              {/* Amount row */}
+              <div className="flex items-center justify-between bg-emerald-50 rounded-xl p-4">
+                <div>
+                  <p className="text-xs text-gray-500 mb-0.5">Phần của bạn</p>
+                  <p className="text-2xl font-extrabold text-emerald-600">{fmtVND(payConfirm.amount)}</p>
+                </div>
+                <div className="text-right">
+                  <p className="text-xs text-gray-500 mb-0.5">Chuyển đến</p>
+                  <p className="text-sm font-bold text-gray-800">{payConfirm.ownerName}</p>
+                  <p className="text-xs text-gray-400">Chủ nhóm</p>
+                </div>
+              </div>
+
+              <p className="text-xs text-gray-500 bg-gray-50 rounded-xl p-3 leading-relaxed">
+                💡 Số tiền sẽ được chuyển ngay từ ví FreshMarket của bạn sang ví của chủ nhóm. Vui lòng đảm bảo số dư đủ.
+              </p>
+
+              {/* Actions */}
+              <div className="flex gap-3 pt-1">
+                <button
+                  onClick={() => setPayConfirm(null)}
+                  disabled={payLoading}
+                  className="flex-1 py-2.5 rounded-xl border border-gray-200 text-sm font-medium text-gray-600 hover:bg-gray-50 disabled:opacity-50"
+                >
+                  Huỷ
+                </button>
+                <button
+                  onClick={handlePayOwner}
+                  disabled={payLoading}
+                  className="flex-1 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 text-white text-sm font-bold hover:from-emerald-600 hover:to-teal-600 active:scale-95 transition-all disabled:opacity-60 flex items-center justify-center gap-2"
+                >
+                  {payLoading && <Loader2 className="w-4 h-4 animate-spin" />}
+                  Xác nhận trả tiền
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

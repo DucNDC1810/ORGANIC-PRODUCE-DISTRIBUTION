@@ -19,6 +19,7 @@ import Header from "../../components/Header";
 import momoService from "../../services/momoService";
 import voucherService from "../../services/voucherService";
 import { orderService } from "../../services/orderService";
+import walletService from "../../services/walletService";
 import subscriptionService from "../../services/subscriptionService";
 import StorePickupModal, { type Store as StoreData } from "../../components/StorePickupModal";
 import RecurringDeliveryModal, {
@@ -104,6 +105,18 @@ export default function CheckoutPage() {
   const [voucherError, setVoucherError] = useState(""); // voucher-specific error
   const [showStoreModal, setShowStoreModal] = useState(false);
   const [selectedStore, setSelectedStore] = useState<StoreData | null>(null);
+
+  // ── Wallet ────────────────────────────────────────────────────────────────
+  const [walletBalance, setWalletBalance] = useState<number>(0);
+  const [walletLoading, setWalletLoading] = useState(false);
+
+  useEffect(() => {
+    if (!user) return;
+    walletService.getWalletInfo()
+      .then((res: any) => setWalletBalance(res?.data?.walletBalance ?? res?.walletBalance ?? 0))
+      .catch(() => setWalletBalance(0));
+  }, [user]);
+  // ─────────────────────────────────────────────────────────────────────────
 
   const [formData, setFormData] = useState({
     fullName: user?.name || "",
@@ -524,6 +537,82 @@ export default function CheckoutPage() {
       }
       return;
     }
+
+    // ── Wallet payment ────────────────────────────────────────────────────
+    if (formData.paymentMethod === "Wallet") {
+      if (walletBalance < total) {
+        setError(
+          `Số dư ví không đủ. Số dư hiện tại: ${walletBalance.toLocaleString("vi-VN")}₫, cần thanh toán: ${total.toLocaleString("vi-VN")}₫`
+        );
+        setLoading(false);
+        return;
+      }
+      setLoading(true);
+      try {
+        const walletBuiltAddress =
+          deliveryType === "delivery"
+            ? [formData.address, selectedWard?.name, selectedDistrict?.name, selectedProvince?.name]
+                .filter(Boolean)
+                .join(", ")
+            : selectedStore
+            ? `${selectedStore.name} - ${selectedStore.address}`
+            : "Store pickup";
+
+        const response = await walletService.payWithWallet({
+          deliveryInfo: {
+            fullName: formData.fullName,
+            phone: formData.phone,
+            email: formData.email,
+            address: walletBuiltAddress,
+            type: deliveryType,
+          },
+          ...(deliveryType === "pickup" && selectedStore
+            ? { pickupLocation: { name: selectedStore.name, address: selectedStore.address } }
+            : {}),
+          items: cart.map((item) => ({
+            productId: item.id,
+            quantity: item.quantity,
+            price: item.price,
+            subtotal: item.price * item.quantity,
+          })),
+          totalAmount: total,
+          notes: formData.notes || undefined,
+          shippingCost: shipping,
+          discountAmount: groupDiscount + recurringDiscount + voucherDiscount,
+        } as any);
+
+        const result = (response as any)?.data || response;
+        const newBalance = result?.walletBalance ?? walletBalance - total;
+        setWalletBalance(newBalance);
+
+        navigate("/order-success", {
+          state: {
+            orderId: result?.order?._id,
+            paymentMethod: "Wallet",
+            totalAmount: total,
+            deliveryType,
+            pickupLocation:
+              deliveryType === "pickup" && selectedStore
+                ? { name: selectedStore.name, address: selectedStore.address }
+                : null,
+            deliveryInfo: {
+              fullName: formData.fullName,
+              phone: formData.phone,
+              email: formData.email,
+              address: walletBuiltAddress,
+              type: deliveryType,
+            },
+          },
+        });
+      } catch (err: any) {
+        setError(
+          err.response?.data?.message || err.message || "Error placing order with wallet."
+        );
+        setLoading(false);
+      }
+      return;
+    }
+    // ── END Wallet payment ────────────────────────────────────────────────
 
     // No valid payment method selected
     setError("Please select a payment method");
@@ -977,15 +1066,59 @@ export default function CheckoutPage() {
               </h2>
 
               <div className="space-y-2">
+                {/* ── Ví FreshMarket (ưu tiên đầu) ───────────────────────── */}
+                <label
+                  className={`flex items-start gap-3 p-3 border rounded-lg cursor-pointer transition-all ${
+                    formData.paymentMethod === "Wallet"
+                      ? "border-primary bg-blue-50"
+                      : "border-gray-300 hover:border-gray-400"
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name="paymentMethod"
+                    value="Wallet"
+                    checked={formData.paymentMethod === "Wallet"}
+                    onChange={handleInputChange}
+                    className="w-4 h-4 text-primary mt-0.5"
+                  />
+                  <span className="text-lg leading-none">👛</span>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-sm font-medium text-gray-700">
+                        Ví FreshMarket
+                      </span>
+                      {walletLoading ? (
+                        <span className="text-xs text-gray-400">Đang tải...</span>
+                      ) : (
+                        <span
+                          className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
+                            walletBalance >= total
+                              ? "bg-green-100 text-green-700"
+                              : "bg-red-100 text-red-600"
+                          }`}
+                        >
+                          Số dư: {walletBalance.toLocaleString("vi-VN")}₫
+                        </span>
+                      )}
+                    </div>
+                    {!walletLoading && walletBalance < total && (
+                      <p className="text-xs text-red-500 mt-0.5">
+                        Số dư không đủ.{" "}
+                        <Link
+                          to="/profile?tab=wallet"
+                          className="underline font-medium hover:text-red-600"
+                        >
+                          Nạp thêm?
+                        </Link>
+                      </p>
+                    )}
+                  </div>
+                </label>
+
+                {/* ── Các phương thức khác ─────────────────────────────── */}
                 {[
-                  // { value: 'Chuyển khoản', icon: '💳' },
-                  // { value: 'Tiền mặt', icon: '💵' },
-                  // { value: 'Visa/Master', icon: '💳' },
-                  // { value: 'Cần trợ công nợ', icon: '💰' },
-                  // { value: 'Thanh toán online qua ví MoMo', icon: '🏦' },
-                  // { value: 'Ví Trả Sau - MoMo', icon: '💳' },
                   { value: "Momo", label: "MoMo", icon: "🏦" },
-                  // { value: 'Chuyển khoản qua QR - BIDV', icon: '📱' },
                   { value: "COD", label: "Cash on Delivery (COD)", icon: "🚚" },
                 ].map((method) => (
                   <label
@@ -1005,9 +1138,7 @@ export default function CheckoutPage() {
                       className="w-4 h-4 text-primary"
                     />
                     <span className="text-lg">{method.icon}</span>
-                    <span className="text-sm text-gray-700">
-                      {method.label}
-                    </span>
+                    <span className="text-sm text-gray-700">{method.label}</span>
                   </label>
                 ))}
               </div>
