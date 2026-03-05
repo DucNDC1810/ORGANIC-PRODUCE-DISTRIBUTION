@@ -7,7 +7,6 @@ import {
   Clock,
   Users,
   CreditCard,
-  Banknote,
   ChevronRight,
   Check,
   Edit3,
@@ -23,9 +22,12 @@ const TIERS = [
   { members: 8,  pct: 10 },
 ];
 
-const PAYMENT_OPTIONS = [
-  { value: "Bạn thanh toán cho mọi người",   subtitle: null },
-  { value: "Chia hoá đơn với mọi người",      subtitle: "Yêu cầu phương thức thanh toán không dùng tiền mặt" },
+type PaymentOption = 'owner_only' | 'individual' | 'equal_split';
+
+const PAYMENT_OPTIONS: { value: PaymentOption; label: string; subtitle: string | null; icon: string }[] = [
+  { value: 'owner_only',   label: 'Bạn thanh toán cho mọi người',   subtitle: null,                                                           icon: '💳' },
+  { value: 'individual',   label: 'Mỗi người trả theo món của mình', subtitle: 'Mỗi thành viên tự thanh toán phần của họ',                     icon: '🧾' },
+  { value: 'equal_split',  label: 'Chia đều hoá đơn cho mọi người', subtitle: 'Tổng bill chia đều cho tất cả thành viên trong nhóm',           icon: '⚖️' },
 ];
 
 const HOURS   = Array.from({ length: 24 }, (_, i) => String(i).padStart(2, "0"));
@@ -120,7 +122,7 @@ export default function GroupOrderPage() {
 
   const [groupName,    setGroupName]    = useState("Đơn hàng nhóm của tôi");
   const [editingName,  setEditingName]  = useState(false);
-  const [paymentMode,  setPaymentMode]  = useState(PAYMENT_OPTIONS[0].value);
+  const [paymentMode,  setPaymentMode]  = useState<PaymentOption>('owner_only');
   const [timeLimit,    setTimeLimit]    = useState("Không có");
 
   // Time limit sheet
@@ -138,10 +140,11 @@ export default function GroupOrderPage() {
       const group = await groupService.createGroup({
         groupName,
         paymentMethod: paymentMode,
+        paymentOption: paymentMode,
         timeLimit: timeLimit !== "Đăng chờ" && timeLimit !== "Không có" ? null : null,
       });
       navigate("/group-order/active", {
-        state: { groupName, cartItems: passedCartItems, groupId: group._id },
+        state: { groupName, cartItems: passedCartItems, groupId: group._id, paymentOption: paymentMode },
       });
     } catch (err: any) {
       toast.error(err?.response?.data?.message ?? "Không tạo được nhóm. Vui lòng thử lại.");
@@ -251,7 +254,7 @@ export default function GroupOrderPage() {
             <SettingCard
               icon={<CreditCard className="w-5 h-5 text-green-600" />}
               label="Thanh toán hoá đơn"
-              value={paymentMode}
+              value={PAYMENT_OPTIONS.find(o => o.value === paymentMode)?.label ?? paymentMode}
               onEdit={() => setShowPaySheet(true)}
             />
             {/* Time limit */}
@@ -394,27 +397,31 @@ export default function GroupOrderPage() {
             </div>
             <div className="px-6 py-5">
               <p className="text-sm text-gray-500 mb-6 leading-relaxed">
-                Nếu bạn muốn chia hoá đơn này, vui lòng xem qua cách chúng tôi áp dụng để chia số tiền giảm giá, phí giao hàng và tiền típ cho mỗi người trong nhóm.
+                Chọn cách thanh toán cho nhóm của bạn. Bạn có thể thay đổi sau khi nhóm đã được tạo.
               </p>
-              <div className="space-y-0 divide-y divide-gray-100">
+              <div className="space-y-2">
                 {PAYMENT_OPTIONS.map((opt) => {
                   const selected = paymentMode === opt.value;
                   return (
                     <button
                       key={opt.value}
                       onClick={() => { setPaymentMode(opt.value); setShowPaySheet(false); }}
-                      className="w-full flex items-center justify-between py-4 text-left group hover:bg-gray-50 rounded-xl px-2 transition-colors"
+                      className={`w-full flex items-center justify-between py-4 px-4 text-left rounded-2xl border-2 transition-all ${
+                        selected
+                          ? 'border-green-500 bg-green-50'
+                          : 'border-gray-100 bg-gray-50 hover:border-gray-200'
+                      }`}
                     >
                       <div className="flex items-center gap-3 flex-1">
-                        <div className="w-10 h-10 rounded-full bg-green-50 flex items-center justify-center flex-shrink-0">
-                          <Banknote className="w-5 h-5 text-green-600" />
+                        <div className="w-10 h-10 rounded-full bg-white flex items-center justify-center flex-shrink-0 shadow-sm text-xl">
+                          {opt.icon}
                         </div>
                         <div>
-                          <p className={`text-sm ${selected ? "font-bold text-gray-900" : "text-gray-700"}`}>{opt.value}</p>
+                          <p className={`text-sm ${selected ? 'font-bold text-gray-900' : 'font-medium text-gray-700'}`}>{opt.label}</p>
                           {opt.subtitle && <p className="text-xs text-gray-400 mt-0.5">{opt.subtitle}</p>}
                         </div>
                       </div>
-                      <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center flex-shrink-0 ml-3 transition-colors ${selected ? "border-green-500 bg-green-500" : "border-gray-300 group-hover:border-green-400"}`}>
+                      <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center flex-shrink-0 ml-3 transition-colors ${selected ? 'border-green-500 bg-green-500' : 'border-gray-300'}`}>
                         {selected && <div className="w-2.5 h-2.5 rounded-full bg-white" />}
                       </div>
                     </button>
@@ -428,7 +435,6 @@ export default function GroupOrderPage() {
                 <div className="flex items-center gap-3">
                   {[
                     { key: "momo", label: "MoMo", icon: <span className="text-white text-[9px] font-black leading-none">mo<br />mo</span>, bg: "bg-pink-600" },
-                    { key: "zalo", label: "ZaloPay", icon: <span className="text-blue-600 text-[8px] font-black leading-none text-center">Zalo<br/>pay</span>, bg: "bg-white border border-gray-200" },
                     { key: "card", label: "Thẻ", icon: <CreditCard className="w-4 h-4 text-gray-500" />, bg: "bg-gray-100" },
                   ].map((m) => (
                     <button key={m.key} className="flex items-center gap-2 px-3 py-2 rounded-xl bg-gray-50 hover:bg-gray-100 transition-colors text-xs text-gray-600 font-medium">

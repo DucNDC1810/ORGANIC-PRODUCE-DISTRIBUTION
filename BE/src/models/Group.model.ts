@@ -8,6 +8,7 @@ export interface IGroup extends Document {
     paymentMethod: string;
     timeLimit: Date | null;
   };
+  paymentOption: 'owner_only' | 'individual' | 'equal_split';
   status: 'active' | 'locked' | 'completed';
   createdAt: Date;
 }
@@ -20,6 +21,11 @@ const groupSchema = new Schema<IGroup>(
     settings: {
       paymentMethod: { type: String, default: 'Chủ nhóm thanh toán' },
       timeLimit: { type: Date, default: null },
+    },
+    paymentOption: {
+      type: String,
+      enum: ['owner_only', 'individual', 'equal_split'],
+      default: 'owner_only',
     },
     status: {
       type: String,

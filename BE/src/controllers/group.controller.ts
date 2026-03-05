@@ -13,14 +13,18 @@ export class GroupController {
       const userId = req.user?.id;
       if (!userId) throw new AppError('Unauthorized', 401);
 
-      const { groupName, paymentMethod, timeLimit } = req.body;
+      const { groupName, paymentMethod, timeLimit, paymentOption } = req.body;
       if (!groupName?.trim()) throw new AppError('groupName là bắt buộc', 400);
+
+      const validPaymentOptions = ['owner_only', 'individual', 'equal_split'];
+      const resolvedPaymentOption = validPaymentOptions.includes(paymentOption) ? paymentOption : 'owner_only';
 
       const group = await groupService.createGroup(
         userId,
         groupName.trim(),
         paymentMethod ?? 'Chủ nhóm thanh toán',
-        timeLimit ? new Date(timeLimit) : null
+        timeLimit ? new Date(timeLimit) : null,
+        resolvedPaymentOption
       );
 
       res.status(201).json({ success: true, data: group });
@@ -82,7 +86,7 @@ export class GroupController {
     }
   };
 
-  /** DELETE /api/groups/:id/members/:memberId — Thành viên rời nhóm */
+  /** DELETE /api/groups/:id/members/:memberId — Thành viên rời nhóm (tự động hoàn tiền nếu đã cọc) */
   leaveGroup = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
     try {
       const { id: groupId, memberId } = req.params;
@@ -98,6 +102,96 @@ export class GroupController {
       } catch (_) {}
 
       res.json({ success: true, message: 'Rời nhóm thành công' });
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  /** POST /api/groups/:id/members/:memberId/wallet-hold — Đặt cọc phần tiền qua ví */
+  holdWalletShare = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const { id: groupId, memberId } = req.params;
+      const userId = req.user?.id;
+      if (!userId) throw new AppError('Unauthorized', 401);
+
+      const result = await groupService.holdWalletShare(groupId, memberId);
+
+      try {
+        getIO().to(`group:${groupId}`).emit('member:wallet_paid', result.member);
+      } catch (_) {}
+
+      res.json({ success: true, data: result });
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  /** DELETE /api/groups/:id — Chủ nhóm hủy đơn (hoàn tiền cho tất cả) */
+  cancelGroup = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const { id: groupId } = req.params;
+      const userId = req.user?.id;
+      if (!userId) throw new AppError('Unauthorized', 401);
+
+      const group = await groupService.cancelGroup(groupId, userId);
+
+      try {
+        getIO().to(`group:${groupId}`).emit('group:cancelled', { groupId });
+      } catch (_) {}
+
+      res.json({ success: true, message: 'Đã hủy đơn nhóm và hoàn tiền cho các thành viên', data: group });
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  /** POST /api/groups/:id/place-order — Chủ nhóm chốt đơn và tạo đơn hàng chính thức */
+  placeGroupOrder = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const { id: groupId } = req.params;
+      const userId = req.user?.id;
+      if (!userId) throw new AppError('Unauthorized', 401);
+
+      const { ownerCartItems = [], deliveryInfo = {} } = req.body;
+
+      const result = await groupService.placeGroupOrder(groupId, userId, ownerCartItems, deliveryInfo);
+
+      try {
+        getIO().to(`group:${groupId}`).emit('group:order_placed', {
+          groupId,
+          orderId: result.order._id,
+          total: result.total,
+        });
+      } catch (_) {}
+
+      res.status(201).json({ success: true, data: result });
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  /** PATCH /api/groups/:id/payment-option — Cập nhật tùy chọn thanh toán (chỉ chủ nhóm) */
+  updatePaymentOption = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const { id: groupId } = req.params;
+      const userId = req.user?.id;
+      if (!userId) throw new AppError('Unauthorized', 401);
+
+      const { paymentOption } = req.body;
+      if (!['owner_only', 'individual', 'equal_split'].includes(paymentOption)) {
+        throw new AppError('paymentOption không hợp lệ', 400);
+      }
+
+      const group = await groupService.updatePaymentOption(groupId, userId, paymentOption);
+
+      try {
+        getIO().to(`group:${groupId}`).emit('group:payment_option_changed', {
+          groupId,
+          paymentOption,
+        });
+      } catch (_) {}
+
+      res.json({ success: true, data: group });
     } catch (err) {
       next(err);
     }

@@ -1,6 +1,9 @@
 import { Response, NextFunction } from 'express';
+import mongoose from 'mongoose';
 import { Payment } from '../models/Payment.model';
 import { Order } from '../models/Order.model';
+import { User } from '../models/User.model';
+import { Transaction } from '../models/Transaction.model';
 import momoService from '../services/momo.service';
 import { AuthRequest } from '../middlewares/auth.middleware';
 import { AppError } from '../utils/AppError';
@@ -171,6 +174,92 @@ export class MoMoController {
       }
 
       console.log('✅ Signature verified successfully');
+
+      // ── WALLET TOP-UP: orderId bắt đầu bằng "topup_" ──────────────────────
+      if (orderId && typeof orderId === 'string' && orderId.startsWith('topup_')) {
+        const transactionId = orderId.replace('topup_', '');
+        console.log('💰 Wallet top-up callback detected, transactionId:', transactionId);
+
+        if (resultCode !== 0) {
+          // Thanh toán nạp ví thất bại
+          await Transaction.findByIdAndUpdate(transactionId, { status: 'failed' });
+          console.log('❌ Wallet top-up failed for transactionId:', transactionId);
+          result.resultCode = 0;
+          result.message = 'success';
+          return void res.json(result);
+        }
+
+        // Nạp ví thành công — dùng Mongoose Session để đảm bảo nguyên tử
+        const session = await mongoose.startSession();
+        session.startTransaction();
+        try {
+          const txn = await Transaction.findById(transactionId).session(session);
+          if (!txn) {
+            await session.abortTransaction();
+            session.endSession();
+            console.error('❌ Transaction record not found:', transactionId);
+            result.resultCode = 0;
+            result.message = 'success';
+            return void res.json(result);
+          }
+
+          if (txn.status !== 'success') {
+            // Cộng tiền vào ví
+            await User.findByIdAndUpdate(
+              txn.userId,
+              { $inc: { walletBalance: txn.amount } },
+              { session }
+            );
+            // Cập nhật transaction thành success
+            await Transaction.findByIdAndUpdate(
+              transactionId,
+              {
+                status: 'success',
+                metadata: { momoTransId: transId, callbackTime: new Date(), callbackData: req.body }
+              },
+              { session }
+            );
+            console.log(`✅ Wallet top-up success: +${txn.amount} VND for user ${txn.userId}`);
+
+            // ── Thưởng nạp tiền lần đầu: +10.000₫ ────────────────────────
+            const FIRST_TOPUP_BONUS = 10000;
+            const user = await User.findById(txn.userId).session(session);
+            if (user && !user.firstTopupBonusClaimed) {
+              await User.findByIdAndUpdate(
+                txn.userId,
+                { $inc: { walletBalance: FIRST_TOPUP_BONUS }, $set: { firstTopupBonusClaimed: true } },
+                { session }
+              );
+              await Transaction.create(
+                [{
+                  userId: txn.userId,
+                  amount: FIRST_TOPUP_BONUS,
+                  type: 'bonus',
+                  status: 'success',
+                  description: 'Thưởng nạp tiền lần đầu +10.000₫'
+                }],
+                { session }
+              );
+              console.log(`🎁 First top-up bonus +${FIRST_TOPUP_BONUS} VND for user ${txn.userId}`);
+            }
+            // ── END bonus ─────────────────────────────────────────────────
+          } else {
+            console.log('ℹ️ Top-up already processed (idempotent):', transactionId);
+          }
+
+          await session.commitTransaction();
+          session.endSession();
+        } catch (err) {
+          await session.abortTransaction();
+          session.endSession();
+          console.error('❌ Wallet top-up session error:', err);
+        }
+
+        result.resultCode = 0;
+        result.message = 'success';
+        return void res.json(result);
+      }
+      // ── END WALLET TOP-UP ─────────────────────────────────────────────────
 
       // Kiểm tra resultCode (0 = success, khác = failed)
       if (resultCode !== 0) {

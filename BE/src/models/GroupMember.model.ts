@@ -16,6 +16,10 @@ export interface IGroupMember extends Document {
   isReady: boolean;
   cartItems: IGroupCartItem[];
   joinedAt: Date;
+  /** Số tiền đã tạm giữ từ ví (đặt cọc) */
+  walletHoldAmount: number;
+  /** Thành viên đã thanh toán phần của mình qua ví chưa */
+  walletPaid: boolean;
 }
 
 const groupCartItemSchema = new Schema<IGroupCartItem>(
@@ -31,13 +35,15 @@ const groupCartItemSchema = new Schema<IGroupCartItem>(
 
 const groupMemberSchema = new Schema<IGroupMember>(
   {
-    groupId:   { type: Schema.Types.ObjectId, ref: 'Group', required: true },
-    userId:    { type: Schema.Types.ObjectId, ref: 'User', default: null },
-    tempName:  { type: String, default: null },
-    role:      { type: String, enum: ['owner', 'member'], default: 'member' },
-    isReady:   { type: Boolean, default: false },
-    cartItems: { type: [groupCartItemSchema], default: [] },
-    joinedAt:  { type: Date, default: Date.now },
+    groupId:          { type: Schema.Types.ObjectId, ref: 'Group', required: true },
+    userId:           { type: Schema.Types.ObjectId, ref: 'User', default: null },
+    tempName:         { type: String, default: null },
+    role:             { type: String, enum: ['owner', 'member'], default: 'member' },
+    isReady:          { type: Boolean, default: false },
+    cartItems:        { type: [groupCartItemSchema], default: [] },
+    joinedAt:         { type: Date, default: Date.now },
+    walletHoldAmount: { type: Number, default: 0 },
+    walletPaid:       { type: Boolean, default: false },
   },
   { timestamps: false }
 );

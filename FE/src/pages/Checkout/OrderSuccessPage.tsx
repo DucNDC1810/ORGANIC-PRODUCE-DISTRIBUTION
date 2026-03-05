@@ -18,7 +18,6 @@ import {
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import Header from '../../components/Header';
-import zalopayService from "../../services/zaloPayService";
 import { orderService } from "../../services/orderService";
 import momoService from "../../services/momoService";
 import subscriptionService from "../../services/subscriptionService";
@@ -63,16 +62,12 @@ export default function OrderSuccessPage() {
     }))
   );
   
-  // Check if coming from ZaloPay return (either from state or localStorage)
-  const searchParams = new URLSearchParams(location.search);
-  
   // Get orderId from URL params (MoMo) or location state
+  const searchParams = new URLSearchParams(location.search);
   const orderIdFromUrl = searchParams.get('orderId');
   const orderId = orderIdFromUrl || location.state?.orderId;
   
-  const [paymentType, setPaymentType] = useState<"zalopay" | "momo" | null>(null);
-  
-  const isZaloPayReturn = !!searchParams.toString() || location.state?.fromZaloPay;
+  const [paymentType, setPaymentType] = useState<"momo" | null>(null);
   // Check for MoMo return by checking partnerCode or orderId in URL
   const isMoMoReturn = searchParams.get('partnerCode') === 'MOMO' || !!searchParams.get('orderId') || !!sessionStorage.getItem('pendingMoMoOrder');
 
@@ -80,6 +75,43 @@ export default function OrderSuccessPage() {
     const verifyAndLoadOrder = async () => {
       try {
         setLoading(true);
+
+        // ── Wallet: navigated directly from CheckoutPage ─────────────────
+        if (location.state?.paymentMethod === "Wallet") {
+          setPaymentType(null);
+          setVerificationStatus("verified");
+          const walletOrderId = location.state.orderId;
+          const stateDeliveryInfo = location.state.deliveryInfo || null;
+          const statePickupLocation = location.state.pickupLocation || null;
+          setOrderData({
+            orderId: walletOrderId,
+            amount: location.state.totalAmount,
+            paymentMethod: "Wallet",
+            deliveryInfo: stateDeliveryInfo,
+            pickupLocation: statePickupLocation,
+            walletBalance: location.state.walletBalance,
+          });
+          if (walletOrderId) {
+            try {
+              const orderRes = await orderService.getOrderById(walletOrderId);
+              if (orderRes.data?.data) {
+                const order = orderRes.data.data;
+                setOrderData({
+                  orderId: order._id,
+                  amount: order.totalAmount,
+                  paymentMethod: "Wallet",
+                  deliveryInfo: (order as any).deliveryInfo || stateDeliveryInfo,
+                  pickupLocation: (order as any).pickupLocation || statePickupLocation,
+                  walletBalance: location.state.walletBalance,
+                });
+              }
+            } catch {
+              // Non-fatal — already seeded from state above
+            }
+          }
+          setLoading(false);
+          return;
+        }
 
         // ── COD: navigated directly from CheckoutPage ──────────────────────
         if (location.state?.paymentMethod === "COD") {
@@ -239,51 +271,8 @@ export default function OrderSuccessPage() {
           return;
         }
 
-        // Get pending order data from localStorage if exists (ZaloPay)
-        const pendingOrderData = localStorage.getItem("pendingZaloPayOrder");
-        if (pendingOrderData) {
-          const { orderData: data, appTransId, subscriptionConfig: zaloSubConfig } = JSON.parse(pendingOrderData);
-          // Remove immediately to prevent double-execution (React Strict Mode / double useEffect)
-          localStorage.removeItem("pendingZaloPayOrder");
-          setOrderData(data);
-          // Capture subscription config for UI display
-          if (zaloSubConfig) {
-            setSubscriptionConfig(zaloSubConfig);
-          }
-          // Create subscription if this was a recurring order
-          if (zaloSubConfig) {
-            subscriptionService.createSubscription(zaloSubConfig).catch((err) =>
-              console.warn('Subscription creation failed (ZaloPay):', err)
-            );
-          }
-          setPaymentType('zalopay');
-
-          // If coming from ZaloPay return, verify payment status
-          if (isZaloPayReturn && appTransId) {
-            setVerificationStatus("verifying");
-            
-            // In dev mode, simulate callback
-            if (import.meta.env.DEV) {
-              try {
-                await zalopayService.testCallback(appTransId);
-              } catch (e) {
-                console.warn("Test callback failed, continuing:", e);
-              }
-            }
-
-            // Verify payment status with backend
-            try {
-              const response = await zalopayService.verifyReturn(data?.orderId || appTransId, appTransId);
-              const paymentStatus = (response as any).data?.status;
-              if (paymentStatus === "paid") {
-                setVerificationStatus("verified");
-              }
-            } catch (error) {
-              console.error("Payment verification error:", error);
-            }
-          }
-
-        }
+        // Get pending order data from localStorage if exists (legacy ZaloPay key cleanup)
+        localStorage.removeItem("pendingZaloPayOrder");
         
         setLoading(false);
       } catch (error) {
@@ -294,7 +283,7 @@ export default function OrderSuccessPage() {
     };
 
     verifyAndLoadOrder();
-  }, [isZaloPayReturn]);
+  }, []);
 
   const isPickup = orderData?.deliveryInfo?.type === 'pickup';
 
@@ -388,11 +377,11 @@ export default function OrderSuccessPage() {
       )}
 
       {/* Payment verification overlay */}
-      {(isZaloPayReturn || isMoMoReturn) && verificationStatus === "verifying" && !loading && (
+      {isMoMoReturn && verificationStatus === "verifying" && !loading && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
           <div className="bg-white rounded-xl p-8 text-center shadow-lg">
             <Loader className="w-12 h-12 text-primary animate-spin mx-auto mb-4" />
-            <p className="text-lg text-gray-600">Đang xác nhận thanh toán {paymentType === 'momo' ? 'MoMo' : 'ZaloPay'}...</p>
+            <p className="text-lg text-gray-600">Đang xác nhận thanh toán MoMo...</p>
           </div>
         </div>
       )}
@@ -599,10 +588,10 @@ export default function OrderSuccessPage() {
                         <span className="text-foreground font-medium">
                           {orderData?.paymentMethod === "COD"
                             ? "🚚 Tiền mặt khi giao hàng (COD)"
-                            : paymentType === "momo"
-                              ? "MoMo"
-                              : paymentType === "zalopay"
-                                ? "ZaloPay"
+                            : orderData?.paymentMethod === "Wallet"
+                              ? "👛 Ví FreshMarket"
+                              : paymentType === "momo"
+                                ? "MoMo"
                                 : "Chưa xác định"}
                         </span>
                         <span className={`inline-flex items-center gap-1 text-sm font-medium px-3 py-1 rounded-full ${
@@ -610,7 +599,7 @@ export default function OrderSuccessPage() {
                             ? "text-orange-600 bg-orange-100"
                             : "text-primary bg-primary/10"
                         }`}>
-                          {orderData?.paymentMethod === "COD" ? "⏳ Thanh toán khi nhận hàng" : "✓ Đã Thanh Toán"}
+                          {orderData?.paymentMethod === "COD" ? "⏳ Thanh toán khi nhận hàng" : orderData?.paymentMethod === "Wallet" ? "✓ Thanh toán bằng ví" : "✓ Đã Thanh Toán"}
                         </span>
                       </div>
                     </div>
