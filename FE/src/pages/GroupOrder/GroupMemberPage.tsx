@@ -275,10 +275,21 @@ export default function GroupMemberPage() {
 
   // Per-member share based on paymentOption
   const paymentOpt = (group?.paymentOption ?? 'owner_only') as 'owner_only' | 'individual' | 'equal_split';
+
+  // Shipping split: 25,000đ divided by total member count
+  const SHIPPING_FEE = 25_000;
+  const sharedShipping = members.length > 0
+    ? Math.round(SHIPPING_FEE / members.length)
+    : 0;
+  const myDiscountPct = members.length > 0 ? activePct / members.length : 0;
+  const myDiscount = Math.round(mySubtotal * myDiscountPct / 100);
+
   const myShare =
     paymentOpt === 'equal_split' && members.length > 0
       ? Math.round(groupTotal / members.length)
-      : mySubtotal;
+      : paymentOpt === 'individual'
+        ? mySubtotal + sharedShipping - myDiscount
+        : mySubtotal;
 
   // ── Loading ────────────────────────────────────────────────────────────────
   if (loading) {
@@ -689,10 +700,24 @@ export default function GroupMemberPage() {
             </div>
 
             <div className="border-t border-gray-100 pt-4 space-y-2.5 text-sm text-gray-600">
-              <div className="flex justify-between">
-                <span>Tạm tính (cả nhóm)</span>
-                <span className="font-semibold text-gray-900">{fmtVND(groupTotal)}</span>
-              </div>
+              {paymentOpt !== 'individual' && (
+                <div className="flex justify-between">
+                  <span>Tạm tính (cả nhóm)</span>
+                  <span className="font-semibold text-gray-900">{fmtVND(groupTotal)}</span>
+                </div>
+              )}
+              {paymentOpt === 'individual' && sharedShipping > 0 && (
+                <div className="flex justify-between text-gray-500">
+                  <span>Phí ship (phần của bạn)</span>
+                  <span className="font-medium">+{fmtVND(sharedShipping)}</span>
+                </div>
+              )}
+              {paymentOpt === 'individual' && myDiscount > 0 && (
+                <div className="flex justify-between text-green-600">
+                  <span>Ưu đãi của bạn ({myDiscountPct.toFixed(1).replace(/\.0$/, '')}%)</span>
+                  <span className="font-medium">−{fmtVND(myDiscount)}</span>
+                </div>
+              )}
               <div className="border-t border-gray-100 pt-2.5 flex justify-between">
                 <span className="font-bold text-gray-900">Tổng cộng</span>
                 <span className="font-extrabold text-green-600 text-base">
@@ -700,41 +725,61 @@ export default function GroupMemberPage() {
                 </span>
               </div>
               <p className="text-xs text-gray-400 text-center">
-                Phần của bạn{paymentOpt === 'equal_split' ? ' (chia đều)' : paymentOpt === 'individual' ? ' (theo món)' : ''}:{" "}
+                {paymentOpt === 'individual' ? 'Bạn cần thanh toán' : paymentOpt === 'equal_split' ? 'Phần của bạn (chia đều)' : 'Phần của bạn'}:{" "}
                 <span className="font-semibold text-gray-700">{fmtVND(myShare)}</span>
               </p>
             </div>
 
             {/* ── Wallet-hold CTA ── */}
             {myMember?.role !== 'owner' && (
-              paymentOpt === 'owner_only' ? (
-                <div className="mt-4 flex items-center gap-2 bg-blue-50 border border-blue-200 rounded-xl px-4 py-3">
-                  <span className="text-lg flex-shrink-0">💳</span>
-                  <div>
-                    <p className="text-sm font-bold text-blue-700">Chủ nhóm sẽ thanh toán hoá đơn này</p>
-                    <p className="text-xs text-blue-500 mt-0.5">Bạn chỉ cần chọn món và xác nhận xong.</p>
+              <>
+                {/* Info badge – always shown, text depends on paymentOpt */}
+                {paymentOpt === 'owner_only' ? (
+                  <div className="mt-4 flex items-center gap-2 bg-blue-50 border border-blue-200 rounded-xl px-4 py-3">
+                    <span className="text-lg flex-shrink-0">💳</span>
+                    <div>
+                      <p className="text-sm font-bold text-blue-700">Chủ nhóm sẽ thanh toán hoá đơn này</p>
+                      <p className="text-xs text-blue-500 mt-0.5">Bạn chỉ cần chọn món và xác nhận xong.</p>
+                    </div>
                   </div>
-                </div>
-              ) : myMember?.walletPaid ? (
-                <div className="mt-4 flex items-center gap-2 bg-teal-50 border border-teal-200 rounded-xl px-4 py-3">
-                  <Wallet className="w-4 h-4 text-teal-600 flex-shrink-0" />
-                  <div>
-                    <p className="text-sm font-bold text-teal-700">Đã đặt cọc!</p>
-                    <p className="text-xs text-teal-600 mt-0.5">
-                      {fmtVND(myMember?.walletHoldAmount ?? mySubtotal)} đã được giữ — chờ chủ nhóm chốt đơn.
-                    </p>
+                ) : (
+                  <div className="mt-4 flex items-center gap-2 bg-orange-50 border border-orange-200 rounded-xl px-4 py-3">
+                    <span className="text-lg flex-shrink-0">{paymentOpt === 'individual' ? '🧾' : '⚖️'}</span>
+                    <div>
+                      <p className="text-sm font-bold text-orange-700">
+                        {paymentOpt === 'individual' ? 'Mọi người tự thanh toán phần của mình' : 'Hoá đơn chia đều cho mọi người'}
+                      </p>
+                      <p className="text-xs text-orange-500 mt-0.5">
+                        {paymentOpt === 'individual' ? 'Thanh toán phần món bạn đã chọn qua ví.' : 'Tổng bill chia đều cho tất cả thành viên.'}
+                      </p>
+                    </div>
                   </div>
-                </div>
-              ) : (
-                <button
-                  onClick={() => setHoldConfirm(true)}
-                  disabled={mySubtotal === 0 || !isReady}
-                  className="mt-4 w-full py-3 rounded-xl bg-gradient-to-r from-teal-500 to-emerald-500 text-white text-sm font-bold shadow hover:from-teal-600 hover:to-emerald-600 active:scale-[0.98] transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  <Wallet className="w-4 h-4" />
-                  Thanh toán phần tôi
-                </button>
-              )
+                )}
+
+                {/* Payment button / paid status – only for non-owner_only */}
+                {paymentOpt !== 'owner_only' && (
+                  myMember?.walletPaid ? (
+                    <div className="mt-3 flex items-center gap-2 bg-teal-50 border border-teal-200 rounded-xl px-4 py-3">
+                      <Wallet className="w-4 h-4 text-teal-600 flex-shrink-0" />
+                      <div>
+                        <p className="text-sm font-bold text-teal-700">Đã đặt cọc!</p>
+                        <p className="text-xs text-teal-600 mt-0.5">
+                          Bạn đã đóng góp <span className="font-bold">{fmtVND(myMember?.walletHoldAmount ?? myShare)}</span>. Đang chờ chủ nhóm chốt đơn.
+                        </p>
+                      </div>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => setHoldConfirm(true)}
+                      disabled={mySubtotal === 0 || !isReady}
+                      className="mt-3 w-full py-3 rounded-xl bg-gradient-to-r from-teal-500 to-emerald-500 text-white text-sm font-bold shadow hover:from-teal-600 hover:to-emerald-600 active:scale-[0.98] transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <Wallet className="w-4 h-4" />
+                      Thanh toán phần tôi{mySubtotal > 0 ? ` · ${fmtVND(myShare)}` : ''}
+                    </button>
+                  )
+                )}
+              </>
             )}
             {myMember?.role !== 'owner' && paymentOpt !== 'owner_only' && !isReady && mySubtotal > 0 && !myMember?.walletPaid && (
               <p className="text-center text-xs text-amber-500 font-medium mt-1">

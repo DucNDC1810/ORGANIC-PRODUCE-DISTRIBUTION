@@ -119,18 +119,34 @@ export class GroupService {
     const subtotal = member.cartItems.reduce((s, i) => s + i.price * i.qty, 0);
     if (subtotal <= 0) throw new AppError('Giỏ hàng trống, không thể đặt cọc', 400);
 
+    // Calculate shared shipping: split SHIPPING equally among all group members
+    const allMembers = await GroupMember.find({ groupId });
+    const sharedShipping = allMembers.length > 0
+      ? Math.round(SHIPPING / allMembers.length)
+      : 0;
+
+    // Calculate group discount tier based on ready member count
+    const orderedCount = allMembers.filter((m) => m.isReady).length;
+    const activeTierIdx = TIERS.reduce((acc, t, i) => (orderedCount >= t.members ? i : acc), -1);
+    const activePct = activeTierIdx >= 0 ? TIERS[activeTierIdx].pct : 0;
+    const myDiscountPct = allMembers.length > 0 ? activePct / allMembers.length : 0;
+    const myDiscount = Math.round(subtotal * myDiscountPct / 100);
+
+    // Hold amount = cart items + shared shipping - personal discount
+    const holdAmount = subtotal + sharedShipping - myDiscount;
+
     const user = await User.findById(member.userId);
     if (!user) throw new AppError('Không tìm thấy tài khoản', 404);
-    if (user.walletBalance < subtotal) {
-      throw new AppError(`Số dư ví không đủ. Cần ${subtotal.toLocaleString('vi-VN')}đ, hiện có ${user.walletBalance.toLocaleString('vi-VN')}đ`, 400);
+    if (user.walletBalance < holdAmount) {
+      throw new AppError(`Số dư ví không đủ. Cần ${holdAmount.toLocaleString('vi-VN')}đ, hiện có ${user.walletBalance.toLocaleString('vi-VN')}đ`, 400);
     }
 
     // Trừ ví
-    user.walletBalance -= subtotal;
+    user.walletBalance -= holdAmount;
     await user.save();
 
     // Cập nhật member
-    member.walletHoldAmount = subtotal;
+    member.walletHoldAmount = holdAmount;
     member.walletPaid = true;
     await member.save();
 

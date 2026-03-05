@@ -119,7 +119,9 @@ export default function GroupOrderActivePage() {
   const [cancelLoading,      setCancelLoading]      = useState(false);
   const [showPlaceConfirm,   setShowPlaceConfirm]   = useState(false);
   const [showCancelConfirm,  setShowCancelConfirm]  = useState(false);
-  const [paymentOption,      setPaymentOption]      = useState<'owner_only' | 'individual' | 'equal_split'>('owner_only');
+  const [paymentOption,      setPaymentOption]      = useState<'owner_only' | 'individual' | 'equal_split'>(
+    ((location.state as any)?.paymentOption as 'owner_only' | 'individual' | 'equal_split') ?? 'owner_only'
+  );
   const [showPayOptionModal, setShowPayOptionModal] = useState(false);
   const [payOptionLoading,   setPayOptionLoading]   = useState(false);
 
@@ -215,6 +217,9 @@ export default function GroupOrderActivePage() {
   const subtotal   = groupSubtotal;
   const discount   = Math.round(groupSubtotal * activePct / 100);
   const total      = groupSubtotal - discount;
+  const ownerSharedShipping = members.length > 0 ? Math.round(25000 / members.length) : 25000;
+  const ownerDiscountPct = members.length > 0 ? activePct / members.length : activePct;
+  const ownerDiscount = Math.round(ownerCartSubtotal * ownerDiscountPct / 100);
   const allOrdered = members.length > 0 && members.every(isMemberOrdered);
 
   // Total amount already held from members' wallets (deposits)
@@ -292,7 +297,7 @@ export default function GroupOrderActivePage() {
         ? "Đã xóa đơn hàng nhóm thành công."
         : "Đã hủy đơn nhóm. Tiền đặt cọc đã được hoàn lại cho tất cả thành viên.";
       toast.success(msg, { duration: 6000 });
-      navigate(paymentOption === 'owner_only' ? "/checkout" : "/group-order");
+      navigate("/checkout");
     } catch (err: any) {
       const msg = err?.response?.data?.message || "Hủy đơn thất bại. Vui lòng thử lại.";
       toast.error(msg);
@@ -578,9 +583,16 @@ export default function GroupOrderActivePage() {
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-semibold text-gray-900 truncate">{getMemberName(m)}</p>
-                        <p className="text-xs text-gray-400 mt-0.5">
-                          {m.isReady ? `Đã chọn ${memberItems.length} món` : "Chưa chọn món"}
-                        </p>
+                        {paymentOption === 'individual' && m.isReady && memberItems.length > 0 && (
+                          <p className="text-xs text-green-600 font-medium mt-0.5">
+                            {fmtVND(memberItems.reduce((s, i) => s + i.price * i.qty, 0))}
+                          </p>
+                        )}
+                        {paymentOption !== 'individual' && (
+                          <p className="text-xs text-gray-400 mt-0.5">
+                            {m.isReady ? `Đã chọn ${memberItems.length} món` : "Chưa chọn món"}
+                          </p>
+                        )}
                       </div>
                       {/* Status badge */}
                       {m.isReady ? (
@@ -729,17 +741,21 @@ export default function GroupOrderActivePage() {
 
             <div className="border-t border-gray-100 pt-4 space-y-2.5 text-sm text-gray-600">
               <div className="flex justify-between">
-                <span>Tạm tính</span>
+                <span>Tạm tính <span className="text-gray-400 font-normal">(cả nhóm)</span></span>
                 <span className="font-semibold text-gray-900">{fmtVND(subtotal)}</span>
               </div>
               <div className="flex justify-between">
-                <span>Phí giao hàng</span>
-                <span className="font-semibold text-gray-900">25.000đ</span>
+                <span>{paymentOption === 'individual' ? 'Phí ship (phần của bạn)' : 'Phí giao hàng'}</span>
+                <span className="font-semibold text-gray-900">{paymentOption === 'individual' ? fmtVND(ownerSharedShipping) : '25.000đ'}</span>
               </div>
               {activePct > 0 && (
                 <div className="flex justify-between text-green-600">
-                  <span>Ưu đãi nhóm ({activePct}%)</span>
-                  <span className="font-semibold">−{fmtVND(discount)}</span>
+                  <span>
+                    {paymentOption === 'individual'
+                      ? `Ưu đãi của bạn (${ownerDiscountPct.toFixed(1).replace(/\.0$/, '')}%)`
+                      : `Ưu đãi nhóm (${activePct}%)`}
+                  </span>
+                  <span className="font-semibold">−{fmtVND(paymentOption === 'individual' ? ownerDiscount : discount)}</span>
                 </div>
               )}
               <div className="border-t border-gray-100 pt-2.5 flex justify-between">
@@ -752,9 +768,14 @@ export default function GroupOrderActivePage() {
                 <>
                   {totalHeld > 0 && (
                     <div className="flex justify-between text-teal-600">
-                      <span className="flex items-center gap-1">
-                        <Wallet className="w-3.5 h-3.5" />
-                        Tổng tiền đã cọc
+                      <span className="flex items-center gap-1 flex-col items-start gap-0">
+                        <span className="flex items-center gap-1">
+                          <Wallet className="w-3.5 h-3.5" />
+                          Tổng tiền đã cọc
+                        </span>
+                        <span className="text-xs text-teal-500 font-normal">
+                          Đã thu cọc từ {members.filter((m) => m.walletPaid).length}/{members.filter((m) => m.role !== 'owner').length} thành viên
+                        </span>
                       </span>
                       <span className="font-semibold">−{fmtVND(totalHeld)}</span>
                     </div>
@@ -765,7 +786,7 @@ export default function GroupOrderActivePage() {
                     <span className={`font-bold ${
                       ownerRemaining === 0 ? "text-teal-700" : "text-orange-700"
                     }`}>
-                      Chủ nhóm cần trả nốt
+                      {paymentOption === 'equal_split' ? 'Phần của bạn (chia đều)' : paymentOption === 'individual' ? 'Phần của bạn' : 'Chủ nhóm cần trả nốt'}
                     </span>
                     <span className={`font-extrabold text-base ${
                       ownerRemaining === 0 ? "text-teal-600" : "text-orange-600"
@@ -887,6 +908,8 @@ export default function GroupOrderActivePage() {
           >
             {placeOrderLoading ? (
               <><Loader2 className="w-5 h-5 animate-spin" /> Đang xử lý...</>
+            ) : paymentOption === 'individual' ? (
+              <><ShoppingCart className="w-5 h-5" /> Thanh toán phần tôi & Chốt đơn →</>
             ) : paymentOption !== 'owner_only' ? (
               <><ShoppingCart className="w-5 h-5" /> Gửi yêu cầu thanh toán →</>
             ) : (
@@ -925,22 +948,26 @@ export default function GroupOrderActivePage() {
                onClick={(e) => e.stopPropagation()}>
             <div className="px-6 py-5 bg-gradient-to-r from-green-600 to-emerald-500 flex items-center gap-3">
               <ShoppingCart className="w-5 h-5 text-white" />
-              <p className="text-white font-bold text-lg">Chốt đơn hàng nhóm</p>
+              <p className="text-white font-bold text-lg">{paymentOption === 'individual' ? 'Thanh toán phần tôi & Chốt đơn' : 'Chốt đơn hàng nhóm'}</p>
             </div>
             <div className="p-6 space-y-4">
               <div className="bg-green-50 rounded-xl p-4 space-y-1.5 text-sm">
                 <div className="flex justify-between">
-                  <span className="text-gray-600">Tạm tính</span>
+                  <span className="text-gray-600">Tạm tính <span className="text-gray-400 font-normal">(cả nhóm)</span></span>
                   <span className="font-semibold">{fmtVND(subtotal)}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-gray-600">Phí giao hàng</span>
-                  <span className="font-semibold">25.000đ</span>
+                  <span className="text-gray-600">{paymentOption === 'individual' ? 'Phí ship (phần của bạn)' : 'Phí giao hàng'}</span>
+                  <span className="font-semibold">{paymentOption === 'individual' ? fmtVND(ownerSharedShipping) : '25.000đ'}</span>
                 </div>
                 {activePct > 0 && (
                   <div className="flex justify-between text-green-600">
-                    <span>Ưu đãi nhóm ({activePct}%)</span>
-                    <span className="font-semibold">−{fmtVND(discount)}</span>
+                    <span>
+                      {paymentOption === 'individual'
+                        ? `Ưu đãi của bạn (${ownerDiscountPct.toFixed(1).replace(/\.0$/, '')}%)`
+                        : `Ưu đãi nhóm (${activePct}%)`}
+                    </span>
+                    <span className="font-semibold">−{fmtVND(paymentOption === 'individual' ? ownerDiscount : discount)}</span>
                   </div>
                 )}
                 <div className="border-t border-green-200 pt-1.5 flex justify-between">
@@ -949,9 +976,14 @@ export default function GroupOrderActivePage() {
                 </div>
                 {paymentOption === 'owner_only' && totalHeld > 0 && (
                   <div className="flex justify-between text-teal-600">
-                    <span className="flex items-center gap-1">
-                      <Wallet className="w-3.5 h-3.5" />
-                      Tổng tiền đã cọc
+                    <span className="flex flex-col gap-0">
+                      <span className="flex items-center gap-1">
+                        <Wallet className="w-3.5 h-3.5" />
+                        Tổng tiền đã cọc
+                      </span>
+                      <span className="text-xs text-teal-500 font-normal">
+                        Đã thu cọc từ {members.filter((m) => m.walletPaid).length}/{members.filter((m) => m.role !== 'owner').length} thành viên
+                      </span>
                     </span>
                     <span className="font-semibold">−{fmtVND(totalHeld)}</span>
                   </div>
@@ -963,7 +995,7 @@ export default function GroupOrderActivePage() {
                   <span className={`font-bold ${
                     ownerRemaining === 0 ? "text-teal-700" : "text-orange-700"
                   }`}>
-                    Chủ nhóm cần trả nốt
+                    {paymentOption === 'equal_split' ? 'Phần của bạn (chia đều)' : paymentOption === 'individual' ? 'Phần của bạn' : 'Chủ nhóm cần trả nốt'}
                   </span>
                   <span className={`font-extrabold ${
                     ownerRemaining === 0 ? "text-teal-600" : "text-orange-600"

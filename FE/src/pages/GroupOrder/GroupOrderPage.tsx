@@ -144,7 +144,7 @@ export default function GroupOrderPage() {
         timeLimit: timeLimit !== "Đăng chờ" && timeLimit !== "Không có" ? null : null,
       });
       navigate("/group-order/active", {
-        state: { groupName, cartItems: passedCartItems, groupId: group._id },
+        state: { groupName, cartItems: passedCartItems, groupId: group._id, paymentOption: paymentMode },
       });
     } catch (err: any) {
       toast.error(err?.response?.data?.message ?? "Không tạo được nhóm. Vui lòng thử lại.");
