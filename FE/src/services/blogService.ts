@@ -1,5 +1,7 @@
 import api from './api';
 
+export type BlogStatus = 'pending' | 'approved' | 'rejected';
+
 export interface BlogAuthor {
   _id: string;
   name: string;
@@ -25,6 +27,8 @@ export interface BlogPost {
   likeCount: number;
   commentCount: number;
   isActive: boolean;
+  status: BlogStatus;
+  rejectedReason?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -34,22 +38,6 @@ export interface BlogPagination {
   limit: number;
   total: number;
   pages: number;
-}
-
-interface BlogFeedResponse {
-  success: boolean;
-  data: BlogPost[];
-  pagination: BlogPagination;
-}
-
-interface BlogSingleResponse {
-  success: boolean;
-  data: BlogPost;
-}
-
-interface LikeResponse {
-  success: boolean;
-  data: { liked: boolean; likeCount: number };
 }
 
 // NOTE: Axios interceptor auto-unwraps response.data, so `res` is already the API body.
@@ -103,6 +91,28 @@ const blogService = {
 
   async deleteComment(postId: string, commentId: string): Promise<BlogPost> {
     const res: any = await api.delete(`/blogs/${postId}/comments/${commentId}`);
+    return res.data;
+  },
+
+  // ===== ADMIN METHODS =====
+  async getAllBlogsAdmin(
+    page: number = 1,
+    limit: number = 10,
+    status?: BlogStatus | 'all'
+  ): Promise<{ posts: BlogPost[]; pagination: BlogPagination; counts: { pending: number; approved: number; rejected: number } }> {
+    const params: any = { page, limit };
+    if (status && status !== 'all') params.status = status;
+    const res: any = await api.get('/blogs/admin/all', { params });
+    return { posts: res.data || [], pagination: res.pagination, counts: res.counts };
+  },
+
+  async approveBlog(id: string): Promise<BlogPost> {
+    const res: any = await api.patch(`/blogs/admin/${id}/approve`);
+    return res.data;
+  },
+
+  async rejectBlog(id: string, reason?: string): Promise<BlogPost> {
+    const res: any = await api.patch(`/blogs/admin/${id}/reject`, { reason });
     return res.data;
   },
 };

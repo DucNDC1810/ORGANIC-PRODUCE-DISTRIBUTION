@@ -112,6 +112,40 @@ class BlogController {
       next(error);
     }
   }
+
+  // GET /api/blogs/admin/all  — Admin: list all blogs with optional status filter
+  async getAllBlogsAdmin(req: AuthRequest, res: Response, next: NextFunction) {
+    try {
+      const page = parseInt(req.query.page as string) || 1;
+      const limit = parseInt(req.query.limit as string) || 10;
+      const status = req.query.status as string | undefined;
+      const result = await blogService.getAllBlogsAdmin(page, limit, status);
+      res.json({ success: true, data: result.posts, pagination: result.pagination, counts: result.counts });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  // PATCH /api/blogs/admin/:id/approve  — Admin: approve a blog
+  async approveBlog(req: AuthRequest, res: Response, next: NextFunction) {
+    try {
+      const post = await blogService.approveBlog(req.params.id);
+      res.json({ success: true, data: post });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  // PATCH /api/blogs/admin/:id/reject  — Admin: reject a blog
+  async rejectBlog(req: AuthRequest, res: Response, next: NextFunction) {
+    try {
+      const { reason } = req.body;
+      const post = await blogService.rejectBlog(req.params.id, reason);
+      res.json({ success: true, data: post });
+    } catch (error) {
+      next(error);
+    }
+  }
 }
 
 export const blogController = new BlogController();

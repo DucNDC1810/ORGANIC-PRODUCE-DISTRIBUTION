@@ -7,6 +7,8 @@ export interface IComment {
   createdAt: Date;
 }
 
+export type BlogStatus = 'pending' | 'approved' | 'rejected';
+
 export interface IBlog extends Document {
   author: mongoose.Types.ObjectId;
   content: string;
@@ -15,6 +17,8 @@ export interface IBlog extends Document {
   likes: mongoose.Types.ObjectId[];
   comments: IComment[];
   isActive: boolean;
+  status: BlogStatus;
+  rejectedReason?: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -72,6 +76,15 @@ const blogSchema = new Schema<IBlog>(
     isActive: {
       type: Boolean,
       default: true,
+    },
+    status: {
+      type: String,
+      enum: ['pending', 'approved', 'rejected'],
+      default: 'pending',
+    },
+    rejectedReason: {
+      type: String,
+      trim: true,
     },
   },
   {
