@@ -718,8 +718,9 @@ export default function GroupMemberPage() {
                   <span className="font-medium">−{fmtVND(myDiscount)}</span>
                 </div>
               )}
+              
               <div className="border-t border-gray-100 pt-2.5 flex justify-between">
-                <span className="font-bold text-gray-900">Tổng cộng</span>
+                <span className="font-bold text-gray-900">Tổng cộng2</span>
                 <span className="font-extrabold text-green-600 text-base">
                   {fmtVND(groupTotal)}
                 </span>
