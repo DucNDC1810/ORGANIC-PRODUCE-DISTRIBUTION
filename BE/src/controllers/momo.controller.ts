@@ -220,6 +220,29 @@ export class MoMoController {
               { session }
             );
             console.log(`✅ Wallet top-up success: +${txn.amount} VND for user ${txn.userId}`);
+
+            // ── Thưởng nạp tiền lần đầu: +10.000₫ ────────────────────────
+            const FIRST_TOPUP_BONUS = 10000;
+            const user = await User.findById(txn.userId).session(session);
+            if (user && !user.firstTopupBonusClaimed) {
+              await User.findByIdAndUpdate(
+                txn.userId,
+                { $inc: { walletBalance: FIRST_TOPUP_BONUS }, $set: { firstTopupBonusClaimed: true } },
+                { session }
+              );
+              await Transaction.create(
+                [{
+                  userId: txn.userId,
+                  amount: FIRST_TOPUP_BONUS,
+                  type: 'bonus',
+                  status: 'success',
+                  description: 'Thưởng nạp tiền lần đầu +10.000₫'
+                }],
+                { session }
+              );
+              console.log(`🎁 First top-up bonus +${FIRST_TOPUP_BONUS} VND for user ${txn.userId}`);
+            }
+            // ── END bonus ─────────────────────────────────────────────────
           } else {
             console.log('ℹ️ Top-up already processed (idempotent):', transactionId);
           }

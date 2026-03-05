@@ -73,6 +73,7 @@ export default function TopupResultPage() {
   // ── State ──────────────────────────────────────────────────────────────────
   const [newBalance, setNewBalance] = useState<number | null>(null);
   const [loading,    setLoading]    = useState(isSuccess);   // only fetch if success
+  const [bonusAwarded, setBonusAwarded] = useState(false);
   const [now]        = useState(() => new Date());
 
   // ── Fetch fresh wallet info to confirm balance ─────────────────────────────
@@ -89,6 +90,7 @@ export default function TopupResultPage() {
             const verifyRes = await walletService.verifyTopUp(momoOrderId, momoRequestId || momoOrderId);
             if (!cancelled) {
               setNewBalance((verifyRes as any)?.data?.walletBalance ?? null);
+              setBonusAwarded((verifyRes as any)?.data?.bonusAwarded === true);
               setLoading(false);
               return; // balance đã có từ verify, không cần fetch lại
             }
@@ -243,6 +245,20 @@ export default function TopupResultPage() {
                 <p className="text-xs text-white/60 mt-1">Ví FreshMarket</p>
               </div>
             </motion.div>
+
+            {/* ── First top-up bonus banner ── */}
+            {bonusAwarded && (
+              <motion.div variants={item}>
+                <div className="flex items-center gap-3 bg-gradient-to-r from-yellow-50 to-amber-50 border border-yellow-200 rounded-2xl px-5 py-4 shadow-sm">
+                  <span className="text-2xl leading-none">🎁</span>
+                  <div>
+                    <p className="text-sm font-bold text-amber-800">Chúc mừng! Bạn nhận được thưởng nạp tiền lần đầu</p>
+                    <p className="text-xs text-amber-600 mt-0.5">+10.000₫ đã được cộng vào ví của bạn</p>
+                  </div>
+                  <span className="ml-auto text-lg font-extrabold text-amber-700">+10.000₫</span>
+                </div>
+              </motion.div>
+            )}
 
             {/* ── Transaction detail card ── */}
             <motion.div variants={item}>

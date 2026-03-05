@@ -17,12 +17,14 @@ const fmt = (n: number) => n.toLocaleString('vi-VN') + '₫';
 function txIcon(type: Transaction['type']) {
   if (type === 'topup')   return <ArrowDownLeft className="w-5 h-5 text-green-600" />;
   if (type === 'payment') return <ShoppingCart   className="w-5 h-5 text-red-500"   />;
+  if (type === 'bonus')   return <span className="text-base leading-none">🎁</span>;
   return                         <RotateCcw      className="w-5 h-5 text-blue-500"  />;
 }
 
 function txBg(type: Transaction['type']) {
   if (type === 'topup')   return 'bg-green-50';
   if (type === 'payment') return 'bg-red-50';
+  if (type === 'bonus')   return 'bg-yellow-50';
   return 'bg-blue-50';
 }
 
@@ -38,6 +40,7 @@ function txLabel(tx: Transaction) {
   if (tx.description) return tx.description;
   if (tx.type === 'topup')   return 'Nạp tiền vào ví';
   if (tx.type === 'payment') return `Thanh toán đơn hàng${tx.orderId ? ` #${String(tx.orderId).slice(-6)}` : ''}`;
+  if (tx.type === 'bonus')   return 'Thưởng nạp tiền lần đầu';
   return 'Hoàn tiền';
 }
 

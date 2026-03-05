@@ -30,7 +30,7 @@ import RecurringDeliveryModal, {
 } from "../../components/RecurringDeliveryModal";
 
 export default function CheckoutPage() {
-  const { cart, getTotalPrice, removeFromCart, updateQuantity } = useCart();
+  const { cart, getTotalPrice, removeFromCart, updateQuantity, clearCart } = useCart();
   const { user } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
@@ -112,9 +112,11 @@ export default function CheckoutPage() {
 
   useEffect(() => {
     if (!user) return;
+    setWalletLoading(true);
     walletService.getWalletInfo()
       .then((res: any) => setWalletBalance(res?.data?.walletBalance ?? res?.walletBalance ?? 0))
-      .catch(() => setWalletBalance(0));
+      .catch(() => setWalletBalance(0))
+      .finally(() => setWalletLoading(false));
   }, [user]);
   // ─────────────────────────────────────────────────────────────────────────
 
@@ -503,6 +505,9 @@ export default function CheckoutPage() {
               console.warn("Subscription creation failed:", subErr);
             }
           }
+          // Xoá giỏ hàng sau khi đặt hàng thành công
+          await clearCart(true);
+
           navigate("/order-success", {
             state: {
               orderId: result?._id || result?.data?._id,
@@ -585,10 +590,14 @@ export default function CheckoutPage() {
         const newBalance = result?.walletBalance ?? walletBalance - total;
         setWalletBalance(newBalance);
 
+        // Xoá giỏ hàng sau khi thanh toán thành công
+        await clearCart(true);
+
         navigate("/order-success", {
           state: {
             orderId: result?.order?._id,
             paymentMethod: "Wallet",
+            walletBalance: newBalance,
             totalAmount: total,
             deliveryType,
             pickupLocation:

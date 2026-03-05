@@ -9,7 +9,7 @@ export interface Transaction {
   _id: string;
   userId: string;
   amount: number;
-  type: 'topup' | 'payment' | 'refund';
+  type: 'topup' | 'payment' | 'refund' | 'bonus';
   status: 'pending' | 'success' | 'failed';
   orderId?: string;
   description?: string;

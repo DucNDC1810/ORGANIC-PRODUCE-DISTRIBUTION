@@ -76,6 +76,43 @@ export default function OrderSuccessPage() {
       try {
         setLoading(true);
 
+        // ── Wallet: navigated directly from CheckoutPage ─────────────────
+        if (location.state?.paymentMethod === "Wallet") {
+          setPaymentType(null);
+          setVerificationStatus("verified");
+          const walletOrderId = location.state.orderId;
+          const stateDeliveryInfo = location.state.deliveryInfo || null;
+          const statePickupLocation = location.state.pickupLocation || null;
+          setOrderData({
+            orderId: walletOrderId,
+            amount: location.state.totalAmount,
+            paymentMethod: "Wallet",
+            deliveryInfo: stateDeliveryInfo,
+            pickupLocation: statePickupLocation,
+            walletBalance: location.state.walletBalance,
+          });
+          if (walletOrderId) {
+            try {
+              const orderRes = await orderService.getOrderById(walletOrderId);
+              if (orderRes.data?.data) {
+                const order = orderRes.data.data;
+                setOrderData({
+                  orderId: order._id,
+                  amount: order.totalAmount,
+                  paymentMethod: "Wallet",
+                  deliveryInfo: (order as any).deliveryInfo || stateDeliveryInfo,
+                  pickupLocation: (order as any).pickupLocation || statePickupLocation,
+                  walletBalance: location.state.walletBalance,
+                });
+              }
+            } catch {
+              // Non-fatal — already seeded from state above
+            }
+          }
+          setLoading(false);
+          return;
+        }
+
         // ── COD: navigated directly from CheckoutPage ──────────────────────
         if (location.state?.paymentMethod === "COD") {
           setPaymentType(null);
@@ -551,16 +588,18 @@ export default function OrderSuccessPage() {
                         <span className="text-foreground font-medium">
                           {orderData?.paymentMethod === "COD"
                             ? "🚚 Tiền mặt khi giao hàng (COD)"
-                            : paymentType === "momo"
-                              ? "MoMo"
-                              : "Chưa xác định"}
+                            : orderData?.paymentMethod === "Wallet"
+                              ? "👛 Ví FreshMarket"
+                              : paymentType === "momo"
+                                ? "MoMo"
+                                : "Chưa xác định"}
                         </span>
                         <span className={`inline-flex items-center gap-1 text-sm font-medium px-3 py-1 rounded-full ${
                           orderData?.paymentMethod === "COD"
                             ? "text-orange-600 bg-orange-100"
                             : "text-primary bg-primary/10"
                         }`}>
-                          {orderData?.paymentMethod === "COD" ? "⏳ Thanh toán khi nhận hàng" : "✓ Đã Thanh Toán"}
+                          {orderData?.paymentMethod === "COD" ? "⏳ Thanh toán khi nhận hàng" : orderData?.paymentMethod === "Wallet" ? "✓ Thanh toán bằng ví" : "✓ Đã Thanh Toán"}
                         </span>
                       </div>
                     </div>

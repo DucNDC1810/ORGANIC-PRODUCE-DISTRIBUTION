@@ -20,6 +20,7 @@ export interface IUser extends Document {
   passwordResetToken?: string;
   passwordResetExpires?: Date;
   walletBalance: number;
+  firstTopupBonusClaimed: boolean;
   createdAt: Date;
   updatedAt: Date;
   comparePassword(candidatePassword: string): Promise<boolean>;
@@ -93,6 +94,10 @@ const userSchema = new Schema<IUser>(
       type: Number,
       default: 0,
       min: 0
+    },
+    firstTopupBonusClaimed: {
+      type: Boolean,
+      default: false
     }
   },
   {

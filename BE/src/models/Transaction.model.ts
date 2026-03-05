@@ -3,7 +3,7 @@ import mongoose, { Document, Schema } from 'mongoose';
 export interface ITransaction extends Document {
   userId: mongoose.Types.ObjectId;
   amount: number;
-  type: 'topup' | 'payment' | 'refund';
+  type: 'topup' | 'payment' | 'refund' | 'bonus';
   status: 'pending' | 'success' | 'failed';
   orderId?: mongoose.Types.ObjectId;
   description?: string;
@@ -27,7 +27,7 @@ const transactionSchema = new Schema<ITransaction>(
     },
     type: {
       type: String,
-      enum: ['topup', 'payment', 'refund'],
+      enum: ['topup', 'payment', 'refund', 'bonus'],
       required: [true, 'Transaction type is required']
     },
     status: {

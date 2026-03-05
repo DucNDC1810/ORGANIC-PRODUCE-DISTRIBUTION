@@ -363,6 +363,7 @@ export class WalletController {
       // Thanh toán hợp lệ — cập nhật nguyên tử
       const session = await mongoose.startSession();
       session.startTransaction();
+      let bonusAwarded = false;
       try {
         // Re-read trong session để tránh race condition với IPN
         const txnInSession = await Transaction.findById(transactionId).session(session);
@@ -391,6 +392,30 @@ export class WalletController {
             { session }
           );
           console.log(`✅ Top-up verified & credited: +${txnInSession.amount} VND for user ${userId}`);
+
+          // ── Thưởng nạp tiền lần đầu: +10.000₫ ──────────────────────────
+          const FIRST_TOPUP_BONUS = 10000;
+          const userRecord = await User.findById(txnInSession.userId).session(session);
+          if (userRecord && !userRecord.firstTopupBonusClaimed) {
+            await User.findByIdAndUpdate(
+              txnInSession.userId,
+              { $inc: { walletBalance: FIRST_TOPUP_BONUS }, $set: { firstTopupBonusClaimed: true } },
+              { session }
+            );
+            await Transaction.create(
+              [{
+                userId: txnInSession.userId,
+                amount: FIRST_TOPUP_BONUS,
+                type: 'bonus',
+                status: 'success',
+                description: 'Thưởng nạp tiền lần đầu +10.000₫'
+              }],
+              { session }
+            );
+            bonusAwarded = true;
+            console.log(`🎁 First top-up bonus +${FIRST_TOPUP_BONUS} VND for user ${userId}`);
+          }
+          // ── END bonus ───────────────────────────────────────────────────
         }
 
         await session.commitTransaction();
@@ -405,7 +430,7 @@ export class WalletController {
       res.status(200).json({
         success: true,
         message: 'Top-up confirmed and wallet credited',
-        data: { walletBalance: updatedUser?.walletBalance ?? 0, alreadyProcessed: false }
+        data: { walletBalance: updatedUser?.walletBalance ?? 0, alreadyProcessed: false, bonusAwarded }
       });
     } catch (error) {
       next(error);
