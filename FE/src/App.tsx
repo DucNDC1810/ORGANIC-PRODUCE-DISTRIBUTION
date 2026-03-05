@@ -1,3 +1,4 @@
+import { lazy, Suspense } from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { Toaster } from 'sonner';
 import { CartProvider } from './context/CartContext';
@@ -5,29 +6,30 @@ import { AuthProvider } from './context/AuthContext';
 import { GroupProvider } from './context/GroupContext';
 import { ProtectedRoute, CustomerRoute, AdminRoute, ManagerRoute } from './components/ProtectedRoute';
 import MiniCart from './components/MiniCart';
-import HomePage from './pages/HomePage/Home';
-import CartPage from './pages/HomePage/CartPage';
-import CheckoutPage from './pages/Checkout/CheckoutPage';
-import OrderSuccessPage from './pages/Checkout/OrderSuccessPage';
-import LoginPage from './pages/HomePage/LoginPage';
-import SignUpPage from './pages/HomePage/SignUpPage';
-import ForgotPasswordPage from './pages/HomePage/ForgotPasswordPage';
-import ResetPasswordPage from './pages/HomePage/ResetPasswordPage';
-import AuthCallbackPage from './pages/HomePage/AuthCallbackPage';
-import VerifyEmailPage from './pages/HomePage/VerifyEmailPage';
-import FarmStories from './pages/HomePage/FarmStories';
-import BlogsPage from './pages/HomePage/BlogsPage';
-import AboutUs from './pages/HomePage/AboutUs';
-import Profile from './pages/Customer/Profile';
-import AdminDashboard from './pages/Admin/AdminDashboard';
-import ManagerDashboard from './pages/Manager/ManagerDashboard';
-import ProductsPage from './pages/HomePage/ProductsPage';
-import ProductDetailPage from './pages/HomePage/ProductDetailPage';
 import ChatWidget from './components/ChatWidget';
-import GroupOrderPage from './pages/GroupOrder/GroupOrderPage';
-import GroupOrderActivePage from './pages/GroupOrder/GroupOrderActivePage';
-import JoinGroupPage from './pages/GroupOrder/JoinGroupPage';
-import GroupMemberPage from './pages/GroupOrder/GroupMemberPage';
+
+const HomePage             = lazy(() => import('./pages/HomePage/Home'));
+const CartPage             = lazy(() => import('./pages/HomePage/CartPage'));
+const CheckoutPage         = lazy(() => import('./pages/Checkout/CheckoutPage'));
+const OrderSuccessPage     = lazy(() => import('./pages/Checkout/OrderSuccessPage'));
+const LoginPage            = lazy(() => import('./pages/HomePage/LoginPage'));
+const SignUpPage           = lazy(() => import('./pages/HomePage/SignUpPage'));
+const ForgotPasswordPage   = lazy(() => import('./pages/HomePage/ForgotPasswordPage'));
+const ResetPasswordPage    = lazy(() => import('./pages/HomePage/ResetPasswordPage'));
+const AuthCallbackPage     = lazy(() => import('./pages/HomePage/AuthCallbackPage'));
+const VerifyEmailPage      = lazy(() => import('./pages/HomePage/VerifyEmailPage'));
+const FarmStories          = lazy(() => import('./pages/HomePage/FarmStories'));
+const BlogsPage            = lazy(() => import('./pages/HomePage/BlogsPage'));
+const AboutUs              = lazy(() => import('./pages/HomePage/AboutUs'));
+const Profile              = lazy(() => import('./pages/Customer/Profile'));
+const AdminDashboard       = lazy(() => import('./pages/Admin/AdminDashboard'));
+const ManagerDashboard     = lazy(() => import('./pages/Manager/ManagerDashboard'));
+const ProductsPage         = lazy(() => import('./pages/HomePage/ProductsPage'));
+const ProductDetailPage    = lazy(() => import('./pages/HomePage/ProductDetailPage'));
+const GroupOrderPage       = lazy(() => import('./pages/GroupOrder/GroupOrderPage'));
+const GroupOrderActivePage = lazy(() => import('./pages/GroupOrder/GroupOrderActivePage'));
+const JoinGroupPage        = lazy(() => import('./pages/GroupOrder/JoinGroupPage'));
+const GroupMemberPage      = lazy(() => import('./pages/GroupOrder/GroupMemberPage'));
 
 export default function App() {
   return (
@@ -37,6 +39,7 @@ export default function App() {
           <BrowserRouter>
           <Toaster position="bottom-right" richColors />
           <MiniCart />
+          <Suspense fallback={null}>
           <Routes>
             {/* Public routes */}
             <Route path="/" element={<HomePage />} />
@@ -72,6 +75,7 @@ export default function App() {
             {/* Manager-only routes */}
             <Route path="/manager" element={<ManagerRoute><ManagerDashboard /></ManagerRoute>} />
           </Routes>
+          </Suspense>
           <ChatWidget />
           </BrowserRouter>
         </GroupProvider>
