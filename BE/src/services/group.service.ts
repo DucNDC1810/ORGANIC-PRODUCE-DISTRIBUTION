@@ -44,23 +44,25 @@ export class GroupService {
       .sort({ joinedAt: 1 });
   }
 
-  /** Tham gia nhóm (user đã đăng nhập hoặc khách vãng lai) */
-  async joinGroup(groupId: string, userId: string | null, tempName: string) {
+  /** Tham gia nhóm (bắt buộc user đã đăng nhập) */
+  async joinGroup(groupId: string, userId: string) {
     // Tránh join trùng cho user đã đăng nhập
-    if (userId) {
-      const existing = await GroupMember.findOne({ groupId, userId });
-      if (existing) return existing;
-    }
+    const existing = await GroupMember.findOne({ groupId, userId });
+    if (existing) return existing;
 
     const member = await GroupMember.create({
       groupId,
-      userId: userId || undefined,
-      tempName: userId ? undefined : tempName,
+      userId,
       role: 'member',
       isReady: false,
     });
 
     return member;
+  }
+
+  /** Xóa thành viên khỏi nhóm (rời nhóm) */
+  async removeMember(groupId: string, memberId: string) {
+    return GroupMember.findOneAndDelete({ _id: memberId, groupId, role: { $ne: 'owner' } });
   }
 
   /** Cập nhật trạng thái sẵn sàng (đã chọn món) của một thành viên */

@@ -14,19 +14,16 @@ router.get('/:id', groupController.getGroup as any);
 // Lấy danh sách thành viên (public)
 router.get('/:id/members', groupController.getMembers as any);
 
-// Tham gia nhóm (có thể là khách, có thể dùng authenticate tùy chọn)
-router.post('/:id/join', (req, res, next) => {
-  // Thử xác thực, nếu không có token thì vẫn cho qua (khách vãng lai)
-  authenticate(req as any, res, (err) => {
-    if (err) return next(); // ignore auth error, guest flow
-    next();
-  });
-}, groupController.joinGroup as any);
+// Tham gia nhóm (bắt buộc đăng nhập)
+router.post('/:id/join', authenticate as any, groupController.joinGroup as any);
 
-// Cập nhật trạng thái đã chọn món
-router.patch('/:id/members/:memberId/ready', groupController.setMemberReady as any);
+// Rời nhóm (bắt buộc đăng nhập)
+router.delete('/:id/members/:memberId', authenticate as any, groupController.leaveGroup as any);
 
-// Thêm món vào giỏ của thành viên (không cần đăng nhập)
-router.post('/:id/members/:memberId/items', groupController.addMemberItem as any);
+// Cập nhật trạng thái đã chọn món (bắt buộc đăng nhập)
+router.patch('/:id/members/:memberId/ready', authenticate as any, groupController.setMemberReady as any);
+
+// Thêm món vào giỏ của thành viên (bắt buộc đăng nhập)
+router.post('/:id/members/:memberId/items', authenticate as any, groupController.addMemberItem as any);
 
 export default router;

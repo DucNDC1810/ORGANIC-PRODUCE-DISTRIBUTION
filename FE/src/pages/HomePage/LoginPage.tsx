@@ -1,11 +1,12 @@
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { Leaf, Eye, EyeOff } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { toast } from 'sonner';
 
 export default function LoginPage() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { login } = useAuth();
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
@@ -30,8 +31,24 @@ export default function LoginPage() {
       if (userStr) {
         const user = JSON.parse(userStr);
         
-        // Redirect based on user role
         toast.success('Login successful! Welcome back!');
+
+        // Priority 1: ?redirect= URL param (e.g. from email link via Profile guard)
+        const redirectParam = searchParams.get('redirect');
+        if (redirectParam && (user.role === 'customer' || !user.role)) {
+          navigate(decodeURIComponent(redirectParam), { replace: true });
+          return;
+        }
+
+        // Priority 2: sessionStorage redirect (e.g. group invite links)
+        const pendingRedirect = sessionStorage.getItem('redirectAfterLogin');
+        if (pendingRedirect && (user.role === 'customer' || !user.role)) {
+          sessionStorage.removeItem('redirectAfterLogin');
+          navigate(pendingRedirect, { replace: true });
+          return;
+        }
+
+        // Redirect based on user role
         switch (user.role) {
           case 'admin':
             navigate('/admin');

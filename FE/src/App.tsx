@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
+﻿import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { Toaster } from 'sonner';
 import { CartProvider } from './context/CartContext';
 import { AuthProvider } from './context/AuthContext';
@@ -56,9 +56,9 @@ export default function App() {
             {/* Protected routes - require authentication */}
             <Route path="/group-order" element={<ProtectedRoute><GroupOrderPage /></ProtectedRoute>} />
             <Route path="/group-order/active" element={<ProtectedRoute><GroupOrderActivePage /></ProtectedRoute>} />
-            {/* Public invite link – không cần đăng nhập */}
+            {/* Public invite link - khong can dang nhap */}
             <Route path="/join-group/:groupId" element={<JoinGroupPage />} />
-            {/* Trang xem nhóm cho thành viên – không cần đăng nhập */}
+            {/* Trang xem nhom cho thanh vien - khong can dang nhap */}
             <Route path="/group/members" element={<GroupMemberPage />} />
             <Route path="/cart" element={<ProtectedRoute><CartPage /></ProtectedRoute>} />
             <Route path="/checkout" element={<ProtectedRoute><CheckoutPage /></ProtectedRoute>} />

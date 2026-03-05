@@ -1,30 +1,48 @@
 import { useState, useEffect, useRef } from 'react';
-import { User, ShoppingBag, LogOut, Phone, Mail, Home, Edit2, Save, X, Camera, Package, ChevronDown, ChevronUp, AlertTriangle } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { User, ShoppingBag, LogOut, Phone, Mail, Home, Edit2, Save, X, Camera, CalendarClock } from 'lucide-react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useCart } from '../../context/CartContext';
 import Header from '../../components/Header';
 import { userAPI } from '../Axios/Axios';
 import { toast } from 'sonner';
-import { orderService, Order } from '../../services/orderService';
+import OrderHistoryTab from './OrderHistoryTab';
+import SubscriptionTab from './SubscriptionTab';
 
 export default function Profile() {
   const { user, logout, setUser } = useAuth();
   const { clearLocalCart } = useCart();
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState<'account' | 'orders'>('account');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [activeTab, setActiveTab] = useState<'account' | 'orders' | 'subscriptions'>(
+    (searchParams.get('tab') as any) || 'account'
+  );
+
+  // Redirect to login if not authenticated, preserve full return URL
+  useEffect(() => {
+    if (user === null) {
+      const returnUrl = encodeURIComponent(window.location.pathname + window.location.search);
+      navigate(`/login?redirect=${returnUrl}`, { replace: true });
+    }
+  }, [user, navigate]);
+
+  // Sync tab from URL param
+  useEffect(() => {
+    const t = searchParams.get('tab');
+    if (t === 'orders' || t === 'subscriptions' || t === 'account') {
+      setActiveTab(t);
+    }
+  }, [searchParams]);
+
+  const handleTabChange = (tab: 'account' | 'orders' | 'subscriptions') => {
+    setActiveTab(tab);
+    setSearchParams(tab !== 'account' ? { tab } : {});
+  };
   const [isEditing, setIsEditing] = useState(false);
   const [loading, setLoading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Order history state
-  const [orders, setOrders] = useState<Order[]>([]);
-  const [ordersLoading, setOrdersLoading] = useState(false);
-  const [orderFilter, setOrderFilter] = useState<string>('');
-  const [expandedOrder, setExpandedOrder] = useState<string | null>(null);
-  const [orderPage, setOrderPage] = useState(1);
-  const [orderTotalPages, setOrderTotalPages] = useState(1);
-  const [cancelModal, setCancelModal] = useState<{ open: boolean; orderId: string; cancelling: boolean }>({ open: false, orderId: '', cancelling: false });
+
   
   // Form state
   const [formData, setFormData] = useState<{
@@ -57,48 +75,7 @@ export default function Profile() {
     }
   }, [user]);
 
-  // Fetch orders when tab changes to 'orders'
-  useEffect(() => {
-    if (activeTab === 'orders') {
-      fetchOrders();
-    }
-  }, [activeTab, orderFilter, orderPage]);
 
-  const fetchOrders = async () => {
-    try {
-      setOrdersLoading(true);
-      const res: any = await orderService.getMyOrders(orderPage, 10, orderFilter || undefined);
-      // api.ts interceptor already unwraps response.data, so res = { success, data, pagination }
-      setOrders(res.data ?? []);
-      setOrderTotalPages(res.pagination?.totalPages ?? 1);
-    } catch (error: any) {
-      toast.error(error.response?.data?.message || 'Failed to load orders');
-    } finally {
-      setOrdersLoading(false);
-    }
-  };
-
-  const getStatusColor = (status: string) => {
-    const map: Record<string, string> = {
-      pending:    'bg-yellow-100 text-yellow-700',
-      confirmed:  'bg-blue-100 text-blue-700',
-      processing: 'bg-purple-100 text-purple-700',
-      shipped:    'bg-indigo-100 text-indigo-700',
-      delivered:  'bg-green-100 text-green-700',
-      cancelled:  'bg-red-100 text-red-700',
-      refunded:   'bg-gray-100 text-gray-700',
-    };
-    return map[status] || 'bg-gray-100 text-gray-700';
-  };
-
-  const getPaymentStatusColor = (status?: string) => {
-    const map: Record<string, string> = {
-      paid:    'text-green-600',
-      pending: 'text-yellow-600',
-      failed:  'text-red-600',
-    };
-    return map[status || ''] || 'text-gray-500';
-  };
 
   const handleLogout = () => {
     clearLocalCart();
@@ -200,7 +177,7 @@ export default function Profile() {
               {/* Navigation Menu */}
               <nav className="p-4">
                 <button
-                  onClick={() => setActiveTab('account')}
+                  onClick={() => handleTabChange('account')}
                   className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-left transition-all mb-2 ${
                     activeTab === 'account'
                       ? 'bg-[#EDF2EE] text-[#00B207]'
@@ -212,7 +189,7 @@ export default function Profile() {
                 </button>
 
                 <button
-                  onClick={() => setActiveTab('orders')}
+                  onClick={() => handleTabChange('orders')}
                   className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-left transition-all mb-2 ${
                     activeTab === 'orders'
                       ? 'bg-[#EDF2EE] text-[#00B207]'
@@ -221,6 +198,18 @@ export default function Profile() {
                 >
                   <ShoppingBag className="w-5 h-5" />
                   <span className="font-medium">Order History</span>
+                </button>
+
+                <button
+                  onClick={() => handleTabChange('subscriptions')}
+                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-left transition-all mb-2 ${
+                    activeTab === 'subscriptions'
+                      ? 'bg-violet-50 text-violet-700'
+                      : 'text-[#364153] hover:bg-[#F3F4F6]'
+                  }`}
+                >
+                  <CalendarClock className="w-5 h-5" />
+                  <span className="font-medium">Đặt hàng định kỳ</span>
                 </button>
 
                 <button
@@ -449,209 +438,19 @@ export default function Profile() {
 
             {/* Order History Tab */}
             {activeTab === 'orders' && (
-              <div className="bg-white rounded-2xl shadow-sm border border-[#E5E7EB] p-6">
-                <div className="flex items-center justify-between mb-6">
-                  <h2 className="text-2xl font-bold text-[#101828]">Order History</h2>
-                  {/* Filter */}
-                  <select
-                    value={orderFilter}
-                    onChange={(e) => { setOrderFilter(e.target.value); setOrderPage(1); }}
-                    className="px-3 py-2 border border-[#E5E7EB] rounded-lg text-sm text-[#364153] focus:outline-none focus:border-[#00B207]"
-                  >
-                    <option value="">All Orders</option>
-                    <option value="pending">Pending</option>
-                    <option value="confirmed">Confirmed</option>
-                    <option value="processing">Processing</option>
-                    <option value="shipped">Shipped</option>
-                    <option value="delivered">Delivered</option>
-                    <option value="cancelled">Cancelled</option>
-                    <option value="refunded">Refunded</option>
-                  </select>
-                </div>
-
-                {ordersLoading ? (
-                  <div className="flex justify-center py-12">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#00B207]" />
-                  </div>
-                ) : (orders ?? []).length === 0 ? (
-                  <div className="flex flex-col items-center justify-center py-12">
-                    <ShoppingBag className="w-16 h-16 text-[#E5E7EB] mb-4" />
-                    <h3 className="text-lg font-semibold text-[#364153] mb-2">No Orders Found</h3>
-                    <p className="text-sm text-[#6A7282] text-center">
-                      {orderFilter ? `No orders with status "${orderFilter}".` : "You haven't placed any orders yet."}
-                    </p>
-                  </div>
-                ) : (
-                  <div className="space-y-4">
-                    {(orders ?? []).map((order) => (
-                      <div key={order._id} className="border border-[#E5E7EB] rounded-xl overflow-hidden">
-                        {/* Order Header */}
-                        <div
-                          className="flex items-center justify-between p-4 bg-[#F9FAFB] cursor-pointer hover:bg-[#EDF2EE] transition-colors"
-                          onClick={() => setExpandedOrder(expandedOrder === order._id ? null : order._id)}
-                        >
-                          <div className="flex items-center gap-3">
-                            <Package className="w-5 h-5 text-[#00B207]" />
-                            <div>
-                              <p className="text-sm font-semibold text-[#101828]">
-                                Order #{order._id.slice(-8).toUpperCase()}
-                              </p>
-                              <p className="text-xs text-[#6A7282]">
-                                {new Date(order.createdAt).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
-                              </p>
-                            </div>
-                          </div>
-                          <div className="flex items-center gap-3">
-                            <span className={`text-xs font-medium px-2.5 py-1 rounded-full capitalize ${getStatusColor(order.status)}`}>
-                              {order.status}
-                            </span>
-                            <span className="text-sm font-bold text-[#101828]">
-                              {order.totalAmount.toLocaleString('vi-VN')}₫
-                            </span>
-                            {expandedOrder === order._id
-                              ? <ChevronUp className="w-4 h-4 text-[#6A7282]" />
-                              : <ChevronDown className="w-4 h-4 text-[#6A7282]" />}
-                          </div>
-                        </div>
-
-                        {/* Order Details */}
-                        {expandedOrder === order._id && (
-                          <div className="p-4 space-y-3">
-                            {/* Items */}
-                            <div className="space-y-2">
-                              {(order.items ?? []).map((item, idx) => (
-                                <div key={idx} className="flex items-center justify-between py-2 border-b border-[#F3F4F6] last:border-0">
-                                  <div className="flex items-center gap-2">
-                                    <span className="text-xs bg-[#EDF2EE] text-[#00B207] px-2 py-0.5 rounded font-medium">x{item.quantity}</span>
-                                    <span className="text-sm text-[#364153]">{(item as any).name || `Product`}</span>
-                                  </div>
-                                  <span className="text-sm font-medium text-[#101828]">{item.subtotal.toLocaleString('vi-VN')}₫</span>
-                                </div>
-                              ))}
-                            </div>
-
-                            {/* Summary */}
-                            <div className="flex justify-between items-center pt-2 text-sm">
-                              <span className="text-[#6A7282]">Payment</span>
-                              <span className="font-medium capitalize">{order.paymentMethod?.replace('_', ' ') || 'N/A'}
-                                {' · '}
-                                <span className={`font-semibold ${getPaymentStatusColor(order.paymentStatus)}`}>
-                                  {order.paymentStatus || 'N/A'}
-                                </span>
-                              </span>
-                            </div>
-                            {order.shippingCost !== undefined && order.shippingCost > 0 && (
-                              <div className="flex justify-between items-center text-sm">
-                                <span className="text-[#6A7282]">Shipping</span>
-                                <span className="font-medium">{order.shippingCost.toLocaleString('vi-VN')}₫</span>
-                              </div>
-                            )}
-                            <div className="flex justify-between items-center pt-2 border-t border-[#E5E7EB]">
-                              <span className="font-semibold text-[#101828]">Total</span>
-                              <span className="font-bold text-[#00B207]">{order.totalAmount.toLocaleString('vi-VN')}₫</span>
-                            </div>
-
-                            {/* Cancel button for pending orders */}
-                            {order.status === 'pending' && (
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setCancelModal({ open: true, orderId: order._id, cancelling: false });
-                                }}
-                                className="mt-2 w-full py-2 text-sm text-red-600 border border-red-200 rounded-lg hover:bg-red-50 transition-colors"
-                              >
-                                Cancel Order
-                              </button>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    ))}
-
-                    {/* Pagination */}
-                    {orderTotalPages > 1 && (
-                      <div className="flex justify-center gap-2 pt-4">
-                        {Array.from({ length: orderTotalPages }, (_, i) => i + 1).map((p) => (
-                          <button
-                            key={p}
-                            onClick={() => setOrderPage(p)}
-                            className={`w-8 h-8 rounded-lg text-sm font-medium transition-colors ${
-                              p === orderPage
-                                ? 'bg-[#00B207] text-white'
-                                : 'bg-[#F3F4F6] text-[#364153] hover:bg-[#EDF2EE]'
-                            }`}
-                          >
-                            {p}
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                )}
+              <div>
+                <OrderHistoryTab highlightOrderId={searchParams.get('highlight') ?? undefined} />
               </div>
+            )}
+
+            {/* Subscription Tab */}
+            {activeTab === 'subscriptions' && (
+              <SubscriptionTab />
             )}
           </div>
         </div>
       </div>
-      {/* Cancel Order Confirmation Modal */}
-      {cancelModal.open && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center">
-          {/* Backdrop */}
-          <div
-            className="absolute inset-0 bg-black/50 backdrop-blur-sm"
-            onClick={() => !cancelModal.cancelling && setCancelModal({ open: false, orderId: '', cancelling: false })}
-          />
-          {/* Modal */}
-          <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 p-6 animate-in fade-in zoom-in-95">
-            <div className="flex flex-col items-center text-center">
-              <div className="w-14 h-14 rounded-full bg-red-100 flex items-center justify-center mb-4">
-                <AlertTriangle className="w-7 h-7 text-red-500" />
-              </div>
-              <h3 className="text-lg font-bold text-[#101828] mb-2">Cancel Order</h3>
-              <p className="text-sm text-[#6A7282] mb-1">
-                Are you sure you want to cancel this order?
-              </p>
-              <p className="text-xs text-[#9CA3AF] mb-6">
-                This action cannot be undone. Your order will be cancelled immediately.
-              </p>
-              <div className="flex gap-3 w-full">
-                <button
-                  disabled={cancelModal.cancelling}
-                  onClick={() => setCancelModal({ open: false, orderId: '', cancelling: false })}
-                  className="flex-1 py-2.5 text-sm font-medium text-[#364153] bg-[#F3F4F6] rounded-xl hover:bg-[#E5E7EB] transition-colors disabled:opacity-50"
-                >
-                  Keep Order
-                </button>
-                <button
-                  disabled={cancelModal.cancelling}
-                  onClick={async () => {
-                    setCancelModal(prev => ({ ...prev, cancelling: true }));
-                    try {
-                      await orderService.cancelOrder(cancelModal.orderId, 'Cancelled by user');
-                      toast.success('Order cancelled successfully');
-                      setCancelModal({ open: false, orderId: '', cancelling: false });
-                      fetchOrders();
-                    } catch (err: any) {
-                      toast.error(err.response?.data?.message || 'Failed to cancel order');
-                      setCancelModal(prev => ({ ...prev, cancelling: false }));
-                    }
-                  }}
-                  className="flex-1 py-2.5 text-sm font-medium text-white bg-red-500 rounded-xl hover:bg-red-600 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
-                >
-                  {cancelModal.cancelling ? (
-                    <>
-                      <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                      Cancelling...
-                    </>
-                  ) : (
-                    'Yes, Cancel Order'
-                  )}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+
     </div>
   );
 }

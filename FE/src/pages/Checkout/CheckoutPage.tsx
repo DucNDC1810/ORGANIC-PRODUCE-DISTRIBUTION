@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useLocation } from "react-router-dom";
+import { useGroup } from "../../context/GroupContext";
 import {
   Plus,
   Minus,
@@ -19,8 +20,8 @@ import zalopayService from "../../services/zaloPayService";
 import momoService from "../../services/momoService";
 import voucherService from "../../services/voucherService";
 import { orderService } from "../../services/orderService";
+import subscriptionService from "../../services/subscriptionService";
 import StorePickupModal, { type Store as StoreData } from "../../components/StorePickupModal";
-import { type GroupOrderData } from "../../components/GroupOrderModal";
 import RecurringDeliveryModal, {
   type RecurringData,
   FREQUENCY_LABELS,
@@ -32,14 +33,33 @@ export default function CheckoutPage() {
   const { cart, getTotalPrice, removeFromCart, updateQuantity } = useCart();
   const { user } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+  const { groupSession } = useGroup();
+
+  // ── Group checkout detection ─────────────────────────────────────────────
+  // Populated when navigating from the Active Group page
+  const navGroupData = (location.state as any)?.groupCheckout as {
+    groupId: string;
+    groupName: string;
+    activePct: number;
+    discount: number;
+    subtotal: number;
+    shipping: number;
+    total: number;
+  } | null | undefined;
+
+  // isGroupOrder = true if we arrived from the group page OR there is an
+  // active group session saved in localStorage
+  const isGroupOrder = navGroupData != null || groupSession != null;
+  const activeGroupId = navGroupData?.groupId ?? groupSession?.groupId ?? null;
+  const groupDiscountPct = navGroupData?.activePct ?? 0;
+  // ─────────────────────────────────────────────────────────────────────────
 
   const [deliveryType, setDeliveryType] = useState<"delivery" | "pickup">(
     "delivery",
   );
-  const [groupOrderData] = useState<GroupOrderData | null>(null);
   const [showRecurringModal, setShowRecurringModal] = useState(false);
   const [recurringData, setRecurringData] = useState<RecurringData | null>(null);
-  const isGroupOrder = groupOrderData !== null;
   const isRecurringOrder = recurringData !== null;
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -184,11 +204,21 @@ export default function CheckoutPage() {
   };
   // ----------------------------------------------------------------
 
-  const subtotal = getTotalPrice();
-  const shipping = deliveryType === "pickup" ? 0 : 25000; // 25k for delivery
-  const recurringDiscount = isRecurringOrder ? subtotal * 0.05 : 0; // 5% discount for recurring
-  const vat = (subtotal + shipping - recurringDiscount) * 0.0476; // 4.76% VAT
-  const total = subtotal + shipping - recurringDiscount - voucherDiscount + vat;
+  const baseSubtotal = getTotalPrice();
+  // For group orders, honour the subtotal/shipping/discount from the Active Group page
+  const subtotal = isGroupOrder && navGroupData ? navGroupData.subtotal : baseSubtotal;
+  const shipping = isGroupOrder
+    ? (navGroupData?.shipping ?? 25000)
+    : deliveryType === "pickup" ? 0 : 25000;
+  const groupDiscount = isGroupOrder && navGroupData
+    ? navGroupData.discount
+    : Math.round(baseSubtotal * groupDiscountPct / 100);
+  const recurringDiscount = isRecurringOrder ? subtotal * 0.05 : 0;
+  // Group orders use the exact total from Active Group page (no separate VAT)
+  const vat = isGroupOrder ? 0 : (subtotal + shipping - recurringDiscount) * 0.0476;
+  const total = isGroupOrder && navGroupData
+    ? navGroupData.total - recurringDiscount - voucherDiscount
+    : subtotal + shipping - groupDiscount - recurringDiscount - voucherDiscount + vat;
 
   const validateForm = (): boolean => {
     if (!formData.fullName.trim()) {
@@ -221,7 +251,7 @@ export default function CheckoutPage() {
         return false;
       }
     }
-    if (isGroupOrder && !groupOrderData?.groupName?.trim()) {
+    if (isGroupOrder && navGroupData && !navGroupData.groupName?.trim()) {
       setError("Please enter a group name");
       return false;
     }
@@ -267,6 +297,41 @@ export default function CheckoutPage() {
     }
   };
 
+  // ── Build subscription payload from recurringData (maps frontend → backend) ──
+  const buildSubscriptionPayload = () => {
+    if (!recurringData) return null;
+    const weekdayToNum: Record<string, number> = {
+      sunday: 0, monday: 1, tuesday: 2, wednesday: 3,
+      thursday: 4, friday: 5, saturday: 6,
+    };
+    const frequencyMap: Record<string, "weekly" | "bi-weekly" | "monthly"> = {
+      weekly: "weekly", biweekly: "bi-weekly", monthly: "monthly",
+    };
+    const deliveryDay =
+      recurringData.recurringFrequency === "monthly"
+        ? parseInt(recurringData.recurringDay)
+        : weekdayToNum[recurringData.recurringDay] ?? 1;
+    // Ưu tiên dùng firstDeliveryDate đã được tính sẵn trong Modal;
+    // fallback về recurringStartDate nếu chưa có (tương thích ngược).
+    const nextDelivery = recurringData.firstDeliveryDate
+      ? new Date(recurringData.firstDeliveryDate)
+      : new Date(recurringData.recurringStartDate);
+
+    return {
+      frequency: frequencyMap[recurringData.recurringFrequency],
+      deliveryDay,
+      nextDeliveryDate: nextDelivery.toISOString(),
+      items: cart.map((item) => ({
+        productId: item.id,
+        quantity: item.quantity,
+        priceAtSubscription: item.price,
+      })),
+      discountRate: 0.05,
+      paymentMethod: formData.paymentMethod,
+      notes: formData.notes || undefined,
+    };
+  };
+
   const handlePlaceOrder = async () => {
     if (!validateForm()) return;
     if (!user) {
@@ -279,14 +344,20 @@ export default function CheckoutPage() {
       setLoading(true);
       try {
         // Gọi API zalopay/init để tạo order + khởi tạo thanh toán ZaloPay
+        const builtAddress = deliveryType === "delivery"
+          ? [formData.address, selectedWard?.name, selectedDistrict?.name, selectedProvince?.name].filter(Boolean).join(', ')
+          : (selectedStore ? `${selectedStore.name} - ${selectedStore.address}` : "Store pickup");
         const orderData = {
           deliveryInfo: {
             fullName: formData.fullName,
             phone: formData.phone,
             email: formData.email,
-            address: deliveryType === "delivery" ? "Delivery address" : "Store pickup",
+            address: builtAddress,
             type: deliveryType,
           },
+          ...(deliveryType === 'pickup' && selectedStore
+            ? { pickupLocation: { name: selectedStore.name, address: selectedStore.address } }
+            : {}),
           items: cart.map((item) => ({
             productId: item.id,
             quantity: item.quantity,
@@ -297,6 +368,9 @@ export default function CheckoutPage() {
           paymentMethod: "zalopay",
           amount: total,
           description: `Order payment from FreshMarket - ${formData.fullName}`,
+          ...(activeGroupId
+            ? { groupId: activeGroupId, isGroupOrder: true, groupDiscount, groupDiscountPct }
+            : {}),
         };
 
         const response = await zalopayService.initPayment({
@@ -309,7 +383,7 @@ export default function CheckoutPage() {
             fullName: formData.fullName,
             phone: formData.phone,
             email: formData.email,
-            address: deliveryType === "delivery" ? "Delivery address" : "Store pickup",
+            address: builtAddress,
             type: deliveryType,
           },
         });
@@ -341,6 +415,7 @@ export default function CheckoutPage() {
               orderId: zaloPayResponse.data.orderId,
               paymentId: zaloPayResponse.data.paymentId,
               apptransid: zaloPayResponse.data.apptransid,
+              subscriptionConfig: isRecurringOrder ? buildSubscriptionPayload() : null,
             })
           );
 
@@ -372,14 +447,20 @@ export default function CheckoutPage() {
     if (formData.paymentMethod === "Momo") {
       setLoading(true);
       try {
+        const momoBuiltAddress = deliveryType === "delivery"
+          ? [formData.address, selectedWard?.name, selectedDistrict?.name, selectedProvince?.name].filter(Boolean).join(', ')
+          : (selectedStore ? `${selectedStore.name} - ${selectedStore.address}` : "Store pickup");
         const orderData = {
           deliveryInfo: {
             fullName: formData.fullName,
             phone: formData.phone,
             email: formData.email,
-            address: deliveryType === "delivery" ? "Delivery address" : "Store pickup",
+            address: momoBuiltAddress,
             type: deliveryType,
           },
+          ...(deliveryType === 'pickup' && selectedStore
+            ? { pickupLocation: { name: selectedStore.name, address: selectedStore.address } }
+            : {}),
           items: cart.map((item) => ({
             productId: item.id,
             quantity: item.quantity,
@@ -390,6 +471,9 @@ export default function CheckoutPage() {
           paymentMethod: "momo",
           amount: total,
           description: `Order payment from FreshMarket - ${formData.fullName}`,
+          ...(activeGroupId
+            ? { groupId: activeGroupId, isGroupOrder: true, groupDiscount, groupDiscountPct }
+            : {}),
         };
 
         const response = await momoService.createPayment({
@@ -400,9 +484,19 @@ export default function CheckoutPage() {
             fullName: formData.fullName,
             phone: formData.phone,
             email: formData.email,
-            address: deliveryType === "delivery" ? "Delivery address" : "Store pickup",
+            address: momoBuiltAddress,
             type: deliveryType,
           },
+          items: cart.map((item) => ({
+            productId: item.id,
+            quantity: item.quantity,
+            price: item.price,
+            subtotal: item.price * item.quantity,
+          })),
+          notes: formData.notes || undefined,
+          ...(deliveryType === 'pickup' && selectedStore
+            ? { pickupLocation: { name: selectedStore.name, address: selectedStore.address } }
+            : {}),
         });
 
         const momoResponse = response as any;
@@ -425,6 +519,7 @@ export default function CheckoutPage() {
               momoOrderId: momoResponse.data.momoOrderId,
               requestId: momoResponse.data.requestId,
               fromMoMo: true,
+              subscriptionConfig: isRecurringOrder ? buildSubscriptionPayload() : null,
             })
           );
 
@@ -450,15 +545,20 @@ export default function CheckoutPage() {
     if (formData.paymentMethod === "COD") {
       setLoading(true);
       try {
+        const codBuiltAddress = deliveryType === "delivery"
+          ? [formData.address, selectedWard?.name, selectedDistrict?.name, selectedProvince?.name].filter(Boolean).join(', ')
+          : (selectedStore ? `${selectedStore.name} - ${selectedStore.address}` : "Store pickup");
         const orderPayload = {
           deliveryInfo: {
             fullName: formData.fullName,
             phone: formData.phone,
             email: formData.email,
-            address:
-              deliveryType === "delivery" ? "Delivery address" : "Store pickup",
+            address: codBuiltAddress,
             type: deliveryType,
           },
+          ...(deliveryType === 'pickup' && selectedStore
+            ? { pickupLocation: { name: selectedStore.name, address: selectedStore.address } }
+            : {}),
           items: cart.map((item) => ({
             productId: item.id,
             quantity: item.quantity,
@@ -468,17 +568,51 @@ export default function CheckoutPage() {
           notes: formData.notes,
           paymentMethod: "cod",
           totalAmount: total,
+          ...(activeGroupId
+            ? {
+                groupId: activeGroupId,
+                isGroupOrder: true,
+                groupDiscount,
+                groupDiscountPct,
+              }
+            : {}),
         };
 
         const response = await orderService.createOrder(orderPayload as any);
         const result = (response as any)?.data || response;
 
         if (result?.success !== false) {
+          // Create subscription if recurring order was configured
+          if (isRecurringOrder && recurringData) {
+            try {
+              const subPayload = buildSubscriptionPayload();
+              if (subPayload) {
+                await subscriptionService.createSubscription(subPayload as any);
+              }
+            } catch (subErr) {
+              // Non-fatal: order was placed successfully, log and continue
+              console.warn("Subscription creation failed:", subErr);
+            }
+          }
           navigate("/order-success", {
             state: {
-              orderId: result?.data?._id,
+              orderId: result?._id || result?.data?._id,
               paymentMethod: "COD",
               totalAmount: total,
+              isRecurring: isRecurringOrder,
+              subscriptionConfig: isRecurringOrder ? buildSubscriptionPayload() : null,
+              deliveryType,
+              pickupLocation:
+                deliveryType === "pickup" && selectedStore
+                  ? { name: selectedStore.name, address: selectedStore.address }
+                  : null,
+              deliveryInfo: {
+                fullName: formData.fullName,
+                phone: formData.phone,
+                email: formData.email,
+                address: codBuiltAddress,
+                type: deliveryType,
+              },
             },
           });
         } else {
@@ -813,7 +947,17 @@ export default function CheckoutPage() {
             {/* Đặt theo nhóm — Clickable card */}
             <button
               type="button"
-              onClick={() => navigate('/group-order', { state: { cartItems: cart } })}
+              onClick={() =>
+                isGroupOrder
+                  ? navigate('/group-order/active', {
+                      state: {
+                        groupId: activeGroupId,
+                        groupName: navGroupData?.groupName ?? groupSession?.groupName,
+                        cartItems: cart,
+                      },
+                    })
+                  : navigate('/group-order', { state: { cartItems: cart } })
+              }
               className={`w-full text-left bg-white rounded-lg p-5 shadow-sm border-2 transition-all duration-150 hover:shadow-md ${
                 isGroupOrder
                   ? "border-green-400 bg-green-50"
@@ -844,20 +988,12 @@ export default function CheckoutPage() {
                         </span>
                       )}
                     </div>
-                    {isGroupOrder && groupOrderData ? (
+                    {isGroupOrder && navGroupData ? (
                       <div className="mt-1 space-y-0.5">
                         <p className="text-xs text-gray-700">
                           <span className="font-medium">Nhóm:</span>{" "}
-                          {groupOrderData.groupName}
-                          {groupOrderData.groupMembers
-                            ? ` · ${groupOrderData.groupMembers} thành viên`
-                            : ""}
+                          {navGroupData.groupName}
                         </p>
-                        {groupOrderData.groupAddress && (
-                          <p className="text-xs text-gray-500">
-                            📍 {groupOrderData.groupAddress}
-                          </p>
-                        )}
                       </div>
                     ) : (
                       <p className="text-xs text-gray-500 mt-0.5">
@@ -908,10 +1044,15 @@ export default function CheckoutPage() {
                     </div>
                     {isRecurringOrder && recurringData ? (
                       <div className="mt-1 space-y-0.5">
-                        <p className="text-xs text-gray-700">
+                        <p className="text-xs font-medium text-blue-700">
+                          ✅ Đã thiết lập
+                        </p>
+                        <p className="text-xs text-blue-600">
                           {FREQUENCY_LABELS[recurringData.recurringFrequency]} ·{" "}
-                          {DAY_LABELS[recurringData.recurringDay]} ·{" "}
-                          {DURATION_LABELS[recurringData.recurringDuration]}
+                          {recurringData.recurringFrequency === "monthly"
+                            ? `Ngày ${recurringData.recurringDay} hàng tháng`
+                            : DAY_LABELS[recurringData.recurringDay]}{" "}
+                          · {DURATION_LABELS[recurringData.recurringDuration]}
                         </p>
                         <p className="text-xs text-gray-500">
                           📅 Bắt đầu:{" "}
@@ -1007,6 +1148,23 @@ export default function CheckoutPage() {
           {/* Right Column - Order Summary */}
           <div className="lg:col-span-1">
             <div className="bg-white rounded-lg p-5 shadow-sm sticky top-6 space-y-5">
+
+              {/* Group order badge */}
+              {isGroupOrder && (
+                <div className="flex items-center gap-2 px-3 py-2.5 bg-green-50 border border-green-200 rounded-lg">
+                  <Users className="w-4 h-4 text-green-600 flex-shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-semibold text-green-700">
+                      Đặt theo nhóm{navGroupData?.groupName ? ` · ${navGroupData.groupName}` : ""}
+                    </p>
+                    {groupDiscountPct > 0 && (
+                      <p className="text-xs text-green-600">
+                        Đang áp dụng ưu đãi nhóm {groupDiscountPct}%
+                      </p>
+                    )}
+                  </div>
+                </div>
+              )}
               {/* Giỏ hàng */}
               <div>
                 <h3 className="text-base font-semibold text-gray-800 mb-4">
@@ -1140,27 +1298,23 @@ export default function CheckoutPage() {
                   </div>
                   <div className="flex justify-between text-sm">
                     <span className="text-gray-600">Shipping</span>
-                    {isGroupOrder ? (
-                      <span className="font-medium text-green-600">
-                        Free
-                      </span>
-                    ) : (
-                      <span className="font-medium text-gray-800">-</span>
-                    )}
+                    <span className="font-medium text-gray-800">
+                      {shipping === 0 ? "Free" : `${shipping.toLocaleString("vi-VN")}₫`}
+                    </span>
                   </div>
-                  {isGroupOrder && (
+                  {isGroupOrder && groupDiscount > 0 && (
                     <div className="flex justify-between text-sm">
-                      <span className="text-green-600">Group discount</span>
-                      <span className="font-medium text-green-600">-0₫</span>
+                      <span className="text-green-600">Ưu đãi nhóm ({groupDiscountPct}%)</span>
+                      <span className="font-medium text-green-600">
+                        −{groupDiscount.toLocaleString("vi-VN")}₫
+                      </span>
                     </div>
                   )}
                   {isRecurringOrder && (
                     <div className="flex justify-between text-sm">
-                      <span className="text-blue-600">
-                        Recurring order discount (5%)
-                      </span>
+                      <span className="text-blue-600">✨ Ưu đãi định kỳ (−5%)</span>
                       <span className="font-medium text-blue-600">
-                        -{recurringDiscount.toLocaleString("vi-VN")}₫
+                        −{recurringDiscount.toLocaleString("vi-VN")}₫
                       </span>
                     </div>
                   )}
@@ -1183,9 +1337,11 @@ export default function CheckoutPage() {
                         {total.toLocaleString("vi-VN")}₫
                       </span>
                     </div>
-                    <p className="text-xs text-gray-400 text-right">
-                      Price includes VAT {vat.toLocaleString("vi-VN")}₫
-                    </p>
+                    {!isGroupOrder && (
+                      <p className="text-xs text-gray-400 text-right">
+                        Price includes VAT {vat.toLocaleString("vi-VN")}₫
+                      </p>
+                    )}
                   </div>
                 </div>
 
@@ -1281,15 +1437,15 @@ export default function CheckoutPage() {
               </div>
 
               {/* 2. Optional features */}
-              {(groupOrderData || recurringData) && (
+              {(isGroupOrder || recurringData) && (
                 <div className="bg-gray-50 rounded-xl px-3 py-2 space-y-1.5">
-                  {groupOrderData && (
+                  {isGroupOrder && (
                     <div className="flex items-center gap-2">
                       <Users className="w-3.5 h-3.5 text-green-600 flex-shrink-0" />
                       <p className="text-xs text-gray-700 truncate">
                         <span className="font-semibold">Nhóm: </span>
-                        {groupOrderData.groupName}
-                        {groupOrderData.groupMembers ? ` · ${groupOrderData.groupMembers} TV` : ""}
+                        {navGroupData?.groupName ?? groupSession?.groupName ?? ""}
+                        {groupDiscountPct > 0 ? ` · ưu đãi ${groupDiscountPct}%` : ""}
                       </p>
                     </div>
                   )}
@@ -1298,7 +1454,11 @@ export default function CheckoutPage() {
                       <Calendar className="w-3.5 h-3.5 text-blue-500 flex-shrink-0" />
                       <p className="text-xs text-gray-700 truncate">
                         <span className="font-semibold">Định kỳ: </span>
-                        {FREQUENCY_LABELS[recurringData.recurringFrequency]} · {DAY_LABELS[recurringData.recurringDay]} · {new Date(recurringData.recurringStartDate).toLocaleDateString("vi-VN")}
+                        {FREQUENCY_LABELS[recurringData.recurringFrequency]} ·{": "}
+                        {recurringData.recurringFrequency === "monthly"
+                          ? `Ngày ${recurringData.recurringDay} hàng tháng`
+                          : DAY_LABELS[recurringData.recurringDay]}{": "}
+                        · {new Date(recurringData.recurringStartDate).toLocaleDateString("vi-VN")}
                       </p>
                     </div>
                   )}

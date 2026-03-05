@@ -1,20 +1,17 @@
 import mongoose, { Document, Schema } from 'mongoose';
 
-export interface ISubscriptionItem extends Document {
-  subscriptionId: mongoose.Types.ObjectId;
+// ──────────────────────────────────────────────
+// Embedded item (stored inside each Subscription)
+// ──────────────────────────────────────────────
+export interface ISubscriptionItem {
   productId: mongoose.Types.ObjectId;
   quantity: number;
-  createdAt: Date;
-  updatedAt: Date;
+  /** Giá tại thời điểm đăng ký – bảo vệ quyền lợi khách */
+  priceAtSubscription?: number;
 }
 
 const subscriptionItemSchema = new Schema<ISubscriptionItem>(
   {
-    subscriptionId: {
-      type: Schema.Types.ObjectId,
-      ref: 'Subscription',
-      required: [true, 'Subscription ID is required']
-    },
     productId: {
       type: Schema.Types.ObjectId,
       ref: 'Product',
@@ -23,32 +20,55 @@ const subscriptionItemSchema = new Schema<ISubscriptionItem>(
     quantity: {
       type: Number,
       required: [true, 'Quantity is required'],
-      min: 1
+      min: 1,
+      default: 1
+    },
+    priceAtSubscription: {
+      type: Number,
+      min: 0
     }
   },
-  {
-    timestamps: true
-  }
+  { _id: false } // không cần _id riêng cho subdocument
 );
 
-subscriptionItemSchema.index({ subscriptionId: 1 });
-subscriptionItemSchema.index({ productId: 1 });
-
-export const SubscriptionItem = mongoose.model<ISubscriptionItem>('SubscriptionItem', subscriptionItemSchema);
-
+// ──────────────────────────────────────────────
+// Main Subscription document
+// ──────────────────────────────────────────────
 export interface ISubscription extends Document {
   userId: mongoose.Types.ObjectId;
   addressId?: mongoose.Types.ObjectId;
-  frequency: 'weekly' | 'monthly';
-  nextDeliveryDate: Date;
-  status: 'active' | 'paused' | 'cancelled';
-  items?: ISubscriptionItem[];
+
+  items: ISubscriptionItem[];
+
+  /** Tần suất giao hàng */
+  frequency: 'weekly' | 'bi-weekly' | 'monthly';
+
+  /**
+   * Ngày giao cụ thể:
+   *  - weekly / bi-weekly → 0-6 (0 = CN, 1 = T2, …, 6 = T7)
+   *  - monthly           → 1-28 (ngày trong tháng)
+   */
+  deliveryDay: number;
+
   startDate: Date;
+  nextDeliveryDate: Date;
+
+  status: 'active' | 'paused' | 'cancelled';
+
+  /** Ưu đãi đặt hàng định kì (mặc định 5%) */
+  discountRate: number;
+
+  /** Phương thức thanh toán */
+  paymentMethod: string;
+
+  // Trạng thái phụ
   endDate?: Date;
   cancelledAt?: Date;
   pausedAt?: Date;
+
   totalPrice?: number;
   notes?: string;
+
   createdAt: Date;
   updatedAt: Date;
 }
@@ -65,33 +85,58 @@ const subscriptionSchema = new Schema<ISubscription>(
       ref: 'Address',
       default: null
     },
+
+    items: {
+      type: [subscriptionItemSchema],
+      default: [],
+      validate: {
+        validator: (v: ISubscriptionItem[]) => v.length > 0,
+        message: 'At least one product item is required'
+      }
+    },
+
     frequency: {
       type: String,
-      enum: ['weekly', 'monthly'],
+      enum: ['weekly', 'bi-weekly', 'monthly'],
       required: [true, 'Frequency is required']
+    },
+
+    deliveryDay: {
+      type: Number,
+      required: [true, 'Delivery day is required']
+    },
+
+    startDate: {
+      type: Date,
+      default: Date.now
     },
     nextDeliveryDate: {
       type: Date,
       required: [true, 'Next delivery date is required']
     },
+
     status: {
       type: String,
       enum: ['active', 'paused', 'cancelled'],
       default: 'active'
     },
-    startDate: {
-      type: Date,
-      default: Date.now
+
+    discountRate: {
+      type: Number,
+      default: 0.05,
+      min: 0,
+      max: 1
     },
-    endDate: {
-      type: Date
+
+    paymentMethod: {
+      type: String,
+      default: 'COD'
     },
-    cancelledAt: {
-      type: Date
-    },
-    pausedAt: {
-      type: Date
-    },
+
+    endDate:      { type: Date },
+    cancelledAt:  { type: Date },
+    pausedAt:     { type: Date },
+
     totalPrice: {
       type: Number,
       min: 0
