@@ -34,6 +34,8 @@ export interface IOrder extends Document {
   notes?: string;
   cancelReason?: string;
   cancelledAt?: Date;
+  confirmedAt?: Date;
+  confirmedBy?: mongoose.Types.ObjectId;
   deliveredAt?: Date;
   createdAt: Date;
   updatedAt: Date;
@@ -172,6 +174,14 @@ const orderSchema = new Schema<IOrder>(
     },
     cancelledAt: {
       type: Date
+    },
+    confirmedAt: {
+      type: Date
+    },
+    confirmedBy: {
+      type: Schema.Types.ObjectId,
+      ref: 'User',
+      default: null
     },
     deliveredAt: {
       type: Date

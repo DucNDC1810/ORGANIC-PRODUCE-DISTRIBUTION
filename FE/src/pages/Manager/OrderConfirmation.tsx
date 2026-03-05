@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import {
   ShoppingBag,
   Search,
@@ -60,7 +60,7 @@ import {
 import { Textarea } from '../../components/ui/textarea';
 import { Label } from '../../components/ui/label';
 import { toast } from 'sonner';
-import { orderService, Order } from '../../services/orderService';
+import { orderAPI, Order } from '../Axios/Axios';
 
 // ─────────────────────────────────────────────
 // Helpers
@@ -225,15 +225,38 @@ const OrderDetailModal = ({
             <div className="flex items-start gap-3 p-3 rounded-lg border bg-white">
               <User className="w-4 h-4 text-emerald-600 mt-0.5 flex-shrink-0" />
               <div>
-                <p className="text-xs text-gray-500 font-medium">Customer ID</p>
-                <p className="text-sm text-gray-900 font-mono">{order.userId}</p>
+                <p className="text-xs text-gray-500 font-medium">Customer</p>
+                {typeof order.userId === 'object' && order.userId !== null ? (
+                  <>
+                    <p className="text-sm text-gray-900 font-semibold">{(order.userId as any).name}</p>
+                    <p className="text-xs text-gray-500">{(order.userId as any).email}</p>
+                  </>
+                ) : (
+                  <p className="text-sm text-gray-900 font-mono">{order.userId as string}</p>
+                )}
               </div>
             </div>
             <div className="flex items-start gap-3 p-3 rounded-lg border bg-white">
               <MapPin className="w-4 h-4 text-emerald-600 mt-0.5 flex-shrink-0" />
               <div>
-                <p className="text-xs text-gray-500 font-medium">Shipping Address ID</p>
-                <p className="text-sm text-gray-900 font-mono">{order.addressId}</p>
+                <p className="text-xs text-gray-500 font-medium">Shipping Address</p>
+                {typeof order.addressId === 'object' && order.addressId !== null ? (
+                  <>
+                    {(order.addressId as any).street && (
+                      <p className="text-sm text-gray-900 font-semibold">{(order.addressId as any).street}</p>
+                    )}
+                    {(order.addressId as any).city && (
+                      <p className="text-xs text-gray-500">
+                        {(order.addressId as any).city}{(order.addressId as any).province ? `, ${(order.addressId as any).province}` : ''}
+                      </p>
+                    )}
+                    {!(order.addressId as any).street && (
+                      <p className="text-sm text-gray-900 font-mono">{(order.addressId as any)._id}</p>
+                    )}
+                  </>
+                ) : (
+                  <p className="text-sm text-gray-900 font-mono">{order.addressId as string ?? '—'}</p>
+                )}
               </div>
             </div>
           </div>
@@ -257,7 +280,11 @@ const OrderDetailModal = ({
                 <TableBody>
                   {order.items.map((item, idx) => (
                     <TableRow key={idx}>
-                      <TableCell className="font-mono text-xs text-gray-600">{item.productId}</TableCell>
+                      <TableCell className="text-xs text-gray-800 font-medium">
+                        {typeof item.productId === 'object' && item.productId !== null
+                          ? (item.productId as any).name ?? (item.productId as any)._id
+                          : item.productId}
+                      </TableCell>
                       <TableCell className="text-center text-sm font-medium">{item.quantity}</TableCell>
                       <TableCell className="text-right text-sm">{formatCurrency(item.price)}</TableCell>
                       <TableCell className="text-right text-sm font-semibold">{formatCurrency(item.subtotal)}</TableCell>
@@ -351,11 +378,14 @@ export default function OrderConfirmation() {
   const [actionLoading, setActionLoading] = useState(false);
   const [totalItems, setTotalItems] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
+  const [pendingSummary, setPendingSummary] = useState({ totalPending: 0, pendingToday: 0 });
 
   // Filter state
   const [currentPage, setCurrentPage] = useState(1);
   const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Dialog state
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
@@ -363,14 +393,30 @@ export default function OrderConfirmation() {
   const [cancelTarget, setCancelTarget] = useState<string | null>(null);
   const [cancelReason, setCancelReason] = useState('');
 
-  // ── Fetch ─────────────────────────────────
+  // ── Search debounce ───────────────────────────────────────
+
+  const handleSearchChange = (value: string) => {
+    setSearchQuery(value);
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => {
+      setDebouncedSearch(value);
+      setCurrentPage(1);
+    }, 400);
+  };
+
+  // ── Fetch orders ──────────────────────────────────────────
 
   const fetchOrders = useCallback(async () => {
     try {
       setLoading(true);
-      const status = statusFilter === 'all' ? undefined : statusFilter;
-      const res = await orderService.getAllOrders(currentPage, ITEMS_PER_PAGE, status);
-      const { data, pagination } = res.data ?? {};
+      const res = await orderAPI.getAllOrders({
+        page: currentPage,
+        limit: ITEMS_PER_PAGE,
+        status: statusFilter === 'all' ? undefined : statusFilter,
+        search: debouncedSearch.trim() || undefined,
+      });
+      // api interceptor already unwraps response.data → res IS the body
+      const { data, pagination } = res ?? {};
       setOrders(Array.isArray(data) ? data : []);
       setTotalItems(pagination?.totalItems ?? 0);
       setTotalPages(pagination?.totalPages ?? 1);
@@ -379,21 +425,33 @@ export default function OrderConfirmation() {
     } finally {
       setLoading(false);
     }
-  }, [currentPage, statusFilter]);
+  }, [currentPage, statusFilter, debouncedSearch]);
 
-  useEffect(() => {
-    fetchOrders();
-  }, [fetchOrders]);
+  // ── Fetch pending summary for stat cards ──────────────────
 
-  // ── Actions ───────────────────────────────
+  const fetchPendingSummary = useCallback(async () => {
+    try {
+      const res = await orderAPI.getPendingSummary();
+      // res IS the body: { success, data: { totalPending, pendingToday } }
+      if (res?.data) setPendingSummary(res.data);
+    } catch {
+      // non-critical
+    }
+  }, []);
+
+  useEffect(() => { fetchOrders(); }, [fetchOrders]);
+  useEffect(() => { fetchPendingSummary(); }, [fetchPendingSummary]);
+
+  // ── Actions ───────────────────────────────────────────────
 
   const handleConfirm = async (id: string) => {
     try {
       setActionLoading(true);
-      await orderService.updateOrderStatus(id, 'confirmed');
+      await orderAPI.confirmOrder(id);
       toast.success('Order confirmed successfully!');
       setIsDetailOpen(false);
       fetchOrders();
+      fetchPendingSummary();
     } catch {
       toast.error('Failed to confirm order.');
     } finally {
@@ -405,12 +463,13 @@ export default function OrderConfirmation() {
     if (!cancelTarget) return;
     try {
       setActionLoading(true);
-      await orderService.cancelOrder(cancelTarget, cancelReason || undefined);
+      await orderAPI.managerCancelOrder(cancelTarget, cancelReason || undefined);
       toast.success('Order cancelled.');
       setCancelTarget(null);
       setCancelReason('');
       setIsDetailOpen(false);
       fetchOrders();
+      fetchPendingSummary();
     } catch {
       toast.error('Failed to cancel order.');
     } finally {
@@ -423,23 +482,18 @@ export default function OrderConfirmation() {
     setIsDetailOpen(true);
   };
 
-  // ── Filtered list (client-side search on ID) ──
+  // ── Derived data ──────────────────────────────────────────
 
-  const safeOrders = Array.isArray(orders) ? orders : [];
+  const safeOrders = useMemo(() => (Array.isArray(orders) ? orders : []), [orders]);
+  const displayedOrders = safeOrders;
 
-  const displayedOrders = safeOrders.filter((o) => {
-    if (!searchQuery.trim()) return true;
-    return o._id.toLowerCase().includes(searchQuery.toLowerCase());
-  });
-
-  // ── Stats (computed from current page data) ──
-
-  const stats = {
-    total:     safeOrders.length,
-    pending:   safeOrders.filter((o) => o.status === 'pending').length,
-    confirmed: safeOrders.filter((o) => o.status === 'confirmed').length,
-    cancelled: safeOrders.filter((o) => o.status === 'cancelled').length,
-  };
+  const stats = useMemo(() => ({
+    total:        totalItems,
+    pending:      pendingSummary.totalPending,
+    pendingToday: pendingSummary.pendingToday,
+    confirmed:    safeOrders.filter((o) => o.status === 'confirmed').length,
+    cancelled:    safeOrders.filter((o) => o.status === 'cancelled').length,
+  }), [totalItems, pendingSummary, safeOrders]);
 
   // ─────────────────────────────────────────
 
@@ -477,11 +531,11 @@ export default function OrderConfirmation() {
           sub="This page filter"
         />
         <StatCard
-          title="Pending"
+          title="Pending Orders"
           value={stats.pending}
           icon={Clock}
           accent="border-l-amber-500"
-          sub="Awaiting confirmation"
+          sub={`${stats.pendingToday} new today`}
         />
         <StatCard
           title="Confirmed"
@@ -513,9 +567,9 @@ export default function OrderConfirmation() {
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
               <Input
-                placeholder="Search by Order ID…"
+                placeholder="Search by customer name, email or Order ID…"
                 value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
+                onChange={(e) => handleSearchChange(e.target.value)}
                 className="pl-9"
               />
             </div>
@@ -582,7 +636,8 @@ export default function OrderConfirmation() {
               <Table>
                 <TableHeader>
                   <TableRow className="bg-gray-50 hover:bg-gray-50">
-                    <TableHead className="text-xs font-semibold text-gray-600 w-[220px]">Order ID</TableHead>
+                    <TableHead className="text-xs font-semibold text-gray-600">Customer</TableHead>
+                    <TableHead className="text-xs font-semibold text-gray-600 w-[160px]">Order ID</TableHead>
                     <TableHead className="text-xs font-semibold text-gray-600">Date</TableHead>
                     <TableHead className="text-xs font-semibold text-gray-600 text-center">Items</TableHead>
                     <TableHead className="text-xs font-semibold text-gray-600">Payment</TableHead>
@@ -597,8 +652,37 @@ export default function OrderConfirmation() {
                       key={order._id}
                       className="hover:bg-gray-50/70 transition-colors group"
                     >
+                      {/* Customer */}
+                      <TableCell>
+                        {typeof order.userId === 'object' && order.userId !== null ? (
+                          <div className="flex items-center gap-2">
+                            {(order.userId as any).avatar ? (
+                              <img
+                                src={(order.userId as any).avatar}
+                                alt={(order.userId as any).name}
+                                className="w-7 h-7 rounded-full object-cover flex-shrink-0"
+                              />
+                            ) : (
+                              <div className="w-7 h-7 rounded-full bg-gradient-to-br from-emerald-400 to-teal-500 flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
+                                {(order.userId as any).name?.charAt(0).toUpperCase() ?? '?'}
+                              </div>
+                            )}
+                            <div className="min-w-0">
+                              <p className="text-sm font-medium text-gray-900 truncate max-w-[130px]">
+                                {(order.userId as any).name}
+                              </p>
+                              <p className="text-xs text-gray-500 truncate max-w-[130px]">
+                                {(order.userId as any).email}
+                              </p>
+                            </div>
+                          </div>
+                        ) : (
+                          <span className="font-mono text-xs text-gray-500">{order.userId as string}</span>
+                        )}
+                      </TableCell>
+
                       {/* Order ID */}
-                      <TableCell className="font-mono text-xs text-gray-600 max-w-[220px] truncate">
+                      <TableCell className="font-mono text-xs text-gray-500 max-w-[160px] truncate">
                         {order._id}
                       </TableCell>
 

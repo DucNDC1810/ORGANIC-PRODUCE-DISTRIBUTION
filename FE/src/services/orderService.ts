@@ -58,6 +58,44 @@ export interface OrderResponse {
   data: Order;
 }
 
+// ─── Query params for getAllOrders ───────────────────────────
+
+export interface GetAllOrdersParams {
+  page?: number;
+  limit?: number;
+  status?: string;
+  paymentStatus?: string;
+  userId?: string;
+  /** Search by customer name or email */
+  search?: string;
+  startDate?: string;
+  endDate?: string;
+  sortBy?: string;
+  sortOrder?: 'asc' | 'desc';
+}
+
+// ─── Bulk confirm response ───────────────────────────────────
+
+export interface BulkConfirmResponse {
+  success: boolean;
+  message: string;
+  data: {
+    requested: number;
+    confirmed: number;
+    skipped: number;
+  };
+}
+
+// ─── Pending summary ─────────────────────────────────────────
+
+export interface PendingSummaryResponse {
+  success: boolean;
+  data: {
+    totalPending: number;
+    pendingToday: number;
+  };
+}
+
 // ===== API CALLS =====
 
 export const orderService = {
@@ -65,11 +103,9 @@ export const orderService = {
   createOrder: (payload: CreateOrderPayload) =>
     api.post<OrderResponse>('/orders', payload),
 
-  // Get all orders (admin)
-  getAllOrders: (page = 1, limit = 10, status?: string, userId?: string) =>
-    api.get<OrdersResponse>('/orders', {
-      params: { page, limit, status, userId }
-    }),
+  // Get all orders (manager/admin) — supports search, date range, paymentStatus
+  getAllOrders: (params: GetAllOrdersParams = {}) =>
+    api.get<OrdersResponse>('/orders', { params }),
 
   // Get my orders
   getMyOrders: (page = 1, limit = 10, status?: string) =>
@@ -81,6 +117,26 @@ export const orderService = {
   getOrderById: (id: string) =>
     api.get<OrderResponse>(`/orders/${id}`),
 
+  // ── ORDER CONFIRMATION FEATURE ────────────────────────────
+
+  // Confirm a single pending order (manager/admin)
+  confirmOrder: (id: string) =>
+    api.patch<OrderResponse>(`/orders/${id}/confirm`),
+
+  // Cancel order by manager (bypasses owner check)
+  managerCancelOrder: (id: string, cancelReason?: string) =>
+    api.patch<OrderResponse>(`/orders/${id}/manager-cancel`, { cancelReason }),
+
+  // Bulk confirm multiple pending orders
+  bulkConfirmOrders: (orderIds: string[]) =>
+    api.post<BulkConfirmResponse>('/orders/bulk-confirm', { orderIds }),
+
+  // Get pending orders summary (badge counts)
+  getPendingSummary: () =>
+    api.get<PendingSummaryResponse>('/orders/pending-summary'),
+
+  // ─────────────────────────────────────────────────────────
+
   // Update order status (admin)
   updateOrderStatus: (id: string, status: string) =>
     api.patch<OrderResponse>(`/orders/${id}/status`, { status }),
@@ -89,7 +145,7 @@ export const orderService = {
   updatePaymentStatus: (id: string, paymentStatus: string) =>
     api.patch<OrderResponse>(`/orders/${id}/payment-status`, { paymentStatus }),
 
-  // Cancel order
+  // Cancel order (owner — or manager via cancelOrder)
   cancelOrder: (id: string, cancelReason?: string) =>
     api.patch<OrderResponse>(`/orders/${id}/cancel`, { cancelReason }),
 
@@ -97,7 +153,7 @@ export const orderService = {
   deleteOrder: (id: string) =>
     api.delete(`/orders/${id}`),
 
-  // Get order statistics (admin)
+  // Get order statistics
   getOrderStats: (startDate?: string, endDate?: string) =>
     api.get('/orders/stats/summary', {
       params: { startDate, endDate }
