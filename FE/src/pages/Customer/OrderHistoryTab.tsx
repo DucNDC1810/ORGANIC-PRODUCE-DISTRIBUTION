@@ -9,7 +9,6 @@ import { useCart } from '../../context/CartContext';
 import { cartService } from '../../services/cartService';
 import { orderService, Order } from '../../services/orderService';
 import momoService from '../../services/momoService';
-import zalopayService from '../../services/zaloPayService';
 import { toast } from 'sonner';
 
 // ─── Extended Order type (includes populated deliveryInfo) ─────
@@ -55,7 +54,6 @@ const TABS = [
 const PAYMENT_LABELS: Record<string, string> = {
   cod:     'COD',
   momo:    'MoMo',
-  zalopay: 'ZaloPay',
   vnpay:   'VNPay',
   stripe:  'Thẻ tín dụng',
   cash:    'Tiền mặt',
@@ -805,36 +803,6 @@ function SubscriptionPaymentModal({
     }
   };
 
-  const handleZaloPay = async () => {
-    setPaying(true);
-    setError('');
-    try {
-      const res = await zalopayService.initPayment({
-        orderId: order._id,
-        amount: order.totalAmount,
-        description: `Thanh toán đơn định kỳ #${order._id.slice(-8).toUpperCase()}`,
-      }) as any;
-      const data = res?.data?.data ?? res?.data;
-      const redirectUrl = data?.orderUrl ?? data?.checkoutUrl;
-      if (redirectUrl) {
-        localStorage.setItem('pendingZaloPayOrder', JSON.stringify({
-          orderData: { orderId: order._id, amount: order.totalAmount, paymentMethod: 'zalopay' },
-          orderId: data.orderId,
-          paymentId: data.paymentId,
-          apptransid: data.apptransid ?? data.transactionId,
-          subscriptionConfig: null,
-        }));
-        window.location.href = redirectUrl;
-      } else {
-        setError('Không lấy được link thanh toán ZaloPay.');
-      }
-    } catch (err: any) {
-      setError(err?.response?.data?.message ?? 'Lỗi khởi tạo thanh toán ZaloPay.');
-    } finally {
-      setPaying(false);
-    }
-  };
-
   return (
     <div className="fixed inset-0 z-[70] flex items-end sm:items-center justify-center p-0 sm:p-4">
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={paying ? undefined : onClose} />
@@ -924,20 +892,7 @@ function SubscriptionPaymentModal({
               {paying ? 'Đang xử lý...' : 'Thanh toán qua MoMo'}
             </button>
           )}
-          {method === 'zalopay' && (
-            <button
-              onClick={handleZaloPay}
-              disabled={paying}
-              className="w-full flex items-center justify-center gap-2.5 py-3.5 rounded-xl font-bold text-white text-sm bg-[#0068FF] hover:bg-[#0055cc] active:scale-[0.98] transition-all disabled:opacity-60 disabled:cursor-not-allowed shadow-sm"
-            >
-              {paying
-                ? <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                : <span className="w-5 h-5 rounded-full bg-white text-[#0068FF] flex items-center justify-center font-black text-xs">Z</span>
-              }
-              {paying ? 'Đang xử lý...' : 'Thanh toán qua ZaloPay'}
-            </button>
-          )}
-          {method !== 'momo' && method !== 'zalopay' && (
+          {method !== 'momo' && (
             <div className="bg-green-50 border border-green-100 rounded-xl px-4 py-3 text-center">
               <p className="text-sm font-semibold text-green-700">✅ Đơn này thanh toán khi nhận hàng (COD)</p>
               <p className="text-xs text-green-600 mt-0.5">Không cần thanh toán trước.</p>

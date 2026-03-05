@@ -16,7 +16,6 @@ import {
 import { useCart } from "../../context/CartContext";
 import { useAuth } from "../../context/AuthContext";
 import Header from "../../components/Header";
-import zalopayService from "../../services/zaloPayService";
 import momoService from "../../services/momoService";
 import voucherService from "../../services/voucherService";
 import { orderService } from "../../services/orderService";
@@ -339,111 +338,8 @@ export default function CheckoutPage() {
       return;
     }
 
-    // ZaloPay: redirect directly without creating order first
-    if (formData.paymentMethod === "ZaloPay") {
-      setLoading(true);
-      try {
-        // Gọi API zalopay/init để tạo order + khởi tạo thanh toán ZaloPay
-        const builtAddress = deliveryType === "delivery"
-          ? [formData.address, selectedWard?.name, selectedDistrict?.name, selectedProvince?.name].filter(Boolean).join(', ')
-          : (selectedStore ? `${selectedStore.name} - ${selectedStore.address}` : "Store pickup");
-        const orderData = {
-          deliveryInfo: {
-            fullName: formData.fullName,
-            phone: formData.phone,
-            email: formData.email,
-            address: builtAddress,
-            type: deliveryType,
-          },
-          ...(deliveryType === 'pickup' && selectedStore
-            ? { pickupLocation: { name: selectedStore.name, address: selectedStore.address } }
-            : {}),
-          items: cart.map((item) => ({
-            productId: item.id,
-            quantity: item.quantity,
-            price: item.price,
-            subtotal: item.price * item.quantity,
-          })),
-          notes: formData.notes,
-          paymentMethod: "zalopay",
-          amount: total,
-          description: `Order payment from FreshMarket - ${formData.fullName}`,
-          ...(activeGroupId
-            ? { groupId: activeGroupId, isGroupOrder: true, groupDiscount, groupDiscountPct }
-            : {}),
-        };
 
-        const response = await zalopayService.initPayment({
-          orderId: "temp", // Sẽ được tạo trên backend
-          amount: total,
-          description: orderData.description,
-          returnUrl: `${window.location.origin}/order-success`,
-          notifyUrl: `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/zalopay/callback`,
-          deliveryInfo: {
-            fullName: formData.fullName,
-            phone: formData.phone,
-            email: formData.email,
-            address: builtAddress,
-            type: deliveryType,
-          },
-        });
-
-        // Response interceptor unwraps response.data, so response is the data object directly
-        const zaloPayResponse = response as any;
-        console.log('ZaloPay Response:', zaloPayResponse);
-        console.log('ZaloPay Response type:', typeof zaloPayResponse);
-        console.log('ZaloPay Response keys:', Object.keys(zaloPayResponse));
-        console.log('ZaloPay Response.data:', zaloPayResponse.data);
-        console.log('ZaloPay Response.success:', zaloPayResponse.success);
-        console.log('🔗 Order URL received:', zaloPayResponse.data?.orderUrl);
-        console.log('📋 Full response data:', JSON.stringify(zaloPayResponse.data, null, 2));
-
-        // Lấy orderUrl từ response (có thể là orderUrl hoặc checkoutUrl)
-        const orderUrl = zaloPayResponse.data?.orderUrl || zaloPayResponse.data?.checkoutUrl;
-
-        if (zaloPayResponse.success && orderUrl) {
-          console.log('✅ Redirecting to ZaloPay:', orderUrl);
-          console.log('Order ID:', zaloPayResponse.data.orderId);
-          console.log('Payment ID:', zaloPayResponse.data.paymentId);
-          console.log('AppTransId:', zaloPayResponse.data.apptransid);
-          
-          // Lưu order data để xử lý khi quay về
-          localStorage.setItem(
-            "pendingZaloPayOrder",
-            JSON.stringify({
-              orderData,
-              orderId: zaloPayResponse.data.orderId,
-              paymentId: zaloPayResponse.data.paymentId,
-              apptransid: zaloPayResponse.data.apptransid,
-              subscriptionConfig: isRecurringOrder ? buildSubscriptionPayload() : null,
-            })
-          );
-
-          // ✅ Redirect sang ZaloPay payment page
-          window.location.href = orderUrl;
-        } else {
-          console.error('Invalid ZaloPay response:', zaloPayResponse);
-          console.error('Expected orderUrl but got:', orderUrl);
-          throw new Error(
-            zaloPayResponse.message || "Failed to initialize ZaloPay payment"
-          );
-        }
-      } catch (err: any) {
-        console.error("Full ZaloPay error object:", err);
-        console.error("Error response:", err.response);
-        console.error("Error response data:", err.response?.data);
-        console.error("Error message:", err.message);
-        
-        setError(
-          err.response?.data?.message || err.message || "Error initializing ZaloPay payment"
-        );
-        console.error("ZaloPay init error:", err);
-        setLoading(false);
-      }
-      return; // Stop here, do not proceed with other payment methods
-    }
-
-    // MoMo payment
+        // MoMo payment
     if (formData.paymentMethod === "Momo") {
       setLoading(true);
       try {
@@ -1086,7 +982,6 @@ export default function CheckoutPage() {
                   // { value: 'Tiền mặt', icon: '💵' },
                   // { value: 'Visa/Master', icon: '💳' },
                   // { value: 'Cần trợ công nợ', icon: '💰' },
-                  { value: "ZaloPay", label: "ZaloPay", icon: "💳" },
                   // { value: 'Thanh toán online qua ví MoMo', icon: '🏦' },
                   // { value: 'Ví Trả Sau - MoMo', icon: '💳' },
                   { value: "Momo", label: "MoMo", icon: "🏦" },
@@ -1497,7 +1392,7 @@ export default function CheckoutPage() {
                   <div className="flex justify-between items-center text-xs">
                     <span className="text-gray-500 flex items-center gap-1.5">
                       <span>
-                        {formData.paymentMethod === "ZaloPay" ? "💳" : formData.paymentMethod === "Momo" ? "🏦" : "🚚"}
+                        {formData.paymentMethod === "Momo" ? "🏦" : "🚚"}
                       </span>
                       Thanh toán
                     </span>

@@ -428,7 +428,6 @@ export default function GroupOrderPage() {
                 <div className="flex items-center gap-3">
                   {[
                     { key: "momo", label: "MoMo", icon: <span className="text-white text-[9px] font-black leading-none">mo<br />mo</span>, bg: "bg-pink-600" },
-                    { key: "zalo", label: "ZaloPay", icon: <span className="text-blue-600 text-[8px] font-black leading-none text-center">Zalo<br/>pay</span>, bg: "bg-white border border-gray-200" },
                     { key: "card", label: "Thẻ", icon: <CreditCard className="w-4 h-4 text-gray-500" />, bg: "bg-gray-100" },
                   ].map((m) => (
                     <button key={m.key} className="flex items-center gap-2 px-3 py-2 rounded-xl bg-gray-50 hover:bg-gray-100 transition-colors text-xs text-gray-600 font-medium">
