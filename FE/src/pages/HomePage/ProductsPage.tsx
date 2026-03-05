@@ -70,6 +70,7 @@ export default function ProductsPage() {
       limit: 12,
       sortBy,
       sortOrder,
+      isActive: true,
     };
 
     if (searchTerm) {

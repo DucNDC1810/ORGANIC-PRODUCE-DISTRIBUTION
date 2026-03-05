@@ -16,13 +16,19 @@ class BlogService {
 
   // Get all unique tags from active posts
   async getTags(): Promise<string[]> {
-    const tags = await Blog.distinct('tags', { isActive: true });
+    const tags = await Blog.distinct('tags', {
+      isActive: true,
+      $or: [{ status: 'approved' }, { status: { $exists: false } }],
+    });
     return tags.filter(Boolean).sort();
   }
 
   // Get paginated blog feed
   async getFeed(page: number = 1, limit: number = 10, tag?: string) {
-    const query: any = { isActive: true };
+    const query: any = {
+      isActive: true,
+      $or: [{ status: 'approved' }, { status: { $exists: false } }],
+    };
     if (tag) {
       query.tags = tag;
     }
@@ -65,7 +71,7 @@ class BlogService {
 
   // Get posts by a specific user
   async getPostsByUser(userId: string, page: number = 1, limit: number = 10) {
-    const query = { author: userId, isActive: true };
+    const query: any = { author: userId, isActive: true };
     const skip = (page - 1) * limit;
 
     const [posts, total] = await Promise.all([
@@ -181,6 +187,64 @@ class BlogService {
       { path: 'author', select: 'name avatar email' },
       { path: 'comments.user', select: 'name avatar' },
     ]);
+  }
+
+  // ===== ADMIN METHODS =====
+
+  // Get all blogs for admin (with pagination and optional status filter)
+  async getAllBlogsAdmin(page: number = 1, limit: number = 10, status?: string) {
+    // Legacy posts (no `status` field) were already live → treat as 'approved'
+    const legacyOrApproved = { $or: [{ status: 'approved' }, { status: { $exists: false } }] };
+
+    let query: any = { isActive: true };
+    if (status && ['pending', 'approved', 'rejected'].includes(status)) {
+      if (status === 'approved') {
+        query = { isActive: true, ...legacyOrApproved };
+      } else {
+        query = { isActive: true, status };
+      }
+    }
+
+    const skip = (page - 1) * limit;
+    const [posts, total] = await Promise.all([
+      Blog.find(query)
+        .populate('author', 'name avatar email')
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .lean(),
+      Blog.countDocuments(query),
+    ]);
+
+    const pending = await Blog.countDocuments({ isActive: true, status: 'pending' });
+    const approved = await Blog.countDocuments({ isActive: true, ...legacyOrApproved });
+    const rejected = await Blog.countDocuments({ isActive: true, status: 'rejected' });
+
+    return {
+      posts,
+      pagination: { page, limit, total, pages: Math.ceil(total / limit) },
+      counts: { pending, approved, rejected },
+    };
+  }
+
+  // Approve a blog post
+  async approveBlog(postId: string): Promise<IBlog> {
+    const post = await Blog.findById(postId);
+    if (!post) throw new AppError('Post not found', 404);
+    post.status = 'approved';
+    post.rejectedReason = undefined;
+    await post.save();
+    return post.populate('author', 'name avatar email');
+  }
+
+  // Reject a blog post
+  async rejectBlog(postId: string, reason?: string): Promise<IBlog> {
+    const post = await Blog.findById(postId);
+    if (!post) throw new AppError('Post not found', 404);
+    post.status = 'rejected';
+    if (reason) post.rejectedReason = reason;
+    await post.save();
+    return post.populate('author', 'name avatar email');
   }
 }
 

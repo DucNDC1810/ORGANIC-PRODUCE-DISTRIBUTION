@@ -1,8 +1,15 @@
 import { Router } from 'express';
 import { blogController } from '../controllers/blog.controller';
 import { authenticate } from '../middlewares/auth.middleware';
+import { checkPermission } from '../middlewares/permission.middleware';
+import { Permission } from '../constants/roles';
 
 const router = Router();
+
+// Admin routes (BEFORE generic :id param to avoid conflicts)
+router.get('/admin/all', authenticate as any, checkPermission(Permission.USER_MANAGE_ALL) as any, blogController.getAllBlogsAdmin as any);
+router.patch('/admin/:id/approve', authenticate as any, checkPermission(Permission.USER_MANAGE_ALL) as any, blogController.approveBlog as any);
+router.patch('/admin/:id/reject', authenticate as any, checkPermission(Permission.USER_MANAGE_ALL) as any, blogController.rejectBlog as any);
 
 // Public routes (specific paths BEFORE :id param)
 router.get('/', blogController.getFeed as any);

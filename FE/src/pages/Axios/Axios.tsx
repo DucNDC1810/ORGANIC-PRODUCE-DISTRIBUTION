@@ -539,6 +539,221 @@ export const cartAPI = {
 };
 
 // ========================
+// ORDER API ENDPOINTS
+// ========================
+
+export interface OrderItem {
+  productId: string;
+  quantity: number;
+  price: number;
+  subtotal: number;
+}
+
+export interface Order {
+  _id: string;
+  userId: string | { _id: string; name: string; email: string; phone?: string; avatar?: string };
+  addressId?: string | Record<string, any>;
+  voucherId?: string;
+  groupBuyId?: string;
+  subscriptionId?: string;
+  orderDate: string;
+  totalAmount: number;
+  status: 'pending' | 'confirmed' | 'processing' | 'shipped' | 'delivered' | 'cancelled' | 'refunded';
+  items: OrderItem[];
+  deliveryInfo?: {
+    fullName?: string;
+    phone?: string;
+    email?: string;
+    address?: string;
+    type?: 'delivery' | 'pickup';
+  };
+  pickupLocation?: { name?: string; address?: string };
+  paymentMethod?: string;
+  paymentStatus?: 'pending' | 'paid' | 'failed' | 'unpaid';
+  shippingCost?: number;
+  discountAmount?: number;
+  taxAmount?: number;
+  notes?: string;
+  cancelReason?: string;
+  cancelledAt?: string;
+  confirmedAt?: string;
+  confirmedBy?: string | { _id: string; name: string; email: string };
+  deliveredAt?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface OrdersResponse {
+  success: boolean;
+  data: Order[];
+  pagination: {
+    currentPage: number;
+    totalPages: number;
+    totalItems: number;
+    itemsPerPage: number;
+  };
+}
+
+export interface OrderResponse {
+  success: boolean;
+  message: string;
+  data: Order;
+}
+
+export interface GetAllOrdersParams {
+  page?: number;
+  limit?: number;
+  status?: string;
+  paymentStatus?: string;
+  userId?: string;
+  /** Search by customer name or email */
+  search?: string;
+  startDate?: string;
+  endDate?: string;
+  sortBy?: string;
+  sortOrder?: 'asc' | 'desc';
+}
+
+export interface BulkConfirmResult {
+  success: boolean;
+  message: string;
+  data: { requested: number; confirmed: number; skipped: number };
+}
+
+export interface PendingSummary {
+  success: boolean;
+  data: { totalPending: number; pendingToday: number };
+}
+
+export const orderAPI = {
+  /**
+   * Get all orders with filters (manager/admin)
+   * GET /api/orders
+   */
+  getAllOrders: async (params: GetAllOrdersParams = {}): Promise<OrdersResponse> => {
+    const response: any = await api.get('/orders', { params });
+    return response;
+  },
+
+  /**
+   * Get my orders (authenticated user)
+   * GET /api/orders/my-orders
+   */
+  getMyOrders: async (page = 1, limit = 10, status?: string): Promise<OrdersResponse> => {
+    const response: any = await api.get('/orders/my-orders', {
+      params: { page, limit, status },
+    });
+    return response;
+  },
+
+  /**
+   * Get single order by ID
+   * GET /api/orders/:id
+   */
+  getOrderById: async (id: string): Promise<OrderResponse> => {
+    const response: any = await api.get(`/orders/${id}`);
+    return response;
+  },
+
+  /**
+   * Confirm a pending order (manager/admin)
+   * PATCH /api/orders/:id/confirm
+   */
+  confirmOrder: async (id: string): Promise<OrderResponse> => {
+    const response: any = await api.patch(`/orders/${id}/confirm`);
+    return response;
+  },
+
+  /**
+   * Cancel order by manager (bypasses owner check)
+   * PATCH /api/orders/:id/manager-cancel
+   */
+  managerCancelOrder: async (id: string, cancelReason?: string): Promise<OrderResponse> => {
+    const response: any = await api.patch(`/orders/${id}/manager-cancel`, { cancelReason });
+    return response;
+  },
+
+  /**
+   * Cancel order (owner or manager)
+   * PATCH /api/orders/:id/cancel
+   */
+  cancelOrder: async (id: string, cancelReason?: string): Promise<OrderResponse> => {
+    const response: any = await api.patch(`/orders/${id}/cancel`, { cancelReason });
+    return response;
+  },
+
+  /**
+   * Bulk confirm multiple pending orders
+   * POST /api/orders/bulk-confirm
+   */
+  bulkConfirmOrders: async (orderIds: string[]): Promise<BulkConfirmResult> => {
+    const response: any = await api.post('/orders/bulk-confirm', { orderIds });
+    return response;
+  },
+
+  /**
+   * Get pending orders badge summary (totalPending, pendingToday)
+   * GET /api/orders/pending-summary
+   */
+  getPendingSummary: async (): Promise<PendingSummary> => {
+    const response: any = await api.get('/orders/pending-summary');
+    return response;
+  },
+
+  /**
+   * Update order status (admin/manager)
+   * PATCH /api/orders/:id/status
+   */
+  updateOrderStatus: async (id: string, status: string): Promise<OrderResponse> => {
+    const response: any = await api.patch(`/orders/${id}/status`, { status });
+    return response;
+  },
+
+  /**
+   * Update payment status (admin)
+   * PATCH /api/orders/:id/payment-status
+   */
+  updatePaymentStatus: async (id: string, paymentStatus: string): Promise<OrderResponse> => {
+    const response: any = await api.patch(`/orders/${id}/payment-status`, { paymentStatus });
+    return response;
+  },
+
+  /**
+   * Get order statistics
+   * GET /api/orders/stats/summary
+   */
+  getOrderStats: async (startDate?: string, endDate?: string): Promise<any> => {
+    const response: any = await api.get('/orders/stats/summary', {
+      params: { startDate, endDate },
+    });
+    return response;
+  },
+
+  /**
+   * Create order
+   * POST /api/orders
+   */
+  createOrder: async (payload: {
+    addressId: string;
+    voucherId?: string;
+    items: OrderItem[];
+    paymentMethod?: string;
+    notes?: string;
+  }): Promise<OrderResponse> => {
+    const response: any = await api.post('/orders', payload);
+    return response;
+  },
+
+  /**
+   * Delete order (admin)
+   * DELETE /api/orders/:id
+   */
+  deleteOrder: async (id: string): Promise<void> => {
+    await api.delete(`/orders/${id}`);
+  },
+};
+
+// ========================
 // EXPORT DEFAULT API INSTANCE
 // ========================
 

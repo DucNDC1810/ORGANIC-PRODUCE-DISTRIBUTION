@@ -1,6 +1,8 @@
 import { Response, NextFunction } from 'express';
+import mongoose from 'mongoose';
 import { Order } from '../models/Order.model';
 import { Address } from '../models/Address.model';
+import { User } from '../models/User.model';
 import { AuthRequest } from '../middlewares/auth.middleware';
 import { AppError } from '../utils/AppError';
 
@@ -61,37 +63,84 @@ export class OrderController {
   /**
    * Get all orders with filters and pagination
    * GET /api/orders
+   * Query: page, limit, status, paymentStatus, userId, search, startDate, endDate, sortBy, sortOrder
    */
   getAllOrders = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
     try {
-      const { page = 1, limit = 10, status, userId, sortBy = 'orderDate', sortOrder = 'desc' } = req.query;
+      const {
+        page = 1,
+        limit = 10,
+        status,
+        paymentStatus,
+        userId,
+        search,
+        startDate,
+        endDate,
+        sortBy = 'orderDate',
+        sortOrder = 'desc'
+      } = req.query;
 
-      const pageNum = parseInt(page as string) || 1;
+      const pageNum  = parseInt(page as string)  || 1;
       const limitNum = parseInt(limit as string) || 10;
-      const skip = (pageNum - 1) * limitNum;
+      const skip     = (pageNum - 1) * limitNum;
 
       const filter: any = {};
 
-      if (status) {
-        filter.status = status;
+      if (status)        filter.status        = status;
+      if (paymentStatus) filter.paymentStatus = paymentStatus;
+      if (userId)        filter.userId        = userId;
+
+      // Date range on orderDate
+      if (startDate || endDate) {
+        filter.orderDate = {};
+        if (startDate) filter.orderDate.$gte = new Date(startDate as string);
+        if (endDate)   filter.orderDate.$lte = new Date(endDate as string);
       }
 
-      if (userId) {
-        filter.userId = userId;
+      // Search by customer name / email — resolve matching user IDs first
+      if (search && typeof search === 'string' && search.trim()) {
+        const regex = new RegExp(search.trim(), 'i');
+        const matchedUsers = await User.find({
+          $or: [{ name: regex }, { email: regex }]
+        }).select('_id');
+        const matchedIds = matchedUsers.map((u) => u._id);
+
+        if (matchedIds.length === 0) {
+          // Also allow matching by partial _id string
+          if (mongoose.Types.ObjectId.isValid(search.trim())) {
+            filter.$or = [
+              { userId: new mongoose.Types.ObjectId(search.trim()) },
+              { userId: { $in: matchedIds } }
+            ];
+          } else {
+            // No users matched and search is not an ObjectId — return empty
+            res.status(200).json({
+              success: true,
+              data: [],
+              pagination: { currentPage: pageNum, totalPages: 0, totalItems: 0, itemsPerPage: limitNum }
+            });
+            return;
+          }
+        } else {
+          filter.userId = { $in: matchedIds };
+        }
       }
 
       const sortObj: any = {};
       sortObj[sortBy as string] = sortOrder === 'asc' ? 1 : -1;
 
-      const orders = await Order.find(filter)
-        .sort(sortObj)
-        .skip(skip)
-        .limit(limitNum)
-        .populate('userId', 'name email phone')
-        .populate('addressId')
-        .populate('items.productId', 'name price thumbnail');
+      const [orders, total] = await Promise.all([
+        Order.find(filter)
+          .sort(sortObj)
+          .skip(skip)
+          .limit(limitNum)
+          .populate('userId', 'name email phone avatar')
+          .populate('addressId')
+          .populate('items.productId', 'name price thumbnail')
+          .populate('confirmedBy', 'name email'),
+        Order.countDocuments(filter)
+      ]);
 
-      const total = await Order.countDocuments(filter);
       const pages = Math.ceil(total / limitNum);
 
       res.status(200).json({
@@ -234,7 +283,7 @@ export class OrderController {
   };
 
   /**
-   * Cancel order
+   * Cancel order (by customer)
    * PATCH /api/orders/:id/cancel
    */
   cancelOrder = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
@@ -248,8 +297,10 @@ export class OrderController {
         throw new AppError('Order not found', 404);
       }
 
-      // Check if user is owner
-      if (req.user?.id !== order.userId.toString()) {
+      const isOwner   = req.user?.id === order.userId.toString();
+      const isManager = ['admin', 'manager'].includes(req.user?.role ?? '');
+
+      if (!isOwner && !isManager) {
         throw new AppError('You do not have permission to cancel this order', 403);
       }
 
@@ -262,16 +313,187 @@ export class OrderController {
         id,
         {
           status: 'cancelled',
-          cancelReason: cancelReason || 'User requested cancellation',
+          cancelReason: cancelReason || (isOwner ? 'Customer requested cancellation' : 'Cancelled by manager'),
           cancelledAt: new Date()
         },
         { new: true, runValidators: true }
-      );
+      ).populate('userId', 'name email phone')
+       .populate('items.productId', 'name price thumbnail');
 
       res.status(200).json({
         success: true,
         message: 'Order cancelled successfully',
         data: updatedOrder
+      });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  // ─────────────────────────────────────────────────────────────────
+  // ORDER CONFIRMATION FEATURE
+  // ─────────────────────────────────────────────────────────────────
+
+  /**
+   * Confirm a single pending order (manager/admin only)
+   * PATCH /api/orders/:id/confirm
+   */
+  confirmOrder = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const { id } = req.params;
+      const managerId = req.user?.id;
+
+      const order = await Order.findById(id);
+
+      if (!order) {
+        throw new AppError('Order not found', 404);
+      }
+
+      if (order.status !== 'pending') {
+        throw new AppError(
+          `Only pending orders can be confirmed. Current status: ${order.status}`,
+          400
+        );
+      }
+
+      const updatedOrder = await Order.findByIdAndUpdate(
+        id,
+        {
+          status: 'confirmed',
+          confirmedAt: new Date(),
+          confirmedBy: managerId
+        },
+        { new: true, runValidators: true }
+      )
+        .populate('userId', 'name email phone avatar')
+        .populate('addressId')
+        .populate('items.productId', 'name price thumbnail')
+        .populate('confirmedBy', 'name email');
+
+      res.status(200).json({
+        success: true,
+        message: 'Order confirmed successfully',
+        data: updatedOrder
+      });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  /**
+   * Manager cancel order (manager/admin only — bypasses owner check)
+   * PATCH /api/orders/:id/manager-cancel
+   */
+  managerCancelOrder = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const { id } = req.params;
+      const { cancelReason } = req.body;
+
+      const order = await Order.findById(id);
+
+      if (!order) {
+        throw new AppError('Order not found', 404);
+      }
+
+      if (!['pending', 'confirmed'].includes(order.status)) {
+        throw new AppError(
+          `Cannot cancel order with status: ${order.status}. Only pending or confirmed orders may be cancelled.`,
+          400
+        );
+      }
+
+      const updatedOrder = await Order.findByIdAndUpdate(
+        id,
+        {
+          status: 'cancelled',
+          cancelReason: cancelReason || 'Cancelled by manager',
+          cancelledAt: new Date()
+        },
+        { new: true, runValidators: true }
+      )
+        .populate('userId', 'name email phone avatar')
+        .populate('addressId')
+        .populate('items.productId', 'name price thumbnail');
+
+      res.status(200).json({
+        success: true,
+        message: 'Order cancelled by manager',
+        data: updatedOrder
+      });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  /**
+   * Bulk confirm multiple pending orders (manager/admin only)
+   * POST /api/orders/bulk-confirm
+   * Body: { orderIds: string[] }
+   */
+  bulkConfirmOrders = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const { orderIds } = req.body;
+      const managerId = req.user?.id;
+
+      if (!Array.isArray(orderIds) || orderIds.length === 0) {
+        throw new AppError('orderIds must be a non-empty array', 400);
+      }
+
+      if (orderIds.length > 100) {
+        throw new AppError('Cannot confirm more than 100 orders at once', 400);
+      }
+
+      const validIds = orderIds.filter((id) => mongoose.Types.ObjectId.isValid(id));
+      if (validIds.length !== orderIds.length) {
+        throw new AppError('One or more order IDs are invalid', 400);
+      }
+
+      // Only update orders that are actually pending
+      const result = await Order.updateMany(
+        { _id: { $in: validIds }, status: 'pending' },
+        {
+          $set: {
+            status: 'confirmed',
+            confirmedAt: new Date(),
+            confirmedBy: new mongoose.Types.ObjectId(managerId)
+          }
+        }
+      );
+
+      res.status(200).json({
+        success: true,
+        message: `${result.modifiedCount} order(s) confirmed successfully`,
+        data: {
+          requested:  orderIds.length,
+          confirmed:  result.modifiedCount,
+          skipped:    orderIds.length - result.modifiedCount
+        }
+      });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  /**
+   * Get pending orders summary for badge counts (manager/admin only)
+   * GET /api/orders/pending-summary
+   */
+  getPendingSummary = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const [pendingCount, todayCount] = await Promise.all([
+        Order.countDocuments({ status: 'pending' }),
+        Order.countDocuments({
+          status: 'pending',
+          orderDate: { $gte: new Date(new Date().setHours(0, 0, 0, 0)) }
+        })
+      ]);
+
+      res.status(200).json({
+        success: true,
+        data: {
+          totalPending:  pendingCount,
+          pendingToday:  todayCount
+        }
       });
     } catch (error) {
       next(error);

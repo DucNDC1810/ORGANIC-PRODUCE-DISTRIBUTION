@@ -8,6 +8,7 @@ import {
   LogOut,
   Settings,
   User,
+  ShoppingBag,
 } from 'lucide-react';
 import { memo, useCallback, useMemo } from 'react';
 import { cn } from '../../components/ui/utils';
@@ -83,6 +84,13 @@ const menuItems: MenuItem[] = [
     icon: Percent,
     description: 'Voucher Management',
     ariaLabel: 'Manage vouchers'
+  },
+  {
+    id: 'orders',
+    label: 'Orders',
+    icon: ShoppingBag,
+    description: 'Order Confirmation',
+    ariaLabel: 'Manage and confirm orders'
   },
 ] as const;
 

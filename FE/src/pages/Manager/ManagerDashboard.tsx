@@ -17,6 +17,7 @@ import ManagerProductManagement from './ProductManagement';
 import ManagerCategoryManagement from './CategoryManagement';
 import ManagerPromotions from './ManagerPromotions';
 import ManagerVouchers from './ManagerVouchers';
+import OrderConfirmation from './OrderConfirmation';
 import { cn } from '../../components/ui/utils';
 
 export default function ManagerDashboard() {
@@ -59,6 +60,7 @@ export default function ManagerDashboard() {
       categories: 'Category Management',
       promotions: 'Promotions',
       vouchers: 'Voucher Management',
+      orders: 'Order Confirmation',
     };
     return tabNames[activeTab] || 'Dashboard';
   };
@@ -75,6 +77,8 @@ export default function ManagerDashboard() {
         return <ManagerPromotions />;
       case 'vouchers':
         return <ManagerVouchers />;
+      case 'orders':
+        return <OrderConfirmation />;
       default:
         return <ManagerOverview />;
     }
