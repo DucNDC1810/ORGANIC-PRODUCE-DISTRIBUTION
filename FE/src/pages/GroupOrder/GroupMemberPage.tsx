@@ -23,7 +23,7 @@ import { toast } from "sonner";
 import { groupService, type Group, type GroupMember, type GroupCartItem } from "../../services/groupService";
 import { useGroup } from "../../context/GroupContext";
 import { useAuth } from "../../context/AuthContext";
-import walletService from "../../services/walletService";
+// walletService không cần cho flow hold – giữ import để tránh lỗi nếu dùng nơi khác
 
 // ── Constants ──────────────────────────────────────────────────────────────────
 const TIERS = [
@@ -34,7 +34,6 @@ const TIERS = [
 ];
 
 const AVATARS = ["🧑‍🌾", "👩‍🍳", "🧑‍💼", "👩‍🌾", "👨‍🍳", "🧑‍🦱", "👩‍🦰", "🧑‍🦳"];
-const SHIPPING = 25_000;
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 function fmtVND(n: number) {
@@ -76,11 +75,16 @@ export default function GroupMemberPage() {
   const [confirming, setConfirming] = useState(false);
   const [leaving,    setLeaving]    = useState(false);
 
-  // Pay-via-wallet to group owner
-  const [payConfirm, setPayConfirm] = useState<{ ownerUserId: string; ownerName: string; amount: number } | null>(null);
-  const [payLoading, setPayLoading] = useState(false);
+  // Hold wallet share
+  const [holdConfirm, setHoldConfirm] = useState(false);
+  const [holdLoading, setHoldLoading] = useState(false);
 
   const socketRef = useRef<Socket | null>(null);
+
+  // Refs to always have fresh state inside socket callbacks
+  const myCartRef  = useRef<GroupCartItem[]>([]);
+  const membersRef = useRef<GroupMember[]>([]);
+  const groupRef   = useRef<Group | null>(null);
 
   const groupId  = groupSession?.groupId;
   const memberId = groupSession?.memberId;
@@ -103,6 +107,11 @@ export default function GroupMemberPage() {
       .finally(() => setLoading(false));
   }, [groupId, memberId]);
 
+  // Keep refs in sync with state so socket callbacks always read the latest values
+  useEffect(() => { myCartRef.current  = myCart;   }, [myCart]);
+  useEffect(() => { membersRef.current = members;  }, [members]);
+  useEffect(() => { groupRef.current   = group;    }, [group]);
+
   // ── Socket.io realtime ─────────────────────────────────────────────────────
   useEffect(() => {
     if (!groupId) return;
@@ -122,6 +131,44 @@ export default function GroupMemberPage() {
       setMembers((prev) => prev.map((x) => (x._id === m._id ? m : x)));
       if (m._id === memberId) setMyCart(m.cartItems ?? []);
     });
+    socket.on("member:wallet_paid", (m: GroupMember) => {
+      setMembers((prev) => prev.map((x) => (x._id === m._id ? m : x)));
+    });
+    socket.on("group:cancelled", () => {
+      toast.info("Đơn nhóm đã bị hủy. Tiền đặt cọc đã được hoàn lại vào ví của bạn.", { duration: 6000 });
+      clearGroupSession();
+      navigate("/products");
+    });
+
+    // ── Owner đã chốt đơn → chuyển member sang trang xác nhận thành công ──
+    socket.on("group:order_placed", (data: { groupId: string; orderId: string; total: number }) => {
+      const latestMembers = membersRef.current;
+      const latestMyCart  = myCartRef.current;
+      const latestGroup   = groupRef.current;
+
+      const me = latestMembers.find((x) => x._id === memberId);
+      const memberName   = me ? getMemberName(me) : "Thành viên";
+      const subtotal     = latestMyCart.reduce((s, i) => s + i.price * i.qty, 0);
+      const orderedCount = latestMembers.filter((m) => m.isReady).length;
+      const tierIdx      = TIERS.reduce((acc, t, i) => (orderedCount >= t.members ? i : acc), -1);
+      const pct          = tierIdx >= 0 ? TIERS[tierIdx].pct : 0;
+
+      clearGroupSession();
+      navigate("/group-order/success", {
+        replace: true,
+        state: {
+          memberName,
+          myCart:           latestMyCart,
+          mySubtotal:       subtotal,
+          walletHoldAmount: me?.walletHoldAmount ?? 0,
+          orderId:          data.orderId,
+          groupName:        latestGroup?.groupName ?? "Đơn hàng nhóm",
+          activePct:        pct,
+          groupTotal:       data.total,
+        },
+      });
+    });
+
     return () => { socket.disconnect(); };
   }, [groupId, memberId]);
 
@@ -181,28 +228,23 @@ export default function GroupMemberPage() {
     }
   };
 
-  // ── Pay owner via wallet ───────────────────────────────────────────────────
-  const handlePayOwner = async () => {
-    if (!payConfirm) return;
-    setPayLoading(true);
+  // ── Hold wallet share ────────────────────────────────────────────────────
+  const handleHoldWallet = async () => {
+    if (!groupId || !memberId) return;
+    setHoldLoading(true);
     try {
-      const res = await walletService.transfer({
-        toUserId: payConfirm.ownerUserId,
-        amount:   payConfirm.amount,
-        description: `Trả tiền nhóm "${group?.groupName}" cho ${payConfirm.ownerName}`,
-      });
-      const newBalance = (res as any)?.data?.walletBalance;
+      const { member: updated, walletBalance } = await groupService.holdWalletShare(groupId, memberId);
+      setMembers((prev) => prev.map((x) => (x._id === updated._id ? { ...x, walletPaid: true, walletHoldAmount: updated.walletHoldAmount } : x)));
       toast.success(
-        `Đã trả ${fmtVND(payConfirm.amount)} cho ${payConfirm.ownerName} thành công! 🎉` +
-        (newBalance !== undefined ? ` Số dư ví: ${fmtVND(newBalance)}` : ''),
+        `Đã đặt cọc ${fmtVND(updated.walletHoldAmount ?? mySubtotal)} thành công! 🎉 Số dư ví: ${fmtVND(walletBalance)}`,
         { duration: 5000 }
       );
-      setPayConfirm(null);
+      setHoldConfirm(false);
     } catch (err: any) {
-      const msg = err?.response?.data?.message || 'Thanh toán thất bại. Vui lòng thử lại.';
+      const msg = err?.response?.data?.message || 'Đặt cọc thất bại. Vui lòng thử lại.';
       toast.error(msg);
     } finally {
-      setPayLoading(false);
+      setHoldLoading(false);
     }
   };
 
@@ -222,7 +264,6 @@ export default function GroupMemberPage() {
     const items = m._id === memberId ? myCart : (m.cartItems ?? []);
     return s + items.reduce((si, i) => si + i.price * i.qty, 0);
   }, 0);
-  const groupDiscount = Math.round(groupTotal * activePct / 100);
 
   // ── Loading ────────────────────────────────────────────────────────────────
   if (loading) {
@@ -573,19 +614,12 @@ export default function GroupMemberPage() {
                       </span>
                     )}
 
-                    {/* Pay-via-wallet button — only for owner row, shown to non-owner members */}
-                    {isOwner && !isMe && mySubtotal > 0 && m.userId?._id && (
-                      <button
-                        onClick={() => setPayConfirm({
-                          ownerUserId: m.userId!._id,
-                          ownerName:   getMemberName(m),
-                          amount:      mySubtotal,
-                        })}
-                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 text-white text-xs font-semibold shadow-sm hover:from-emerald-600 hover:to-teal-600 active:scale-95 transition-all flex-shrink-0"
-                      >
-                        <Wallet className="w-3.5 h-3.5" />
-                        Trả tiền qua ví
-                      </button>
+                    {/* Wallet payment status badge */}
+                    {m.walletPaid && (
+                      <span className="flex items-center gap-1 text-xs text-teal-700 font-semibold bg-teal-50 border border-teal-200 px-2.5 py-1 rounded-full flex-shrink-0">
+                        <Wallet className="w-3 h-3" />
+                        Đã cọc
+                      </span>
                     )}
                   </div>
                   </motion.div>
@@ -644,20 +678,10 @@ export default function GroupMemberPage() {
                 <span>Tạm tính (cả nhóm)</span>
                 <span className="font-semibold text-gray-900">{fmtVND(groupTotal)}</span>
               </div>
-              <div className="flex justify-between">
-                <span>Phí giao hàng</span>
-                <span className="font-semibold text-gray-900">{fmtVND(SHIPPING)}</span>
-              </div>
-              {activePct > 0 && (
-                <div className="flex justify-between text-green-600">
-                  <span>Ưu đãi nhóm ({activePct}%)</span>
-                  <span className="font-semibold">−{fmtVND(groupDiscount)}</span>
-                </div>
-              )}
               <div className="border-t border-gray-100 pt-2.5 flex justify-between">
                 <span className="font-bold text-gray-900">Tổng cộng</span>
                 <span className="font-extrabold text-green-600 text-base">
-                  {fmtVND(groupTotal - groupDiscount + SHIPPING)}
+                  {fmtVND(groupTotal)}
                 </span>
               </div>
               <p className="text-xs text-gray-400 text-center">
@@ -665,6 +689,35 @@ export default function GroupMemberPage() {
                 <span className="font-semibold text-gray-700">{fmtVND(mySubtotal)}</span>
               </p>
             </div>
+
+            {/* ── Wallet-hold CTA ── */}
+            {myMember?.role !== 'owner' && (
+              myMember?.walletPaid ? (
+                <div className="mt-4 flex items-center gap-2 bg-teal-50 border border-teal-200 rounded-xl px-4 py-3">
+                  <Wallet className="w-4 h-4 text-teal-600 flex-shrink-0" />
+                  <div>
+                    <p className="text-sm font-bold text-teal-700">Đã đặt cọc!</p>
+                    <p className="text-xs text-teal-600 mt-0.5">
+                      {fmtVND(myMember?.walletHoldAmount ?? mySubtotal)} đã được giữ — chờ chủ nhóm chốt đơn.
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                <button
+                  onClick={() => setHoldConfirm(true)}
+                  disabled={mySubtotal === 0 || !isReady}
+                  className="mt-4 w-full py-3 rounded-xl bg-gradient-to-r from-teal-500 to-emerald-500 text-white text-sm font-bold shadow hover:from-teal-600 hover:to-emerald-600 active:scale-[0.98] transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <Wallet className="w-4 h-4" />
+                  Thanh toán phần tôi
+                </button>
+              )
+            )}
+            {myMember?.role !== 'owner' && !isReady && mySubtotal > 0 && !myMember?.walletPaid && (
+              <p className="text-center text-xs text-amber-500 font-medium mt-1">
+                ⚠ Hãy xác nhận chọn xong trước khi đặt cọc
+              </p>
+            )}
           </div>
 
           {/* ── Member readiness avatars ── */}
@@ -738,54 +791,54 @@ export default function GroupMemberPage() {
         </div>
       </div>
 
-      {/* ══════════════ PAY-VIA-WALLET MODAL ══════════════ */}
-      {payConfirm && (
+      {/* ══════════════ HOLD WALLET MODAL ══════════════ */}
+      {holdConfirm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
-             onClick={() => !payLoading && setPayConfirm(null)}>
+             onClick={() => !holdLoading && setHoldConfirm(false)}>
           <div
             className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Header */}
-            <div className="flex items-center gap-2 px-6 py-4 bg-gradient-to-r from-emerald-500 to-teal-500 text-white">
+            <div className="flex items-center gap-2 px-6 py-4 bg-gradient-to-r from-teal-500 to-emerald-500 text-white">
               <Wallet className="w-5 h-5" />
-              <h3 className="text-lg font-bold flex-1">Trả tiền qua ví</h3>
+              <h3 className="text-lg font-bold flex-1">Đặt cọc phần của bạn</h3>
             </div>
 
             <div className="p-6 space-y-4">
               {/* Amount row */}
-              <div className="flex items-center justify-between bg-emerald-50 rounded-xl p-4">
+              <div className="flex items-center justify-between bg-teal-50 rounded-xl p-4">
                 <div>
                   <p className="text-xs text-gray-500 mb-0.5">Phần của bạn</p>
-                  <p className="text-2xl font-extrabold text-emerald-600">{fmtVND(payConfirm.amount)}</p>
+                  <p className="text-2xl font-extrabold text-teal-600">{fmtVND(mySubtotal)}</p>
                 </div>
                 <div className="text-right">
-                  <p className="text-xs text-gray-500 mb-0.5">Chuyển đến</p>
-                  <p className="text-sm font-bold text-gray-800">{payConfirm.ownerName}</p>
-                  <p className="text-xs text-gray-400">Chủ nhóm</p>
+                  <p className="text-xs text-gray-500 mb-0.5">Nhóm</p>
+                  <p className="text-sm font-bold text-gray-800">{group?.groupName}</p>
+                  <p className="text-xs text-gray-400">{members.length} thành viên</p>
                 </div>
               </div>
 
               <p className="text-xs text-gray-500 bg-gray-50 rounded-xl p-3 leading-relaxed">
-                💡 Số tiền sẽ được chuyển ngay từ ví FreshMarket của bạn sang ví của chủ nhóm. Vui lòng đảm bảo số dư đủ.
+                💡 Số tiền sẽ bị <strong>tạm giữ</strong> từ ví FreshMarket của bạn. Nếu bạn rời nhóm hoặc chủ nhóm hủy đơn, tiền sẽ được <strong>hoàn lại ngay lập tức</strong>.
               </p>
 
               {/* Actions */}
               <div className="flex gap-3 pt-1">
                 <button
-                  onClick={() => setPayConfirm(null)}
-                  disabled={payLoading}
+                  onClick={() => setHoldConfirm(false)}
+                  disabled={holdLoading}
                   className="flex-1 py-2.5 rounded-xl border border-gray-200 text-sm font-medium text-gray-600 hover:bg-gray-50 disabled:opacity-50"
                 >
                   Huỷ
                 </button>
                 <button
-                  onClick={handlePayOwner}
-                  disabled={payLoading}
-                  className="flex-1 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 text-white text-sm font-bold hover:from-emerald-600 hover:to-teal-600 active:scale-95 transition-all disabled:opacity-60 flex items-center justify-center gap-2"
+                  onClick={handleHoldWallet}
+                  disabled={holdLoading}
+                  className="flex-1 py-2.5 rounded-xl bg-gradient-to-r from-teal-500 to-emerald-500 text-white text-sm font-bold hover:from-teal-600 hover:to-emerald-600 active:scale-95 transition-all disabled:opacity-60 flex items-center justify-center gap-2"
                 >
-                  {payLoading && <Loader2 className="w-4 h-4 animate-spin" />}
-                  Xác nhận trả tiền
+                  {holdLoading && <Loader2 className="w-4 h-4 animate-spin" />}
+                  Xác nhận đặt cọc
                 </button>
               </div>
             </div>

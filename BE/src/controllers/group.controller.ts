@@ -82,7 +82,7 @@ export class GroupController {
     }
   };
 
-  /** DELETE /api/groups/:id/members/:memberId — Thành viên rời nhóm */
+  /** DELETE /api/groups/:id/members/:memberId — Thành viên rời nhóm (tự động hoàn tiền nếu đã cọc) */
   leaveGroup = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
     try {
       const { id: groupId, memberId } = req.params;
@@ -98,6 +98,69 @@ export class GroupController {
       } catch (_) {}
 
       res.json({ success: true, message: 'Rời nhóm thành công' });
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  /** POST /api/groups/:id/members/:memberId/wallet-hold — Đặt cọc phần tiền qua ví */
+  holdWalletShare = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const { id: groupId, memberId } = req.params;
+      const userId = req.user?.id;
+      if (!userId) throw new AppError('Unauthorized', 401);
+
+      const result = await groupService.holdWalletShare(groupId, memberId);
+
+      try {
+        getIO().to(`group:${groupId}`).emit('member:wallet_paid', result.member);
+      } catch (_) {}
+
+      res.json({ success: true, data: result });
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  /** DELETE /api/groups/:id — Chủ nhóm hủy đơn (hoàn tiền cho tất cả) */
+  cancelGroup = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const { id: groupId } = req.params;
+      const userId = req.user?.id;
+      if (!userId) throw new AppError('Unauthorized', 401);
+
+      const group = await groupService.cancelGroup(groupId, userId);
+
+      try {
+        getIO().to(`group:${groupId}`).emit('group:cancelled', { groupId });
+      } catch (_) {}
+
+      res.json({ success: true, message: 'Đã hủy đơn nhóm và hoàn tiền cho các thành viên', data: group });
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  /** POST /api/groups/:id/place-order — Chủ nhóm chốt đơn và tạo đơn hàng chính thức */
+  placeGroupOrder = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const { id: groupId } = req.params;
+      const userId = req.user?.id;
+      if (!userId) throw new AppError('Unauthorized', 401);
+
+      const { ownerCartItems = [], deliveryInfo = {} } = req.body;
+
+      const result = await groupService.placeGroupOrder(groupId, userId, ownerCartItems, deliveryInfo);
+
+      try {
+        getIO().to(`group:${groupId}`).emit('group:order_placed', {
+          groupId,
+          orderId: result.order._id,
+          total: result.total,
+        });
+      } catch (_) {}
+
+      res.status(201).json({ success: true, data: result });
     } catch (err) {
       next(err);
     }
