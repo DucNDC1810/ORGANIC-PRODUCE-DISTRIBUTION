@@ -1,5 +1,4 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { useSearchParams } from 'react-router-dom';
 import {
   Plus, ArrowDownLeft, ShoppingCart, RotateCcw,
   ChevronLeft, ChevronRight, X,
@@ -190,7 +189,6 @@ export default function WalletTab() {
   const [totalPages, setTotalPages]   = useState(1);
 
   const [showTopUp, setShowTopUp] = useState(false);
-  const [searchParams, setSearchParams] = useSearchParams();
 
   // Track previous balance for change notifications
   const prevBalanceRef   = useRef<number | null>(null);
@@ -253,12 +251,6 @@ export default function WalletTab() {
 
         const allTxData: Transaction[] = (txAllRes as any)?.data ?? [];
         setTxAll(allTxData);
-
-        // Handle MoMo redirect back with ?topup=success
-        if (searchParams.get('topup') === 'success') {
-          toast.success('Nạp tiền vào ví thành công! 🎉', { duration: 5000 });
-          setSearchParams({}, { replace: true });
-        }
       } catch {
         toast.error('Không thể tải thông tin ví');
       } finally {

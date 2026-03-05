@@ -28,6 +28,7 @@ import GroupOrderPage from './pages/GroupOrder/GroupOrderPage';
 import GroupOrderActivePage from './pages/GroupOrder/GroupOrderActivePage';
 import JoinGroupPage from './pages/GroupOrder/JoinGroupPage';
 import GroupMemberPage from './pages/GroupOrder/GroupMemberPage';
+import TopupResultPage from './pages/Wallet/TopupResultPage';
 
 export default function App() {
   return (
@@ -64,6 +65,9 @@ export default function App() {
             <Route path="/checkout" element={<ProtectedRoute><CheckoutPage /></ProtectedRoute>} />
             <Route path="/order-success" element={<ProtectedRoute><OrderSuccessPage /></ProtectedRoute>} />
             <Route path="/payment-result" element={<ProtectedRoute><OrderSuccessPage /></ProtectedRoute>} />
+            {/* /wallet-topup = new redirect URL; /wallet = legacy MoMo redirect — both render the same result page */}
+            <Route path="/wallet-topup" element={<ProtectedRoute><TopupResultPage /></ProtectedRoute>} />
+            <Route path="/wallet"        element={<ProtectedRoute><TopupResultPage /></ProtectedRoute>} />
             {/* Customer-only routes */}
             <Route path="/profile" element={<CustomerRoute> <Profile /></CustomerRoute>} />
 

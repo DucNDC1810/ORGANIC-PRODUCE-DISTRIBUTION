@@ -68,7 +68,7 @@ export class WalletController {
       const momoOrderId = `topup_${transaction._id.toString()}`;
 
       const feOrigin = req.headers.origin || process.env.FE_BASE_URL || 'http://localhost:5173';
-      const redirectUrl = `${feOrigin}/wallet?topup=success`;
+      const redirectUrl = `${feOrigin}/wallet-topup`;
 
       try {
         const momoResponse = await momoService.createPayment(
@@ -301,6 +301,113 @@ export class WalletController {
     } catch (error) {
       await session.abortTransaction();
       session.endSession();
+      next(error);
+    }
+  };
+
+  /**
+   * Xác nhận nạp ví sau khi MoMo redirect về FE
+   * POST /api/wallet/verify-topup
+   * Body: { orderId: "topup_<transactionId>", requestId: "topup_<transactionId>" }
+   *
+   * Dùng để xử lý trường hợp IPN không tới được server (ngrok hết hạn, v.v.)
+   * FE gọi endpoint này ngay sau khi được MoMo redirect về trang kết quả.
+   */
+  verifyTopUp = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const userId = req.user?.id;
+      if (!userId) throw new AppError('User not authenticated', 401);
+
+      const { orderId, requestId } = req.body;
+      if (!orderId || typeof orderId !== 'string' || !orderId.startsWith('topup_')) {
+        throw new AppError('Invalid orderId for top-up verification', 400);
+      }
+
+      const transactionId = orderId.replace('topup_', '');
+      const txn = await Transaction.findById(transactionId);
+      if (!txn) throw new AppError('Transaction not found', 404);
+
+      // Chỉ xử lý giao dịch thuộc về user đang đăng nhập
+      if (txn.userId.toString() !== userId) throw new AppError('Unauthorized', 403);
+
+      // Nếu đã cập nhật thành công (IPN đã xử lý trước), trả về kết quả luôn
+      if (txn.status === 'success') {
+        const user = await User.findById(userId).select('walletBalance');
+        res.status(200).json({
+          success: true,
+          message: 'Top-up already confirmed',
+          data: { walletBalance: user?.walletBalance ?? 0, alreadyProcessed: true }
+        });
+        return;
+      }
+
+      if (txn.status === 'failed') {
+        throw new AppError('Top-up transaction was marked as failed', 400);
+      }
+
+      // Gọi MoMo query API để xác nhận trạng thái
+      const effectiveRequestId = requestId || orderId;
+      console.log(`🔍 Verifying top-up via MoMo query: orderId=${orderId}, requestId=${effectiveRequestId}`);
+      const statusResponse = await momoService.queryPayment(orderId, effectiveRequestId);
+      console.log(`📥 MoMo query result: resultCode=${statusResponse.resultCode}`);
+
+      if (statusResponse.resultCode !== 0) {
+        // MoMo xác nhận thất bại — đánh dấu failed
+        await Transaction.findByIdAndUpdate(transactionId, { status: 'failed' });
+        throw new AppError(
+          `Top-up payment failed: ${statusResponse.resultDescription || statusResponse.message || 'Payment not completed'}`,
+          400
+        );
+      }
+
+      // Thanh toán hợp lệ — cập nhật nguyên tử
+      const session = await mongoose.startSession();
+      session.startTransaction();
+      try {
+        // Re-read trong session để tránh race condition với IPN
+        const txnInSession = await Transaction.findById(transactionId).session(session);
+        if (!txnInSession) {
+          await session.abortTransaction();
+          session.endSession();
+          throw new AppError('Transaction not found', 404);
+        }
+
+        if (txnInSession.status !== 'success') {
+          await User.findByIdAndUpdate(
+            txnInSession.userId,
+            { $inc: { walletBalance: txnInSession.amount } },
+            { session }
+          );
+          await Transaction.findByIdAndUpdate(
+            transactionId,
+            {
+              status: 'success',
+              metadata: {
+                momoTransId: statusResponse.transId,
+                verifiedAt: new Date(),
+                verifiedBy: 'client-verify',
+              }
+            },
+            { session }
+          );
+          console.log(`✅ Top-up verified & credited: +${txnInSession.amount} VND for user ${userId}`);
+        }
+
+        await session.commitTransaction();
+        session.endSession();
+      } catch (err) {
+        await session.abortTransaction();
+        session.endSession();
+        throw err;
+      }
+
+      const updatedUser = await User.findById(userId).select('walletBalance');
+      res.status(200).json({
+        success: true,
+        message: 'Top-up confirmed and wallet credited',
+        data: { walletBalance: updatedUser?.walletBalance ?? 0, alreadyProcessed: false }
+      });
+    } catch (error) {
       next(error);
     }
   };

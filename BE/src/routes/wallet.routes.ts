@@ -20,6 +20,14 @@ router.get('/balance', authenticate as any, WalletController.getWalletInfo as an
 router.post('/topup', authenticate as any, WalletController.topUpWallet as any);
 
 /**
+ * @route   POST /api/wallet/verify-topup
+ * @desc    Xác nhận nạp tiền sau khi MoMo redirect (fallback khi IPN không tới được server)
+ * @access  Private
+ * @body    { orderId: "topup_<transactionId>", requestId?: string }
+ */
+router.post('/verify-topup', authenticate as any, WalletController.verifyTopUp as any);
+
+/**
  * @route   POST /api/wallet/pay
  * @desc    Thanh toán đơn hàng bằng ví FreshMarket (Mongoose Session)
  * @access  Private

@@ -47,6 +47,13 @@ const walletService = {
     data: { amount: number; toUser: { id: string; name: string }; walletBalance: number };
   }> =>
     api.post('/wallet/transfer', payload) as any,
+
+  verifyTopUp: (orderId: string, requestId?: string): Promise<{
+    success: boolean;
+    message: string;
+    data: { walletBalance: number; alreadyProcessed: boolean };
+  }> =>
+    api.post('/wallet/verify-topup', { orderId, requestId: requestId ?? orderId }) as any,
 };
 
 export default walletService;
