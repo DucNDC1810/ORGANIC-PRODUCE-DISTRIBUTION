@@ -2,11 +2,11 @@ import { useState, useRef, useEffect, lazy, Suspense } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   Leaf, 
-  User,
-  Settings,
+
   LogOut,
   ChevronDown,
   Bell,
+  Store,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useCart } from '../../context/CartContext';
@@ -21,6 +21,8 @@ const OrderManagement = lazy(() => import('./OrderManagement'));
 const CustomerManagement = lazy(() => import('./CustomerManagement'));
 const ProductCategories = lazy(() => import('./CategoryManagement'));
 const ReportsAnalytics = lazy(() => import('./ReportsAnalytics'));
+const BlogManagement = lazy(() => import('./BlogManagement'));
+const AdminSettings = lazy(() => import('./AdminSettings'));
 
 export default function AdminDashboard() {
   const [activeTab, setActiveTab] = useState('overview');
@@ -63,7 +65,9 @@ export default function AdminDashboard() {
       orders: 'Order Management',
       customers: 'Customer Management',
       categories: 'Category Management',
+      blogs: 'Blog Management',
       reports: 'Reports & Analytics',
+      settings: 'Account Settings',
     };
     return tabNames[activeTab] || 'Dashboard';
   };
@@ -80,8 +84,12 @@ export default function AdminDashboard() {
         return <CustomerManagement />;
       case 'categories':
         return <ProductCategories />;
+      case 'blogs':
+        return <BlogManagement />;
       case 'reports':
         return <ReportsAnalytics />;
+      case 'settings':
+        return <AdminSettings />;
       default:
         return <Overview />;
     }
@@ -145,6 +153,19 @@ export default function AdminDashboard() {
 
           {/* Right Section */}
           <div className="flex items-center gap-3">
+            {/* Back to Store */}
+            <button
+              onClick={() => navigate('/')}
+              className="flex items-center gap-2 px-4 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 hover:text-emerald-800 rounded-xl text-sm font-medium transition-all duration-200 border border-emerald-200 hover:border-emerald-300 group"
+              title="Quay lại trang Store"
+            >
+              <Store className="w-4 h-4 group-hover:scale-110 transition-transform duration-200" />
+              <span className="hidden sm:block">Visit Store</span>
+            </button>
+
+            {/* Divider */}
+            <div className="h-8 w-px bg-gray-200"></div>
+
             {/* Notifications */}
             <div className="relative" ref={notificationRef}>
               <button
@@ -253,36 +274,6 @@ export default function AdminDashboard() {
 
                   {/* Menu Items */}
                   <div className="py-2">
-                    <button
-                      onClick={() => {
-                        setDropdownOpen(false);
-                        navigate('/profile');
-                      }}
-                      className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors group"
-                    >
-                      <div className="w-8 h-8 rounded-lg bg-gray-100 flex items-center justify-center group-hover:bg-emerald-100 transition-colors">
-                        <User className="w-4 h-4 text-gray-600 group-hover:text-emerald-600 transition-colors" />
-                      </div>
-                      <div className="flex-1 text-left">
-                        <p className="font-medium">Profile</p>
-                        <p className="text-xs text-gray-500">View and edit profile</p>
-                      </div>
-                    </button>
-                    <button
-                      onClick={() => {
-                        setDropdownOpen(false);
-                        // Add settings navigation if needed
-                      }}
-                      className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors group"
-                    >
-                      <div className="w-8 h-8 rounded-lg bg-gray-100 flex items-center justify-center group-hover:bg-blue-100 transition-colors">
-                        <Settings className="w-4 h-4 text-gray-600 group-hover:text-blue-600 transition-colors" />
-                      </div>
-                      <div className="flex-1 text-left">
-                        <p className="font-medium">Settings</p>
-                        <p className="text-xs text-gray-500">Preferences and config</p>
-                      </div>
-                    </button>
                   </div>
 
                   {/* Logout */}

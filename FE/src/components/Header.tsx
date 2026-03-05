@@ -1,9 +1,10 @@
 import { useState, useRef, useEffect } from 'react';
-import { Search, ShoppingCart, Leaf, Apple, Carrot, Wheat, Milk, Lightbulb, Gift, User, LogOut, Settings, X, Bell, ChevronDown } from 'lucide-react';
+import { Search, ShoppingCart, Leaf, Apple, Carrot, Wheat, Milk, Lightbulb, Gift, LogOut, Settings, X, Bell, ChevronDown } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
 import { cn } from './ui/utils';
+
 
 interface DropdownItem {
   icon: React.ReactNode;
@@ -72,6 +73,13 @@ export default function Header() {
       searchInputRef.current.focus();
     }
   }, [searchOpen]);
+
+  const handleSearchSubmit = (query: string) => {
+    if (!query.trim()) return;
+    navigate(`/products?search=${encodeURIComponent(query.trim())}`);
+    setSearchOpen(false);
+    setSearchQuery('');
+  };
 
   // Close dropdowns on outside click
   useEffect(() => {
@@ -276,19 +284,7 @@ export default function Header() {
                       {/* Menu Items */}
                       <div className="py-2">
                         <button
-                          onClick={() => { setUserDropdownOpen(false); navigate('/profile'); }}
-                          className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors group"
-                        >
-                          <div className="w-8 h-8 rounded-lg bg-gray-100 flex items-center justify-center group-hover:bg-emerald-100 transition-colors">
-                            <User className="w-4 h-4 text-gray-600 group-hover:text-emerald-600 transition-colors" />
-                          </div>
-                          <div className="flex-1 text-left">
-                            <p className="font-medium">Profile</p>
-                            <p className="text-xs text-gray-500">View and edit profile</p>
-                          </div>
-                        </button>
-                        <button
-                          onClick={() => { setUserDropdownOpen(false); navigate('/profile'); setUserDropdownOpen(false); }}
+                          onClick={() => { setUserDropdownOpen(false); navigate(user?.role === 'admin' ? '/admin' : '/profile'); }}
                           className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors group"
                         >
                           <div className="w-8 h-8 rounded-lg bg-gray-100 flex items-center justify-center group-hover:bg-blue-100 transition-colors">
@@ -324,15 +320,9 @@ export default function Header() {
             <div className="relative flex items-center">
               {searchOpen && (
                 <form
-                  onSubmit={(e) => {
-                    e.preventDefault();
-                    if (searchQuery.trim()) {
-                      navigate(`/products?search=${encodeURIComponent(searchQuery.trim())}`);
-                      setSearchOpen(false);
-                      setSearchQuery('');
-                    }
-                  }}
-                  className="absolute right-0 flex items-center animate-in slide-in-from-right-4 duration-200"
+                  onSubmit={(e) => { e.preventDefault(); handleSearchSubmit(searchQuery); }}
+                  className="absolute right-8 flex items-center animate-in slide-in-from-right-4 duration-200"
+                  style={{ width: '280px' }}
                 >
                   <input
                     ref={searchInputRef}
@@ -340,7 +330,7 @@ export default function Header() {
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     placeholder="Search products..."
-                    className="w-56 pl-4 pr-8 py-2 text-sm border border-gray-200 rounded-lg bg-white shadow-md focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+                    className="w-full pl-4 pr-8 py-2 text-sm border border-gray-200 rounded-lg bg-white shadow-md focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
                     onKeyDown={(e) => {
                       if (e.key === 'Escape') {
                         setSearchOpen(false);
@@ -357,6 +347,7 @@ export default function Header() {
                   </button>
                 </form>
               )}
+
               <button
                 onClick={() => setSearchOpen(!searchOpen)}
                 className="p-2 hover:bg-muted rounded-lg transition-colors"
