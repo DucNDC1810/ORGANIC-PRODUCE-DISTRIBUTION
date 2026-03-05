@@ -24,7 +24,8 @@ export default function AuthCallbackPage() {
       localStorage.setItem('token', token);
       
       // Fetch user details using the token
-      fetch('http://localhost:5000/api/users/me', {
+      const apiBase = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+      fetch(`${apiBase}/users/me`, {
         headers: {
           'Authorization': `Bearer ${token}`,
         },
