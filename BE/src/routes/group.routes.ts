@@ -20,6 +20,9 @@ router.post('/:id/join', authenticate as any, groupController.joinGroup as any);
 // Rời nhóm (bắt buộc đăng nhập, tự động hoàn tiền nếu đã cọc)
 router.delete('/:id/members/:memberId', authenticate as any, groupController.leaveGroup as any);
 
+// Cập nhật tùy chọn thanh toán (chỉ chủ nhóm)
+router.patch('/:id/payment-option', authenticate as any, groupController.updatePaymentOption as any);
+
 // Cập nhật trạng thái đã chọn món (bắt buộc đăng nhập)
 router.patch('/:id/members/:memberId/ready', authenticate as any, groupController.setMemberReady as any);
 

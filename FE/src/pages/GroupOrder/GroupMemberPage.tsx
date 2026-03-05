@@ -134,8 +134,16 @@ export default function GroupMemberPage() {
     socket.on("member:wallet_paid", (m: GroupMember) => {
       setMembers((prev) => prev.map((x) => (x._id === m._id ? m : x)));
     });
+    socket.on("group:payment_option_changed", (data: { groupId: string; paymentOption: string }) => {
+      setGroup((prev) => prev ? { ...prev, paymentOption: data.paymentOption as any } : prev);
+    });
     socket.on("group:cancelled", () => {
-      toast.info("Đơn nhóm đã bị hủy. Tiền đặt cọc đã được hoàn lại vào ví của bạn.", { duration: 6000 });
+      const isOwnerPays = (groupRef.current?.paymentOption ?? 'owner_only') === 'owner_only';
+      if (isOwnerPays) {
+        toast.info("Đơn nhóm đã bị hủy bởi chủ nhóm.", { duration: 5000 });
+      } else {
+        toast.info("Đơn nhóm đã bị hủy. Tiền đặt cọc đã được hoàn lại vào ví của bạn.", { duration: 6000 });
+      }
       clearGroupSession();
       navigate("/products");
     });
@@ -264,6 +272,13 @@ export default function GroupMemberPage() {
     const items = m._id === memberId ? myCart : (m.cartItems ?? []);
     return s + items.reduce((si, i) => si + i.price * i.qty, 0);
   }, 0);
+
+  // Per-member share based on paymentOption
+  const paymentOpt = (group?.paymentOption ?? 'owner_only') as 'owner_only' | 'individual' | 'equal_split';
+  const myShare =
+    paymentOpt === 'equal_split' && members.length > 0
+      ? Math.round(groupTotal / members.length)
+      : mySubtotal;
 
   // ── Loading ────────────────────────────────────────────────────────────────
   if (loading) {
@@ -685,14 +700,22 @@ export default function GroupMemberPage() {
                 </span>
               </div>
               <p className="text-xs text-gray-400 text-center">
-                Phần của bạn:{" "}
-                <span className="font-semibold text-gray-700">{fmtVND(mySubtotal)}</span>
+                Phần của bạn{paymentOpt === 'equal_split' ? ' (chia đều)' : paymentOpt === 'individual' ? ' (theo món)' : ''}:{" "}
+                <span className="font-semibold text-gray-700">{fmtVND(myShare)}</span>
               </p>
             </div>
 
             {/* ── Wallet-hold CTA ── */}
             {myMember?.role !== 'owner' && (
-              myMember?.walletPaid ? (
+              paymentOpt === 'owner_only' ? (
+                <div className="mt-4 flex items-center gap-2 bg-blue-50 border border-blue-200 rounded-xl px-4 py-3">
+                  <span className="text-lg flex-shrink-0">💳</span>
+                  <div>
+                    <p className="text-sm font-bold text-blue-700">Chủ nhóm sẽ thanh toán hoá đơn này</p>
+                    <p className="text-xs text-blue-500 mt-0.5">Bạn chỉ cần chọn món và xác nhận xong.</p>
+                  </div>
+                </div>
+              ) : myMember?.walletPaid ? (
                 <div className="mt-4 flex items-center gap-2 bg-teal-50 border border-teal-200 rounded-xl px-4 py-3">
                   <Wallet className="w-4 h-4 text-teal-600 flex-shrink-0" />
                   <div>
@@ -713,7 +736,7 @@ export default function GroupMemberPage() {
                 </button>
               )
             )}
-            {myMember?.role !== 'owner' && !isReady && mySubtotal > 0 && !myMember?.walletPaid && (
+            {myMember?.role !== 'owner' && paymentOpt !== 'owner_only' && !isReady && mySubtotal > 0 && !myMember?.walletPaid && (
               <p className="text-center text-xs text-amber-500 font-medium mt-1">
                 ⚠ Hãy xác nhận chọn xong trước khi đặt cọc
               </p>
@@ -810,7 +833,7 @@ export default function GroupMemberPage() {
               <div className="flex items-center justify-between bg-teal-50 rounded-xl p-4">
                 <div>
                   <p className="text-xs text-gray-500 mb-0.5">Phần của bạn</p>
-                  <p className="text-2xl font-extrabold text-teal-600">{fmtVND(mySubtotal)}</p>
+                  <p className="text-2xl font-extrabold text-teal-600">{fmtVND(myShare)}</p>
                 </div>
                 <div className="text-right">
                   <p className="text-xs text-gray-500 mb-0.5">Nhóm</p>

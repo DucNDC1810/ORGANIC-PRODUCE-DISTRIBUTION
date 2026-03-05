@@ -29,6 +29,7 @@ import GroupOrderActivePage from './pages/GroupOrder/GroupOrderActivePage';
 import JoinGroupPage from './pages/GroupOrder/JoinGroupPage';
 import GroupMemberPage from './pages/GroupOrder/GroupMemberPage';
 import GroupOrderSuccess from './pages/GroupOrder/GroupOrderSuccess';
+import GroupOwnerSuccessPage from './pages/GroupOrder/GroupOwnerSuccessPage';
 import TopupResultPage from './pages/Wallet/TopupResultPage';
 
 export default function App() {
@@ -64,6 +65,8 @@ export default function App() {
             <Route path="/group/members" element={<GroupMemberPage />} />
             {/* Trang xác nhận thành công cho nhóm */}
             <Route path="/group-order/success" element={<ProtectedRoute><GroupOrderSuccess /></ProtectedRoute>} />
+            {/* Trang xác nhận thành công cho chủ nhóm */}
+            <Route path="/group-order/owner-success" element={<ProtectedRoute><GroupOwnerSuccessPage /></ProtectedRoute>} />
             <Route path="/cart" element={<ProtectedRoute><CartPage /></ProtectedRoute>} />
             <Route path="/checkout" element={<ProtectedRoute><CheckoutPage /></ProtectedRoute>} />
             <Route path="/order-success" element={<ProtectedRoute><OrderSuccessPage /></ProtectedRoute>} />

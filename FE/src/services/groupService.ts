@@ -13,6 +13,7 @@ export interface Group {
   ownerId: string;
   inviteCode: string;
   settings: GroupSettings;
+  paymentOption: 'owner_only' | 'individual' | 'equal_split';
   status: 'active' | 'locked' | 'completed';
   createdAt: string;
 }
@@ -47,6 +48,7 @@ export const groupService = {
   createGroup: async (data: {
     groupName: string;
     paymentMethod: string;
+    paymentOption?: 'owner_only' | 'individual' | 'equal_split';
     timeLimit?: string | null;
   }): Promise<Group> => {
     const res: any = await api.post('/groups', data);
@@ -114,6 +116,15 @@ export const groupService = {
   /** DELETE /api/groups/:id — Chủ nhóm hủy đơn (hoàn tiền tất cả) */
   cancelGroup: async (groupId: string): Promise<void> => {
     await api.delete(`/groups/${groupId}`);
+  },
+
+  /** PATCH /api/groups/:id/payment-option — Cập nhật tùy chọn thanh toán */
+  updatePaymentOption: async (
+    groupId: string,
+    paymentOption: 'owner_only' | 'individual' | 'equal_split'
+  ): Promise<Group> => {
+    const res: any = await api.patch(`/groups/${groupId}/payment-option`, { paymentOption });
+    return res.data;
   },
 
   /** POST /api/groups/:id/place-order — Chủ nhóm chốt đơn */

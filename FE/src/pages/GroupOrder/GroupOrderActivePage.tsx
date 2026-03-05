@@ -119,13 +119,21 @@ export default function GroupOrderActivePage() {
   const [cancelLoading,      setCancelLoading]      = useState(false);
   const [showPlaceConfirm,   setShowPlaceConfirm]   = useState(false);
   const [showCancelConfirm,  setShowCancelConfirm]  = useState(false);
+  const [paymentOption,      setPaymentOption]      = useState<'owner_only' | 'individual' | 'equal_split'>('owner_only');
+  const [showPayOptionModal, setShowPayOptionModal] = useState(false);
+  const [payOptionLoading,   setPayOptionLoading]   = useState(false);
 
   // ── Fetch members from API on mount ────────────────────────────────────
   useEffect(() => {
     if (!groupId) { setMembersLoading(false); return; }
-    groupService
-      .getMembers(groupId)
-      .then(setMembers)
+    Promise.all([
+      groupService.getMembers(groupId),
+      groupService.getGroup(groupId),
+    ])
+      .then(([ms, g]) => {
+        setMembers(ms);
+        if (g.paymentOption) setPaymentOption(g.paymentOption);
+      })
       .catch(console.error)
       .finally(() => setMembersLoading(false));
   }, [groupId]);
@@ -170,6 +178,10 @@ export default function GroupOrderActivePage() {
     socket.on("member:left", (leftMemberId: string) => {
       setMembers((prev) => prev.filter((m) => m._id !== leftMemberId));
       toast.info("Một thành viên vừa rời khỏi nhóm.", { icon: "🚪" });
+    });
+    // Chủ nhóm đổi hình thức thanh toán: cập nhật cho tất cả
+    socket.on("group:payment_option_changed", (data: { groupId: string; paymentOption: string }) => {
+      setPaymentOption(data.paymentOption as 'owner_only' | 'individual' | 'equal_split');
     });
     return () => { socket.disconnect(); };
   }, [groupId]);
@@ -242,11 +254,25 @@ export default function GroupOrderActivePage() {
         image: i.image,
       }));
       const result = await groupService.placeGroupOrder(groupId, ownerCartItems);
-      toast.success(
-        `Đơn hàng nhóm đã được tạo thành công! 🎉 Tổng: ${result.total.toLocaleString("vi-VN")}đ`,
-        { duration: 6000 }
-      );
-      navigate("/orders");
+      const ownerMember = members.find((m) => m.role === "owner");
+      const ownerName   = ownerMember ? getMemberName(ownerMember) : "Chủ nhóm";
+      navigate("/group-order/owner-success", {
+        replace: true,
+        state: {
+          ownerName,
+          groupName,
+          orderId:             result.order?._id ?? "",
+          groupTotal:          total + 25000,
+          subtotal,
+          discount:            result.discount  ?? discount,
+          activePct,
+          totalMemberDeposits: result.totalHeld ?? totalHeld,
+          ownerPaid:           result.ownerCharge ?? ownerRemaining,
+          walletBalance:       result.walletBalance,
+          memberCount:         members.length,
+          ownerCart:           cart.map((i) => ({ name: i.name, price: i.price, qty: i.qty, image: i.image })),
+        },
+      });
     } catch (err: any) {
       const msg = err?.response?.data?.message || "Chốt đơn thất bại. Vui lòng thử lại.";
       toast.error(msg);
@@ -262,13 +288,33 @@ export default function GroupOrderActivePage() {
     setShowCancelConfirm(false);
     try {
       await groupService.cancelGroup(groupId);
-      toast.success("Đã hủy đơn nhóm. Tiền đặt cọc đã được hoàn lại cho tất cả thành viên.", { duration: 6000 });
-      navigate("/group-order");
+      const msg = paymentOption === 'owner_only'
+        ? "Đã xóa đơn hàng nhóm thành công."
+        : "Đã hủy đơn nhóm. Tiền đặt cọc đã được hoàn lại cho tất cả thành viên.";
+      toast.success(msg, { duration: 6000 });
+      navigate(paymentOption === 'owner_only' ? "/checkout" : "/group-order");
     } catch (err: any) {
       const msg = err?.response?.data?.message || "Hủy đơn thất bại. Vui lòng thử lại.";
       toast.error(msg);
     } finally {
       setCancelLoading(false);
+    }
+  };
+
+  // ── Update payment option ─────────────────────────────────────────────────
+  const handleSelectPaymentOption = async (option: 'owner_only' | 'individual' | 'equal_split') => {
+    if (option === paymentOption) { setShowPayOptionModal(false); return; }
+    setPaymentOption(option);
+    setShowPayOptionModal(false);
+    if (!groupId) return;
+    setPayOptionLoading(true);
+    try {
+      await groupService.updatePaymentOption(groupId, option);
+      toast.success('Đã cập nhật hình thức thanh toán!', { icon: '💳' });
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || 'Không thể cập nhật. Vui lòng thử lại.');
+    } finally {
+      setPayOptionLoading(false);
     }
   };
 
@@ -642,15 +688,19 @@ export default function GroupOrderActivePage() {
           <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
             <h3 className="text-base font-bold text-gray-900 mb-5">Tóm tắt đơn nhóm</h3>
 
-            {/* Per-member rows */}
+            {/* Per-member rows – amount shown depends on paymentOption */}
             <div className="space-y-2.5">
               {membersLoading ? (
                 <div className="py-6 text-center text-sm text-gray-400">Đang tải...</div>
               ) : members.map((m, idx) => {
-                const ordered      = isMemberOrdered(m);
-                const itemsQty     = getMemberTotalQty(m);
-                const memberCart   = m.role === "owner" ? cart : (m.cartItems ?? []);
-                const memberAmount = memberCart.reduce((s, i) => s + i.price * i.qty, 0);
+                const ordered    = isMemberOrdered(m);
+                const itemsQty   = getMemberTotalQty(m);
+                const memberCart = m.role === "owner" ? cart : (m.cartItems ?? []);
+                const rawAmount  = memberCart.reduce((s, i) => s + i.price * i.qty, 0);
+                const memberShare =
+                  paymentOption === 'equal_split' && members.length > 0
+                    ? Math.round((total + 25000) / members.length)
+                    : rawAmount;
                 return (
                   <div key={m._id} className="flex items-center gap-3">
                     <div className="w-7 h-7 rounded-full bg-gray-100 flex items-center justify-center text-base flex-shrink-0">
@@ -658,8 +708,8 @@ export default function GroupOrderActivePage() {
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-xs text-gray-600 truncate">{getMemberName(m)}</p>
-                      {ordered && memberAmount > 0 && (
-                        <p className="text-xs text-green-600 font-medium">{fmtVND(memberAmount)}</p>
+                      {ordered && memberShare > 0 && (
+                        <p className="text-xs text-green-600 font-medium">{fmtVND(memberShare)}</p>
                       )}
                     </div>
                     <div className="flex items-center gap-1.5 flex-shrink-0">
@@ -697,35 +747,59 @@ export default function GroupOrderActivePage() {
                 <span className="font-extrabold text-green-600 text-base">{fmtVND(total + 25000)}</span>
               </div>
 
-              {/* ── Deposit breakdown ── */}
-              {totalHeld > 0 && (
-                <div className="flex justify-between text-teal-600">
-                  <span className="flex items-center gap-1">
-                    <Wallet className="w-3.5 h-3.5" />
-                    Tổng tiền đã cọc
-                  </span>
-                  <span className="font-semibold">−{fmtVND(totalHeld)}</span>
-                </div>
+              {/* ── Deposit breakdown – only for individual / equal_split ── */}
+              {paymentOption !== 'owner_only' && (
+                <>
+                  {totalHeld > 0 && (
+                    <div className="flex justify-between text-teal-600">
+                      <span className="flex items-center gap-1">
+                        <Wallet className="w-3.5 h-3.5" />
+                        Tổng tiền đã cọc
+                      </span>
+                      <span className="font-semibold">−{fmtVND(totalHeld)}</span>
+                    </div>
+                  )}
+                  <div className={`border-t pt-2.5 flex justify-between ${
+                    ownerRemaining === 0 ? "border-teal-100" : "border-orange-100"
+                  }`}>
+                    <span className={`font-bold ${
+                      ownerRemaining === 0 ? "text-teal-700" : "text-orange-700"
+                    }`}>
+                      Chủ nhóm cần trả nốt
+                    </span>
+                    <span className={`font-extrabold text-base ${
+                      ownerRemaining === 0 ? "text-teal-600" : "text-orange-600"
+                    }`}>
+                      {ownerRemaining === 0 ? "Đã đủ 🎉" : fmtVND(ownerRemaining)}
+                    </span>
+                  </div>
+                  {ownerRemaining > 0 && (
+                    <p className="text-xs text-orange-500 leading-relaxed">
+                      💡 Số tiền này sẽ bị trừ từ ví của bạn khi chốt đơn.
+                    </p>
+                  )}
+                </>
               )}
-              <div className={`border-t pt-2.5 flex justify-between ${
-                ownerRemaining === 0 ? "border-teal-100" : "border-orange-100"
-              }`}>
-                <span className={`font-bold ${
-                  ownerRemaining === 0 ? "text-teal-700" : "text-orange-700"
-                }`}>
-                  Chủ nhóm cần trả nốt
-                </span>
-                <span className={`font-extrabold text-base ${
-                  ownerRemaining === 0 ? "text-teal-600" : "text-orange-600"
-                }`}>
-                  {ownerRemaining === 0 ? "Đã đủ 🎉" : fmtVND(ownerRemaining)}
-                </span>
-              </div>
-              {ownerRemaining > 0 && (
-                <p className="text-xs text-orange-500 leading-relaxed">
-                  💡 Số tiền này sẽ bị trừ từ ví của bạn khi chốt đơn.
+            </div>
+          </div>
+
+          {/* ── Payment option selector ── */}
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs text-gray-400 font-medium">Hình thức thanh toán</p>
+                <p className="text-sm font-semibold text-gray-800 mt-0.5">
+                  {paymentOption === 'owner_only'   ? 'Chủ nhóm trả cho mọi người'
+                   : paymentOption === 'individual' ? 'Mỗi người trả theo món'
+                   : 'Chia đều hoá đơn'}
                 </p>
-              )}
+              </div>
+              <button
+                onClick={() => setShowPayOptionModal(true)}
+                className="text-xs font-semibold text-green-600 hover:underline flex-shrink-0 ml-3"
+              >
+                Thay đổi
+              </button>
             </div>
           </div>
 
@@ -768,8 +842,8 @@ export default function GroupOrderActivePage() {
             )}
           </div>
 
-          {/* ── Wallet stats for members ── */}
-          {(() => {
+          {/* ── Wallet stats for members – only for split modes ── */}
+          {paymentOption !== 'owner_only' && (() => {
             const paidCount    = members.filter((m) => m.role !== 'owner' && m.walletPaid).length;
             const regularCount = members.filter((m) => m.role !== 'owner').length;
             if (regularCount === 0) return null;
@@ -789,12 +863,32 @@ export default function GroupOrderActivePage() {
 
           {/* ── Chốt đơn button ── */}
           <button
-            onClick={() => setShowPlaceConfirm(true)}
+            onClick={() => {
+              if (paymentOption === 'owner_only') {
+                navigate("/checkout", {
+                  state: {
+                    groupCheckout: {
+                      groupId,
+                      groupName,
+                      activePct,
+                      discount,
+                      subtotal,
+                      shipping: 25000,
+                      total: total + 25000,
+                    },
+                  },
+                });
+              } else {
+                setShowPlaceConfirm(true);
+              }
+            }}
             disabled={placeOrderLoading || cart.length === 0}
             className="w-full py-4 rounded-2xl bg-gradient-to-r from-green-600 to-emerald-500 text-white text-base font-extrabold shadow-lg hover:from-green-700 hover:to-emerald-600 active:scale-[0.98] transition-all duration-150 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {placeOrderLoading ? (
               <><Loader2 className="w-5 h-5 animate-spin" /> Đang xử lý...</>
+            ) : paymentOption !== 'owner_only' ? (
+              <><ShoppingCart className="w-5 h-5" /> Gửi yêu cầu thanh toán →</>
             ) : (
               <><ShoppingCart className="w-5 h-5" /> Chốt đơn hàng nhóm →</>
             )}
@@ -805,14 +899,14 @@ export default function GroupOrderActivePage() {
             </p>
           )}
 
-          {/* ── Hủy đơn button ── */}
+          {/* ── Cancel / Delete group button ── */}
           <button
             onClick={() => setShowCancelConfirm(true)}
             disabled={cancelLoading}
             className="w-full py-3 rounded-2xl border border-red-200 text-red-500 text-sm font-semibold hover:bg-red-50 transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
           >
             {cancelLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <AlertTriangle className="w-4 h-4" />}
-            Hủy đơn & hoàn tiền
+            {paymentOption === 'owner_only' ? 'Xóa đơn hàng nhóm' : 'Hủy đơn & hoàn tiền'}
           </button>
 
           {/* ── Delivery scheduling ── */}
@@ -853,7 +947,7 @@ export default function GroupOrderActivePage() {
                   <span className="font-bold text-gray-900">Tổng cộng</span>
                   <span className="font-extrabold text-green-600">{fmtVND(total + 25000)}</span>
                 </div>
-                {totalHeld > 0 && (
+                {paymentOption === 'owner_only' && totalHeld > 0 && (
                   <div className="flex justify-between text-teal-600">
                     <span className="flex items-center gap-1">
                       <Wallet className="w-3.5 h-3.5" />
@@ -862,6 +956,7 @@ export default function GroupOrderActivePage() {
                     <span className="font-semibold">−{fmtVND(totalHeld)}</span>
                   </div>
                 )}
+                {paymentOption !== 'owner_only' && (
                 <div className={`border-t pt-1.5 flex justify-between ${
                   ownerRemaining === 0 ? "border-teal-200" : "border-orange-200"
                 }`}>
@@ -876,11 +971,16 @@ export default function GroupOrderActivePage() {
                     {ownerRemaining === 0 ? "Đã đủ 🎉" : fmtVND(ownerRemaining)}
                   </span>
                 </div>
+                )}
               </div>
               <p className="text-xs text-gray-500 leading-relaxed">
-                {ownerRemaining > 0
-                  ? `💡 ${fmtVND(ownerRemaining)} sẽ bị trừ từ ví của bạn khi chốt đơn. Phần đã cọc của thành viên đã được tính.`
-                  : "✅ Tiền đặt cọc của thành viên đã đủ để thanh toán toàn bộ đơn hàng."}
+                {paymentOption === 'individual'
+                  ? '🧾 Mỗi thành viên trả phần tiền theo món của riêng mình sau khi đơn được chốt.'
+                  : paymentOption === 'equal_split'
+                    ? `⚖️ Tổng hoá đơn được chia đều: mỗi người trả ${fmtVND(Math.round((total + 25000) / Math.max(members.length, 1)))} .`
+                    : ownerRemaining > 0
+                      ? `💡 ${fmtVND(ownerRemaining)} sẽ bị trừ từ ví của bạn khi chốt đơn. Phần đã cọc của thành viên đã được tính.`
+                      : '✅ Tiền đặt cọc của thành viên đã đủ để thanh toán toàn bộ đơn hàng.'}
               </p>
               <div className="flex gap-3">
                 <button onClick={() => setShowPlaceConfirm(false)}
@@ -897,6 +997,111 @@ export default function GroupOrderActivePage() {
         </div>
       )}
 
+      {/* ════════════ PAYMENT OPTION MODAL ════════════ */}
+      {showPayOptionModal && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
+          onClick={() => setShowPayOptionModal(false)}
+        >
+          <div
+            className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="px-6 pt-5 pb-4 flex items-center gap-3 border-b border-gray-100">
+              <button
+                onClick={() => setShowPayOptionModal(false)}
+                className="w-8 h-8 rounded-full hover:bg-gray-100 flex items-center justify-center transition-colors"
+              >
+                <ArrowLeft className="w-5 h-5 text-gray-700" />
+              </button>
+              <h3 className="text-lg font-bold text-gray-900">Chọn người thanh toán</h3>
+            </div>
+
+            {/* Description */}
+            <div className="px-6 pt-4 pb-2">
+              <p className="text-sm text-gray-500 leading-relaxed">
+                Nếu bạn muốn chia hoá đơn này, vui lòng xem qua cách chúng tôi áp dụng để chia số tiền giảm giá, phí giao hàng và tiền típ cho mỗi người trong nhóm.
+              </p>
+            </div>
+
+            {/* 3 Radio options */}
+            <div className="px-6 pb-5 pt-2 divide-y divide-gray-100">
+              {([
+                {
+                  value: 'owner_only'   as const,
+                  icon: '💳',
+                  label: 'Bạn thanh toán cho mọi người',
+                  subtitle: null,
+                },
+                {
+                  value: 'individual'   as const,
+                  icon: '🧾',
+                  label: 'Mỗi người trả theo món của mình',
+                  subtitle: 'Tính tiền dựa trên giỏ hàng riêng của từng thành viên',
+                },
+                {
+                  value: 'equal_split'  as const,
+                  icon: '⚖️',
+                  label: 'Chia đều hoá đơn cho mọi người',
+                  subtitle: 'Tổng hoá đơn ÷ số thành viên trong nhóm',
+                },
+              ]).map((opt) => {
+                const selected = paymentOption === opt.value;
+                return (
+                  <button
+                    key={opt.value}
+                    disabled={payOptionLoading}
+                    onClick={() => handleSelectPaymentOption(opt.value)}
+                    className="w-full flex items-center justify-between py-4 text-left group hover:bg-green-50/50 rounded-xl px-2 -mx-2 transition-colors disabled:opacity-60"
+                  >
+                    <div className="flex items-center gap-3 flex-1">
+                      <div className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 text-xl transition-colors ${
+                        selected ? 'bg-green-100' : 'bg-gray-100 group-hover:bg-green-50'
+                      }`}>
+                        {opt.icon}
+                      </div>
+                      <div>
+                        <p className={`text-sm leading-snug ${selected ? 'font-bold text-gray-900' : 'font-medium text-gray-700'}`}>
+                          {opt.label}
+                        </p>
+                        {opt.subtitle && (
+                          <p className="text-xs text-gray-400 mt-0.5 leading-relaxed">{opt.subtitle}</p>
+                        )}
+                      </div>
+                    </div>
+                    <div className={`w-5 h-5 rounded-full border-2 flex-shrink-0 ml-3 flex items-center justify-center transition-all ${
+                      selected ? 'border-green-500 bg-green-500' : 'border-gray-300 group-hover:border-green-400'
+                    }`}>
+                      {selected && (
+                        payOptionLoading
+                          ? <Loader2 className="w-3 h-3 text-white animate-spin" />
+                          : <div className="w-2 h-2 rounded-full bg-white" />
+                      )}
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Footer hint */}
+            <div className="px-6 pb-5 border-t border-gray-100 pt-3">
+              <p className="text-xs text-gray-400 text-center">
+                Phương thức thanh toán khác
+              </p>
+              <div className="flex gap-2 mt-2 justify-center">
+                <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-pink-50 border border-pink-100 text-xs font-semibold text-pink-600">
+                  <span className="text-sm">💜</span> MoMo
+                </span>
+                <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-blue-50 border border-blue-100 text-xs font-semibold text-blue-600">
+                  <span className="text-sm">💳</span> Thẻ
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ════════════ CANCEL GROUP CONFIRM MODAL ════════════ */}
       {showCancelConfirm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
@@ -905,11 +1110,16 @@ export default function GroupOrderActivePage() {
                onClick={(e) => e.stopPropagation()}>
             <div className="px-6 py-5 bg-gradient-to-r from-red-500 to-rose-500 flex items-center gap-3">
               <AlertTriangle className="w-5 h-5 text-white" />
-              <p className="text-white font-bold text-lg">Hủy đơn nhóm</p>
+              <p className="text-white font-bold text-lg">
+                {paymentOption === 'owner_only' ? 'Xóa đơn hàng nhóm' : 'Hủy đơn nhóm'}
+              </p>
             </div>
             <div className="p-6 space-y-4">
               <p className="text-sm text-gray-600 leading-relaxed">
-                Bạn có chắc muốn <strong>hủy đơn hàng nhóm</strong>? Hành động này không thể hoàn tác. Tất cả thành viên đã đặt cọc sẽ được <strong>hoàn tiền ngay lập tức</strong>.
+                {paymentOption === 'owner_only'
+                  ? <>Đại bạn có chắc muốn <strong>xóa đơn hàng nhóm</strong>? Hành động này không thể hoàn tác và nhóm sẽ bị giải tán.</>
+                  : <>Bạn có chắc muốn <strong>hủy đơn hàng nhóm</strong>? Hành động này không thể hoàn tác. Tất cả thành viên đã đặt cọ sẽ được <strong>hoàn tiền ngay lập tức</strong>.</>
+                }
               </p>
               <div className="flex gap-3">
                 <button onClick={() => setShowCancelConfirm(false)}
@@ -918,7 +1128,7 @@ export default function GroupOrderActivePage() {
                 </button>
                 <button onClick={handleCancelGroup}
                   className="flex-1 py-2.5 rounded-xl bg-gradient-to-r from-red-500 to-rose-500 text-white text-sm font-bold hover:from-red-600 hover:to-rose-600 transition-all">
-                  Hủy đơn & hoàn tiền
+                  {paymentOption === 'owner_only' ? 'Xóa đơn' : 'Hủy đơn & hoàn tiền'}
                 </button>
               </div>
             </div>

@@ -13,14 +13,18 @@ export class GroupController {
       const userId = req.user?.id;
       if (!userId) throw new AppError('Unauthorized', 401);
 
-      const { groupName, paymentMethod, timeLimit } = req.body;
+      const { groupName, paymentMethod, timeLimit, paymentOption } = req.body;
       if (!groupName?.trim()) throw new AppError('groupName là bắt buộc', 400);
+
+      const validPaymentOptions = ['owner_only', 'individual', 'equal_split'];
+      const resolvedPaymentOption = validPaymentOptions.includes(paymentOption) ? paymentOption : 'owner_only';
 
       const group = await groupService.createGroup(
         userId,
         groupName.trim(),
         paymentMethod ?? 'Chủ nhóm thanh toán',
-        timeLimit ? new Date(timeLimit) : null
+        timeLimit ? new Date(timeLimit) : null,
+        resolvedPaymentOption
       );
 
       res.status(201).json({ success: true, data: group });
@@ -161,6 +165,33 @@ export class GroupController {
       } catch (_) {}
 
       res.status(201).json({ success: true, data: result });
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  /** PATCH /api/groups/:id/payment-option — Cập nhật tùy chọn thanh toán (chỉ chủ nhóm) */
+  updatePaymentOption = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const { id: groupId } = req.params;
+      const userId = req.user?.id;
+      if (!userId) throw new AppError('Unauthorized', 401);
+
+      const { paymentOption } = req.body;
+      if (!['owner_only', 'individual', 'equal_split'].includes(paymentOption)) {
+        throw new AppError('paymentOption không hợp lệ', 400);
+      }
+
+      const group = await groupService.updatePaymentOption(groupId, userId, paymentOption);
+
+      try {
+        getIO().to(`group:${groupId}`).emit('group:payment_option_changed', {
+          groupId,
+          paymentOption,
+        });
+      } catch (_) {}
+
+      res.json({ success: true, data: group });
     } catch (err) {
       next(err);
     }

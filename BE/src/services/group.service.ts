@@ -22,7 +22,8 @@ export class GroupService {
     ownerId: string,
     groupName: string,
     paymentMethod: string,
-    timeLimit: Date | null
+    timeLimit: Date | null,
+    paymentOption: 'owner_only' | 'individual' | 'equal_split' = 'owner_only'
   ) {
     // Tạo invite code ngẫu nhiên dạng "nhom-xxxxxxxx"
     const inviteCode = 'nhom-' + uuidv4().replace(/-/g, '').slice(0, 8);
@@ -32,6 +33,7 @@ export class GroupService {
       ownerId,
       inviteCode,
       settings: { paymentMethod, timeLimit },
+      paymentOption,
       status: 'active',
     });
 
@@ -147,6 +149,19 @@ export class GroupService {
   }
 
   // ── Cancel Group ───────────────────────────────────────────────────────────
+
+  /** Cập nhật tùy chọn thanh toán (chỉ chủ nhóm) */
+  async updatePaymentOption(
+    groupId: string,
+    ownerId: string,
+    paymentOption: 'owner_only' | 'individual' | 'equal_split'
+  ) {
+    const group = await Group.findOne({ _id: groupId, ownerId });
+    if (!group) throw new AppError('Không tìm thấy nhóm hoặc bạn không có quyền', 403);
+    group.paymentOption = paymentOption;
+    await group.save();
+    return group;
+  }
 
   /**
    * Chủ nhóm hủy đơn – hoàn tiền cho tất cả thành viên đã đặt cọc.
