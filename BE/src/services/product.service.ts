@@ -102,11 +102,10 @@ export class ProductService {
     // Build query
     const query: any = {};
 
-    // Text search
+    // Text search — only name and tags to avoid false positives from description
     if (search) {
       query.$or = [
         { name: { $regex: search, $options: 'i' } },
-        { description: { $regex: search, $options: 'i' } },
         { tags: { $in: [new RegExp(search, 'i')] } }
       ];
     }
@@ -462,13 +461,31 @@ export class ProductService {
    * Search products with text search
    */
   async searchProducts(searchTerm: string, limit: number = 20): Promise<IProduct[]> {
-    return Product.find(
-      { $text: { $search: searchTerm }, isActive: true },
-      { score: { $meta: 'textScore' } }
-    )
-      .sort({ score: { $meta: 'textScore' } })
-      .limit(limit)
-      .populate('farmer', 'name');
+    const escaped = searchTerm.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const results = await Product.aggregate([
+      {
+        $match: {
+          isActive: true,
+          $or: [
+            { name: { $regex: escaped, $options: 'i' } },
+            { description: { $regex: escaped, $options: 'i' } },
+            { tags: { $regex: escaped, $options: 'i' } },
+          ],
+        },
+      },
+      {
+        $addFields: {
+          _namePriority: {
+            $cond: [{ $regexMatch: { input: '$name', regex: escaped, options: 'i' } }, 0, 1],
+          },
+        },
+      },
+      { $sort: { _namePriority: 1, soldCount: -1, rating: -1 } },
+      { $limit: limit },
+    ]);
+    // Populate farmer manually after aggregate
+    await Product.populate(results, { path: 'farmer', select: 'name' });
+    return results as IProduct[];
   }
 
   /**

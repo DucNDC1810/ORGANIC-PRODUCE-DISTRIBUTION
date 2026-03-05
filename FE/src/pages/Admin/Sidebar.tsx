@@ -9,6 +9,7 @@ import {
   LogOut,
   Settings,
   User,
+  FileText,
 } from 'lucide-react';
 import { memo, useCallback, useMemo } from 'react';
 import { cn } from '../../components/ui/utils';
@@ -86,11 +87,25 @@ const menuItems: MenuItem[] = [
     ariaLabel: 'Quản lý danh mục sản phẩm'
   },
   { 
+    id: 'blogs', 
+    label: 'Blog Management', 
+    icon: FileText,
+    description: 'Duyệt bài viết người dùng',
+    ariaLabel: 'Quản lý và duyệt bài viết blog'
+  },
+  { 
     id: 'reports', 
     label: 'Reports', 
     icon: BarChart3,
     description: 'Báo cáo và phân tích',
     ariaLabel: 'Xem báo cáo và phân tích'
+  },
+  { 
+    id: 'settings', 
+    label: 'Settings', 
+    icon: Settings,
+    description: 'Quản lý tài khoản admin',
+    ariaLabel: 'Cài đặt tài khoản'
   },
 ] as const;
 
@@ -297,13 +312,6 @@ const Sidebar = ({
           {/* Footer Actions */}
           <div className="flex items-center justify-between text-xs">
             <span className="text-gray-400">v2.0.0</span>
-            <button
-              className="text-gray-400 hover:text-green-600 transition-colors flex items-center gap-1"
-              aria-label="Cài đặt"
-            >
-              <Settings className="w-3.5 h-3.5" />
-              <span>Settings</span>
-            </button>
           </div>
         </footer>
       </aside>

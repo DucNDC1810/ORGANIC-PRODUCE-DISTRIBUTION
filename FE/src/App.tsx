@@ -3,7 +3,7 @@ import { Toaster } from 'sonner';
 import { CartProvider } from './context/CartContext';
 import { AuthProvider } from './context/AuthContext';
 import { GroupProvider } from './context/GroupContext';
-import { ProtectedRoute, CustomerRoute, AdminRoute, ManagerRoute } from './components/ProtectedRoute';
+import { ProtectedRoute, AdminRoute, ManagerRoute } from './components/ProtectedRoute';
 import MiniCart from './components/MiniCart';
 import HomePage from './pages/HomePage/Home';
 import CartPage from './pages/HomePage/CartPage';
@@ -64,8 +64,8 @@ export default function App() {
             <Route path="/checkout" element={<ProtectedRoute><CheckoutPage /></ProtectedRoute>} />
             <Route path="/order-success" element={<ProtectedRoute><OrderSuccessPage /></ProtectedRoute>} />
             <Route path="/payment-result" element={<ProtectedRoute><OrderSuccessPage /></ProtectedRoute>} />
-            {/* Customer-only routes */}
-            <Route path="/profile" element={<CustomerRoute> <Profile /></CustomerRoute>} />
+            {/* Profile - accessible by all authenticated users */}
+            <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
 
             {/* Admin-only routes */}
             <Route path="/admin" element={<AdminRoute><AdminDashboard /></AdminRoute>} />

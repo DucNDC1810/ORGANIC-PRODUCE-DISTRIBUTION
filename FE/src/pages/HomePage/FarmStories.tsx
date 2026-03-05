@@ -29,14 +29,6 @@ export default function FarmStories() {
     }
   };
 
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    return date.toLocaleDateString('en-US', { 
-      year: 'numeric', 
-      month: 'long', 
-      day: 'numeric' 
-    });
-  };
 
   // Calculate pagination
   const totalPages = Math.ceil(stories.length / itemsPerPage);
