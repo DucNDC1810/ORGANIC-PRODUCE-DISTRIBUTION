@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { User, ShoppingBag, LogOut, Phone, Mail, Home, Edit2, Save, X, Camera, CalendarClock } from 'lucide-react';
+import { User, ShoppingBag, LogOut, Phone, Mail, Home, Edit2, Save, X, Camera, CalendarClock, Wallet } from 'lucide-react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useCart } from '../../context/CartContext';
@@ -8,13 +8,14 @@ import { userAPI } from '../Axios/Axios';
 import { toast } from 'sonner';
 import OrderHistoryTab from './OrderHistoryTab';
 import SubscriptionTab from './SubscriptionTab';
+import WalletTab from './WalletTab';
 
 export default function Profile() {
   const { user, logout, setUser } = useAuth();
   const { clearLocalCart } = useCart();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  const [activeTab, setActiveTab] = useState<'account' | 'orders' | 'subscriptions'>(
+  const [activeTab, setActiveTab] = useState<'account' | 'orders' | 'subscriptions' | 'wallet'>(
     (searchParams.get('tab') as any) || 'account'
   );
 
@@ -29,12 +30,12 @@ export default function Profile() {
   // Sync tab from URL param
   useEffect(() => {
     const t = searchParams.get('tab');
-    if (t === 'orders' || t === 'subscriptions' || t === 'account') {
+    if (t === 'orders' || t === 'subscriptions' || t === 'account' || t === 'wallet') {
       setActiveTab(t);
     }
   }, [searchParams]);
 
-  const handleTabChange = (tab: 'account' | 'orders' | 'subscriptions') => {
+  const handleTabChange = (tab: 'account' | 'orders' | 'subscriptions' | 'wallet') => {
     setActiveTab(tab);
     setSearchParams(tab !== 'account' ? { tab } : {});
   };
@@ -209,7 +210,19 @@ export default function Profile() {
                   }`}
                 >
                   <CalendarClock className="w-5 h-5" />
-                  <span className="font-medium">Đặt hàng định kỳ</span>
+                  <span className="font-medium">Recurring Orders</span>
+                </button>
+
+                <button
+                  onClick={() => handleTabChange('wallet')}
+                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-left transition-all mb-2 ${
+                    activeTab === 'wallet'
+                      ? 'bg-emerald-50 text-emerald-700'
+                      : 'text-[#364153] hover:bg-[#F3F4F6]'
+                  }`}
+                >
+                  <Wallet className="w-5 h-5" />
+                  <span className="font-medium">My Wallet</span>
                 </button>
 
                 <button
@@ -446,6 +459,11 @@ export default function Profile() {
             {/* Subscription Tab */}
             {activeTab === 'subscriptions' && (
               <SubscriptionTab />
+            )}
+
+            {/* Wallet Tab */}
+            {activeTab === 'wallet' && (
+              <WalletTab />
             )}
           </div>
         </div>

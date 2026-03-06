@@ -57,20 +57,51 @@ class BlogService {
     };
   }
 
-  // Get single post
+  // Get single post (public — only approved or legacy posts)
   async getPostById(postId: string): Promise<IBlog> {
     const post = await Blog.findById(postId)
       .populate('author', 'name avatar email')
       .populate('comments.user', 'name avatar');
 
-    if (!post) {
+    if (!post || !post.isActive) {
+      throw new AppError('Post not found', 404);
+    }
+    // Block pending / rejected from public access
+    const isApproved = post.status === 'approved' || !(post as any).status;
+    if (!isApproved) {
       throw new AppError('Post not found', 404);
     }
     return post;
   }
 
-  // Get posts by a specific user
+  // Get posts by a specific user — public view only returns approved posts
   async getPostsByUser(userId: string, page: number = 1, limit: number = 10) {
+    const query: any = {
+      author: userId,
+      isActive: true,
+      $or: [{ status: 'approved' }, { status: { $exists: false } }],
+    };
+    const skip = (page - 1) * limit;
+
+    const [posts, total] = await Promise.all([
+      Blog.find(query)
+        .populate('author', 'name avatar email')
+        .populate('comments.user', 'name avatar')
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .lean(),
+      Blog.countDocuments(query),
+    ]);
+
+    return {
+      posts,
+      pagination: { page, limit, total, pages: Math.ceil(total / limit) },
+    };
+  }
+
+  // Get ALL posts of the authenticated author (all statuses — owner view)
+  async getMyPosts(userId: string, page: number = 1, limit: number = 10) {
     const query: any = { author: userId, isActive: true };
     const skip = (page - 1) * limit;
 

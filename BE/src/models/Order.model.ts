@@ -108,7 +108,7 @@ const orderSchema = new Schema<IOrder>(
     ],
     paymentMethod: {
       type: String,
-      enum: ['credit_card', 'debit_card', 'cash', 'bank_transfer', 'e_wallet', 'zalopay', 'momo', 'cod'],
+      enum: ['credit_card', 'debit_card', 'cash', 'bank_transfer', 'e_wallet', 'momo', 'cod', 'wallet'],
       default: 'credit_card'
     },
     paymentStatus: {

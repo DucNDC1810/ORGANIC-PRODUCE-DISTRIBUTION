@@ -15,7 +15,6 @@ import cartRoutes from './routes/cart.routes';
 import reviewRoutes from './routes/review.routes';
 import orderRoutes from './routes/order.routes';
 import paymentRoutes from './routes/payment.routes';
-import zalopayRoutes from './routes/zalopay.routes';
 import momoRoutes from './routes/momo.routes';
 import subscriptionRoutes from './routes/subscription.routes';
 import groupbuyRoutes from './routes/groupbuy.routes';
@@ -24,6 +23,7 @@ import newsRoutes from './routes/news.routes';
 import chatRoutes from './routes/chat.routes';
 import blogRoutes from './routes/blog.routes';
 import groupRoutes from './routes/group.routes';
+import walletRoutes from './routes/wallet.routes';
 // import exampleRoutes from './routes/example.routes'; // Uncomment để test
 import { configurePassport } from './config/passport';
 // Register models that are referenced via populate but may not be auto-imported
@@ -69,7 +69,6 @@ app.use('/api/cart', cartRoutes);
 app.use('/api/reviews', reviewRoutes);
 app.use('/api/orders', orderRoutes);
 app.use('/api/payments', paymentRoutes);
-app.use('/api/zalopay', zalopayRoutes);
 app.use('/api/momo', momoRoutes);
 app.use('/api/subscriptions', subscriptionRoutes);
 app.use('/api/group-buy-events', groupbuyRoutes);
@@ -78,6 +77,7 @@ app.use('/api/news', newsRoutes);
 app.use('/api/chat', chatRoutes);
 app.use('/api/blogs', blogRoutes);
 app.use('/api/groups', groupRoutes);
+app.use('/api/wallet', walletRoutes);
 // app.use('/api/example', exampleRoutes); // Uncomment để test authentication
 
 // 404 Handler - Must be after all routes
