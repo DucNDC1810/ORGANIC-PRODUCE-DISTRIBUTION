@@ -11,6 +11,9 @@ import {
   Loader2,
   Leaf,
   Hash,
+  Clock,
+  XCircle,
+  AlertTriangle,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import Header from '../../components/Header';
@@ -94,7 +97,7 @@ function CreatePostCard({
       setImages([]);
       setTags([]);
       setShowImageInput(false);
-      toast.success('Post published!');
+      toast.success('Your post has been submitted and is pending review!');
       onPostCreated();
     } catch (err: any) {
       toast.error(err?.response?.data?.message || err?.message || 'Failed to create post');
@@ -215,10 +218,12 @@ function CreatePostCard({
 function PostCard({
   post,
   currentUserId,
+  currentUser,
   onUpdated,
 }: {
   post: BlogPost;
   currentUserId?: string;
+  currentUser?: { name: string; avatar?: string };
   onUpdated: () => void;
 }) {
   const [showComments, setShowComments] = useState(false);
@@ -232,6 +237,8 @@ function PostCard({
   const [updatingPost, setUpdatingPost] = useState(false);
   const [localComments, setLocalComments] = useState(post.comments || []);
   const [showAllImages, setShowAllImages] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
   const isLiked = currentUserId ? localLikes.includes(currentUserId) : false;
@@ -307,22 +314,26 @@ function PostCard({
     try {
       await blogService.updatePost(post._id, { content: editContent.trim() });
       setEditing(false);
-      toast.success('Post updated');
+      toast.success('Cập nhật bài viết thành công');
       onUpdated();
     } catch {
-      toast.error('Failed to update post');
+      toast.error('Cập nhật bài viết thất bại');
     } finally {
       setUpdatingPost(false);
     }
   };
 
   const handleDelete = async () => {
+    setDeleting(true);
     try {
       await blogService.deletePost(post._id);
       toast.success('Post deleted');
+      setConfirmDelete(false);
       onUpdated();
     } catch {
       toast.error('Failed to delete post');
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -342,7 +353,21 @@ function PostCard({
           </Avatar>
           <div>
             <p className="text-sm font-semibold text-gray-900">{post.author.name}</p>
-            <p className="text-xs text-gray-500">{timeAgo(post.createdAt)}</p>
+            <div className="flex items-center gap-2">
+              <p className="text-xs text-gray-500">{timeAgo(post.createdAt)}</p>
+              {isAuthor && post.status === 'pending' && (
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-700">
+                  <Clock className="w-3 h-3" />
+                  Pending Review
+                </span>
+              )}
+              {isAuthor && post.status === 'rejected' && (
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-600">
+                  <XCircle className="w-3 h-3" />
+                  Rejected
+                </span>
+              )}
+            </div>
           </div>
         </div>
 
@@ -367,7 +392,7 @@ function PostCard({
                 </button>
                 <button
                   onClick={() => {
-                    handleDelete();
+                    setConfirmDelete(true);
                     setShowMenu(false);
                   }}
                   className="flex items-center gap-2 w-full px-4 py-2 text-sm text-red-600 hover:bg-red-50"
@@ -425,6 +450,17 @@ function PostCard({
                 #{tag}
               </span>
             ))}
+          </div>
+        )}
+
+        {/* Rejection reason — only visible to author */}
+        {isAuthor && post.status === 'rejected' && (
+          <div className="mt-3 flex items-start gap-2 bg-red-50 border border-red-100 rounded-lg px-3 py-2.5 text-xs text-red-600">
+            <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+            <span>
+              <span className="font-semibold">Rejection reason: </span>
+              {post.rejectedReason || 'Your post did not meet community guidelines.'}
+            </span>
           </div>
         )}
       </div>
@@ -528,8 +564,9 @@ function PostCard({
           {currentUserId && (
             <div className="flex gap-2 items-center">
               <Avatar className="w-8 h-8">
+                <AvatarImage src={currentUser?.avatar} />
                 <AvatarFallback className="bg-emerald-100 text-emerald-700 text-xs font-semibold">
-                  U
+                  {currentUser?.name ? getInitials(currentUser.name) : 'U'}
                 </AvatarFallback>
               </Avatar>
               <div className="flex-1 flex items-center bg-white border border-gray-200 rounded-full px-3 py-1.5">
@@ -562,6 +599,40 @@ function PostCard({
           )}
         </div>
       )}
+
+      {/* Delete Confirmation */}
+      {confirmDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+          <div className="bg-white rounded-2xl shadow-xl p-6 max-w-sm w-full">
+            <div className="flex items-center gap-3 mb-3">
+              <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center flex-shrink-0">
+                <AlertTriangle className="w-5 h-5 text-red-500" />
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-gray-900">Delete post?</p>
+                <p className="text-xs text-gray-500 mt-0.5">This action cannot be undone.</p>
+              </div>
+            </div>
+            <div className="flex gap-2 justify-end mt-4">
+              <button
+                onClick={() => setConfirmDelete(false)}
+                disabled={deleting}
+                className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleDelete}
+                disabled={deleting}
+                className="px-4 py-2 text-sm bg-red-500 text-white rounded-lg hover:bg-red-600 disabled:opacity-50 flex items-center gap-1.5"
+              >
+                {deleting && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -575,6 +646,7 @@ export default function BlogsPage() {
   const [loadingMore, setLoadingMore] = useState(false);
   const [selectedTag, setSelectedTag] = useState<string | undefined>();
   const [availableTags, setAvailableTags] = useState<string[]>([]);
+  const [myPendingPosts, setMyPendingPosts] = useState<BlogPost[]>([]);
 
   const loadTags = async () => {
     try {
@@ -605,6 +677,15 @@ export default function BlogsPage() {
     }
   };
 
+  const loadMyPendingPosts = async () => {
+    try {
+      const result = await blogService.getMyPosts(1, 50);
+      setMyPendingPosts(result.posts.filter((p) => p.status === 'pending' || p.status === 'rejected'));
+    } catch {
+      // silently fail
+    }
+  };
+
   useEffect(() => {
     loadTags();
   }, []);
@@ -612,6 +693,10 @@ export default function BlogsPage() {
   useEffect(() => {
     loadPosts(1);
   }, [selectedTag]);
+
+  useEffect(() => {
+    if (isAuthenticated && user?._id) loadMyPendingPosts();
+  }, [isAuthenticated, user?._id]);
 
   const handleLoadMore = () => {
     if (pagination && pagination.page < pagination.pages) {
@@ -666,7 +751,26 @@ export default function BlogsPage() {
         {/* Create Post (only for logged-in users) */}
         {isAuthenticated && user && (
           <div className="mb-5">
-            <CreatePostCard user={user} onPostCreated={() => { loadPosts(1); loadTags(); }} />
+            <CreatePostCard user={user} onPostCreated={() => { loadPosts(1); loadTags(); loadMyPendingPosts(); }} />
+          </div>
+        )}
+
+        {/* My Pending / Rejected Posts */}
+        {myPendingPosts.length > 0 && (
+          <div className="mb-5">
+            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2 px-1">Your pending / rejected posts</p>
+            <div className="space-y-3">
+              {myPendingPosts.map((post) => (
+                <PostCard
+                  key={post._id}
+                  post={post}
+                  currentUserId={user?._id}
+                  currentUser={user ? { name: user.name, avatar: user.avatar } : undefined}
+                  onUpdated={() => { loadMyPendingPosts(); loadPosts(1); }}
+                />
+              ))}
+            </div>
+            <hr className="my-5 border-gray-200" />
           </div>
         )}
 
@@ -689,6 +793,7 @@ export default function BlogsPage() {
                 key={post._id}
                 post={post}
                 currentUserId={user?._id}
+                currentUser={user ? { name: user.name, avatar: user.avatar } : undefined}
                 onUpdated={() => loadPosts(1)}
               />
             ))}
@@ -707,7 +812,7 @@ export default function BlogsPage() {
                       Loading...
                     </>
                   ) : (
-                    'Load More'
+                    'Load more'
                   )}
                 </button>
               </div>

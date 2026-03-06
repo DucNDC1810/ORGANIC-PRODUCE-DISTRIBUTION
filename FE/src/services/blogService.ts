@@ -65,6 +65,12 @@ const blogService = {
     return { posts: res.data || [], pagination: res.pagination };
   },
 
+  // Returns ALL own posts regardless of status (requires auth)
+  async getMyPosts(page: number = 1, limit: number = 50): Promise<{ posts: BlogPost[]; pagination: BlogPagination }> {
+    const res: any = await api.get('/blogs/me/posts', { params: { page, limit } });
+    return { posts: res.data || [], pagination: res.pagination };
+  },
+
   async createPost(data: { content: string; images?: string[]; tags?: string[] }): Promise<BlogPost> {
     const res: any = await api.post('/blogs', data);
     return res.data;

@@ -15,6 +15,9 @@ router.patch('/admin/:id/reject', authenticate as any, checkPermission(Permissio
 router.get('/', blogController.getFeed as any);
 router.get('/tags', blogController.getTags as any);
 router.get('/user/:userId', blogController.getUserPosts as any);
+
+// Protected routes (require login)
+router.get('/me/posts', authenticate as any, blogController.getMyPosts as any);
 router.get('/:id', blogController.getPost as any);
 
 // Protected routes (require login)

@@ -70,24 +70,24 @@ const STATUS_CONFIG: Record<
   { label: string; color: string; icon: React.ReactNode }
 > = {
   pending: {
-    label: "Chờ duyệt",
+    label: "Pending",
     color: "bg-amber-100 text-amber-700 border-amber-200",
     icon: <Clock className="w-3 h-3" />,
   },
   approved: {
-    label: "Đã duyệt",
+    label: "Approved",
     color: "bg-emerald-100 text-emerald-700 border-emerald-200",
     icon: <CheckCircle2 className="w-3 h-3" />,
   },
   rejected: {
-    label: "Từ chối",
+    label: "Rejected",
     color: "bg-red-100 text-red-700 border-red-200",
     icon: <XCircle className="w-3 h-3" />,
   },
 };
 
 const formatDate = (dateStr: string) =>
-  new Date(dateStr).toLocaleString("vi-VN", {
+  new Date(dateStr).toLocaleString("en-US", {
     day: "2-digit",
     month: "2-digit",
     year: "numeric",
@@ -206,7 +206,7 @@ const BlogCard = ({
             )}
             <div className="min-w-0">
               <p className="text-sm font-semibold text-gray-900 truncate">
-                {post.author?.name ?? "Ẩn danh"}
+                {post.author?.name ?? "Anonymous"}
               </p>
               <p className="text-xs text-gray-400">{formatDate(post.createdAt)}</p>
             </div>
@@ -228,7 +228,7 @@ const BlogCard = ({
         {status === "rejected" && post.rejectedReason && (
           <div className="flex items-start gap-2 bg-red-50 border border-red-100 rounded-lg p-2.5 text-xs text-red-600">
             <AlertCircle className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />
-            <span>Lý do từ chối: {post.rejectedReason}</span>
+            <span>Rejection reason: {post.rejectedReason}</span>
           </div>
         )}
 
@@ -237,7 +237,7 @@ const BlogCard = ({
           {post.images?.length > 0 && (
             <span className="flex items-center gap-1">
               <ImageIcon className="w-3.5 h-3.5" />
-              {post.images.length} ảnh
+              {post.images.length} image(s)
             </span>
           )}
           <span className="flex items-center gap-1">
@@ -281,10 +281,10 @@ const BlogCard = ({
                   onClick={() => onView(post)}
                 >
                   <Eye className="w-3.5 h-3.5" />
-                  Xem
+                  View
                 </Button>
               </TooltipTrigger>
-              <TooltipContent>Xem nội dung đầy đủ</TooltipContent>
+              <TooltipContent>View full content</TooltipContent>
             </Tooltip>
           </TooltipProvider>
 
@@ -301,7 +301,7 @@ const BlogCard = ({
                 ) : (
                   <CheckCircle2 className="w-3.5 h-3.5" />
                 )}
-                Duyệt
+                Approve
               </Button>
 
               <Button
@@ -316,9 +316,42 @@ const BlogCard = ({
                 ) : (
                   <XCircle className="w-3.5 h-3.5" />
                 )}
-                Từ chối
+                Reject
               </Button>
             </>
+          )}
+
+          {status === "rejected" && (
+            <Button
+              size="sm"
+              className="h-8 gap-1.5 text-xs bg-emerald-500 hover:bg-emerald-600 text-white"
+              onClick={() => onApprove(post)}
+              disabled={isLoading}
+            >
+              {isLoading ? (
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              ) : (
+                <CheckCircle2 className="w-3.5 h-3.5" />
+              )}
+              Re-approve
+            </Button>
+          )}
+
+          {status === "approved" && (
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-8 gap-1.5 text-xs border-red-200 text-red-600 hover:bg-red-50"
+              onClick={() => onReject(post)}
+              disabled={isLoading}
+            >
+              {isLoading ? (
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              ) : (
+                <XCircle className="w-3.5 h-3.5" />
+              )}
+              Revoke
+            </Button>
           )}
         </div>
       </CardContent>
@@ -363,7 +396,7 @@ export default function BlogManagement() {
         setTotalPages(res.pagination?.pages ?? 1);
         if (res.counts) setCounts(res.counts);
       } catch {
-        toast.error("Không thể tải danh sách bài viết");
+        toast.error("Failed to load posts");
       } finally {
         setLoading(false);
       }
@@ -386,10 +419,10 @@ export default function BlogManagement() {
     setActionLoading(post._id);
     try {
       await blogService.approveBlog(post._id);
-      toast.success("Đã duyệt bài viết thành công");
+      toast.success("Post approved successfully");
       fetchPosts(page, filterStatus);
     } catch {
-      toast.error("Duyệt bài viết thất bại");
+      toast.error("Failed to approve post");
     } finally {
       setActionLoading(null);
     }
@@ -405,11 +438,11 @@ export default function BlogManagement() {
     setRejectLoading(true);
     try {
       await blogService.rejectBlog(rejectTarget._id, rejectReason.trim() || undefined);
-      toast.success("Đã từ chối bài viết");
+      toast.success("Post rejected");
       setRejectTarget(null);
       fetchPosts(page, filterStatus);
     } catch {
-      toast.error("Từ chối bài viết thất bại");
+      toast.error("Failed to reject post");
     } finally {
       setRejectLoading(false);
     }
@@ -420,11 +453,11 @@ export default function BlogManagement() {
     setDeleteLoading(true);
     try {
       await blogService.deletePost(deleteTarget._id);
-      toast.success("Đã xóa bài viết");
+      toast.success("Post deleted");
       setDeleteTarget(null);
       fetchPosts(page, filterStatus);
     } catch {
-      toast.error("Xóa bài viết thất bại");
+      toast.error("Failed to delete post");
     } finally {
       setDeleteLoading(false);
     }
@@ -456,10 +489,10 @@ export default function BlogManagement() {
             <div className="w-9 h-9 rounded-xl bg-green-100 flex items-center justify-center">
               <FileText className="w-5 h-5 text-green-600" />
             </div>
-            Quản lý Blog
+            Blog Management
           </h1>
           <p className="text-sm text-gray-500 mt-0.5">
-            Duyệt và quản lý bài viết của người dùng
+            Approve and manage user posts
           </p>
         </div>
         <Button
@@ -470,7 +503,7 @@ export default function BlogManagement() {
           disabled={loading}
         >
           <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
-          Làm mới
+          Refresh
         </Button>
       </div>
 
@@ -478,25 +511,25 @@ export default function BlogManagement() {
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         <StatCard
           icon={FileText}
-          label="Tổng bài viết"
+          label="Total Posts"
           value={totalAll}
           iconClass="bg-blue-50 text-blue-600"
         />
         <StatCard
           icon={Clock}
-          label="Chờ duyệt"
+          label="Pending"
           value={counts.pending}
           iconClass="bg-amber-50 text-amber-600"
         />
         <StatCard
           icon={CheckCircle2}
-          label="Đã duyệt"
+          label="Approved"
           value={counts.approved}
           iconClass="bg-emerald-50 text-emerald-600"
         />
         <StatCard
           icon={XCircle}
-          label="Từ chối"
+          label="Rejected"
           value={counts.rejected}
           iconClass="bg-red-50 text-red-600"
         />
@@ -508,11 +541,11 @@ export default function BlogManagement() {
         <Tabs value={filterStatus} onValueChange={handleTabChange}>
           <TabsList className="h-9">
             <TabsTrigger value="all" className="text-xs px-3">
-              Tất cả
+              All
             </TabsTrigger>
             <TabsTrigger value="pending" className="text-xs px-3 gap-1.5">
               <Clock className="w-3 h-3" />
-              Chờ duyệt
+              Pending
               {counts.pending > 0 && (
                 <span className="ml-1 bg-amber-500 text-white rounded-full text-[10px] px-1.5 py-0 leading-4">
                   {counts.pending}
@@ -521,11 +554,11 @@ export default function BlogManagement() {
             </TabsTrigger>
             <TabsTrigger value="approved" className="text-xs px-3 gap-1.5">
               <CheckCircle2 className="w-3 h-3" />
-              Đã duyệt
+              Approved
             </TabsTrigger>
             <TabsTrigger value="rejected" className="text-xs px-3 gap-1.5">
               <XCircle className="w-3 h-3" />
-              Từ chối
+              Rejected
             </TabsTrigger>
           </TabsList>
         </Tabs>
@@ -534,7 +567,7 @@ export default function BlogManagement() {
         <div className="relative flex-1 sm:max-w-xs">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
           <Input
-            placeholder="Tìm theo nội dung, tác giả..."
+            placeholder="Search by content, author..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="pl-9 h-9 text-sm"
@@ -552,9 +585,9 @@ export default function BlogManagement() {
       ) : filtered.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-20 text-gray-400">
           <FileText className="w-14 h-14 mb-3 opacity-30" />
-          <p className="text-base font-medium">Không có bài viết nào</p>
+          <p className="text-base font-medium">No posts found</p>
           <p className="text-sm">
-            {search ? "Thử tìm với từ khóa khác" : "Chưa có bài viết trong bộ lọc này"}
+            {search ? "Try different keywords" : "No posts in this filter"}
           </p>
         </div>
       ) : (
@@ -585,7 +618,7 @@ export default function BlogManagement() {
             <ChevronLeft className="w-4 h-4" />
           </Button>
           <span className="text-sm text-gray-600 px-2">
-            Trang {page} / {totalPages}
+            Page {page} of {totalPages}
           </span>
           <Button
             size="sm"
@@ -605,14 +638,14 @@ export default function BlogManagement() {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Eye className="w-4 h-4 text-green-600" />
-              Chi tiết bài viết
+              Post Details
             </DialogTitle>
             <DialogDescription>
               {viewPost && (
                 <span>
-                  Đăng bởi{" "}
+                  Posted by{" "}
                   <strong className="text-gray-700">{viewPost.author?.name}</strong>{" "}
-                  lúc {formatDate(viewPost.createdAt)}
+                  at {formatDate(viewPost.createdAt)}
                 </span>
               )}
             </DialogDescription>
@@ -665,14 +698,14 @@ export default function BlogManagement() {
               {viewPost.images?.length > 0 && (
                 <div className="space-y-2">
                   <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
-                    Hình ảnh ({viewPost.images.length})
+                    Images ({viewPost.images.length})
                   </p>
                   <div className="grid grid-cols-2 gap-2">
                     {viewPost.images.map((img, i) => (
                       <img
                         key={i}
                         src={img}
-                        alt={`Ảnh ${i + 1}`}
+                        alt={`Image ${i + 1}`}
                         className="w-full h-36 object-cover rounded-lg border border-gray-100"
                         onError={(e) => {
                           (e.target as HTMLImageElement).src =
@@ -698,10 +731,10 @@ export default function BlogManagement() {
               {/* Stats */}
               <div className="flex gap-4 text-sm text-gray-500 pt-1">
                 <span className="flex items-center gap-1">
-                  <Heart className="w-4 h-4" /> {viewPost.likes?.length ?? 0} lượt thích
+                  <Heart className="w-4 h-4" /> {viewPost.likes?.length ?? 0} like(s)
                 </span>
                 <span className="flex items-center gap-1">
-                  <MessageCircle className="w-4 h-4" /> {viewPost.comments?.length ?? 0} bình luận
+                  <MessageCircle className="w-4 h-4" /> {viewPost.comments?.length ?? 0} comment(s)
                 </span>
               </div>
 
@@ -710,7 +743,7 @@ export default function BlogManagement() {
                 <div className="space-y-2">
                   <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide flex items-center gap-1">
                     <MessageCircle className="w-3.5 h-3.5" />
-                    Bình luận ({viewPost.comments.length})
+                    Comments ({viewPost.comments.length})
                   </p>
                   <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
                     {viewPost.comments.map((c) => (
@@ -727,7 +760,7 @@ export default function BlogManagement() {
                           </div>
                         )}
                         <div className="min-w-0">
-                          <p className="text-xs font-semibold text-gray-800">{c.user?.name ?? "Ẩn danh"}</p>
+                          <p className="text-xs font-semibold text-gray-800">{c.user?.name ?? "Anonymous"}</p>
                           <p className="text-xs text-gray-600 mt-0.5 break-words">{c.content}</p>
                           <p className="text-[10px] text-gray-400 mt-0.5">{formatDate(c.createdAt)}</p>
                         </div>
@@ -740,7 +773,7 @@ export default function BlogManagement() {
           )}
 
           <DialogFooter className="gap-2 flex-wrap">
-            {viewPost && (viewPost.status ?? "approved") === "pending" && (
+            {viewPost && (viewPost.status ?? "approved") !== "approved" && (
               <Button
                 className="bg-emerald-500 hover:bg-emerald-600 text-white gap-1.5"
                 onClick={() => {
@@ -751,10 +784,10 @@ export default function BlogManagement() {
                 }}
               >
                 <CheckCircle2 className="w-4 h-4" />
-                Duyệt bài
+                {(viewPost.status ?? "approved") === "rejected" ? "Re-approve" : "Approve"}
               </Button>
             )}
-            {viewPost && (viewPost.status ?? "approved") === "pending" && (
+            {viewPost && (viewPost.status ?? "approved") !== "rejected" && (
               <Button
                 variant="outline"
                 className="border-red-200 text-red-600 hover:bg-red-50 gap-1.5"
@@ -766,11 +799,11 @@ export default function BlogManagement() {
                 }}
               >
                 <XCircle className="w-4 h-4" />
-                Từ chối
+                {(viewPost.status ?? "approved") === "approved" ? "Revoke" : "Reject"}
               </Button>
             )}
             <Button variant="ghost" onClick={() => setViewPost(null)}>
-              Đóng
+              Close
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -785,17 +818,17 @@ export default function BlogManagement() {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-red-600">
               <XCircle className="w-5 h-5" />
-              Từ chối bài viết
+              Reject Post
             </DialogTitle>
             <DialogDescription>
-              Bạn có thể để lại lý do để người dùng biết tại sao bài viết bị từ chối.
+              You can provide a reason so the author understands why their post was rejected.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-2 py-2">
-            <Label htmlFor="reject-reason">Lý do từ chối (tùy chọn)</Label>
+            <Label htmlFor="reject-reason">Rejection reason (optional)</Label>
             <Textarea
               id="reject-reason"
-              placeholder="Ví dụ: Nội dung không phù hợp, thiếu thông tin..."
+              placeholder="E.g. Inappropriate content, missing information..."
               value={rejectReason}
               onChange={(e) => setRejectReason(e.target.value)}
               rows={3}
@@ -812,7 +845,7 @@ export default function BlogManagement() {
               onClick={() => setRejectTarget(null)}
               disabled={rejectLoading}
             >
-              Hủy
+              Cancel
             </Button>
             <Button
               className="bg-red-500 hover:bg-red-600 text-white gap-1.5"
@@ -824,7 +857,7 @@ export default function BlogManagement() {
               ) : (
                 <XCircle className="w-4 h-4" />
               )}
-              Xác nhận từ chối
+              Confirm Rejection
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -834,14 +867,14 @@ export default function BlogManagement() {
       <AlertDialog open={!!deleteTarget} onOpenChange={(o) => !o && setDeleteTarget(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Xóa bài viết?</AlertDialogTitle>
+            <AlertDialogTitle>Delete post?</AlertDialogTitle>
             <AlertDialogDescription>
-              Hành động này không thể hoàn tác. Bài viết của{" "}
-              <strong>{deleteTarget?.author?.name}</strong> sẽ bị xóa vĩnh viễn.
+              This action cannot be undone. The post by{" "}
+              <strong>{deleteTarget?.author?.name}</strong> will be permanently deleted.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={deleteLoading}>Hủy</AlertDialogCancel>
+            <AlertDialogCancel disabled={deleteLoading}>Cancel</AlertDialogCancel>
             <AlertDialogAction
               className="bg-red-500 hover:bg-red-600 text-white"
               onClick={handleDeleteConfirm}
@@ -850,7 +883,7 @@ export default function BlogManagement() {
               {deleteLoading ? (
                 <Loader2 className="w-4 h-4 animate-spin mr-1" />
               ) : null}
-              Xóa
+              Delete
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

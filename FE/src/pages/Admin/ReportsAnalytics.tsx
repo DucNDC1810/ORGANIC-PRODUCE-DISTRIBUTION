@@ -6,19 +6,19 @@ import { BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Toolti
 
 // Mock data
 const revenueData = [
-  { month: 'T1', revenue: 12500, orders: 45 },
-  { month: 'T2', revenue: 15800, orders: 52 },
-  { month: 'T3', revenue: 18200, orders: 68 },
-  { month: 'T4', revenue: 22400, orders: 78 },
-  { month: 'T5', revenue: 19800, orders: 65 },
-  { month: 'T6', revenue: 25600, orders: 85 },
+  { month: 'Jan', revenue: 12500, orders: 45 },
+  { month: 'Feb', revenue: 15800, orders: 52 },
+  { month: 'Mar', revenue: 18200, orders: 68 },
+  { month: 'Apr', revenue: 22400, orders: 78 },
+  { month: 'May', revenue: 19800, orders: 65 },
+  { month: 'Jun', revenue: 25600, orders: 85 },
 ];
 
 const categoryData = [
-  { name: 'Rau củ', value: 45, color: '#10b981' },
-  { name: 'Trái cây', value: 32, color: '#f59e0b' },
-  { name: 'Thảo mộc', value: 18, color: '#8b5cf6' },
-  { name: 'Nấm', value: 12, color: '#ef4444' },
+  { name: 'Vegetables', value: 45, color: '#10b981' },
+  { name: 'Fruits', value: 32, color: '#f59e0b' },
+  { name: 'Herbs', value: 18, color: '#8b5cf6' },
+  { name: 'Mushrooms', value: 12, color: '#ef4444' },
 ];
 
 const topProducts = [

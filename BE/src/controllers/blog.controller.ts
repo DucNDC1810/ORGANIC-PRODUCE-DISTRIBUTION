@@ -59,6 +59,18 @@ class BlogController {
     }
   }
 
+  // GET /api/blogs/me/posts  — Authenticated: get all own posts (all statuses)
+  async getMyPosts(req: AuthRequest, res: Response, next: NextFunction) {
+    try {
+      const page = parseInt(req.query.page as string) || 1;
+      const limit = parseInt(req.query.limit as string) || 50;
+      const result = await blogService.getMyPosts(req.user!.id, page, limit);
+      res.json({ success: true, data: result.posts, pagination: result.pagination });
+    } catch (error) {
+      next(error);
+    }
+  }
+
   // PUT /api/blogs/:id
   async updatePost(req: AuthRequest, res: Response, next: NextFunction) {
     try {
