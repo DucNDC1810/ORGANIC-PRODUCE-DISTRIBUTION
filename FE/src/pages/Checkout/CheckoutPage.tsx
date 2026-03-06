@@ -249,19 +249,19 @@ export default function CheckoutPage() {
     }
     if (deliveryType === "delivery") {
       if (!formData.address.trim()) {
-        setError("Vui lòng nhập địa chỉ cụ thể (số nhà, tên đường)");
+        setError("Please enter specific address (house number, street name)");
         return false;
       }
       if (!selectedProvince) {
-        setError("Vui lòng chọn Tỉnh/Thành phố");
+        setError("Please select Province/City");
         return false;
       }
       if (!selectedDistrict) {
-        setError("Vui lòng chọn Quận/Huyện");
+        setError("Please select District");
         return false;
       }
       if (!selectedWard) {
-        setError("Vui lòng chọn Phường/Xã");
+        setError("Please select Ward");
         return false;
       }
     }
@@ -547,7 +547,7 @@ export default function CheckoutPage() {
     if (formData.paymentMethod === "Wallet") {
       if (walletBalance < total) {
         setError(
-          `Số dư ví không đủ. Số dư hiện tại: ${walletBalance.toLocaleString("vi-VN")}₫, cần thanh toán: ${total.toLocaleString("vi-VN")}₫`
+          `Insufficient wallet balance. Current balance: ${walletBalance.toLocaleString("vi-VN")}₫, amount due: ${total.toLocaleString("vi-VN")}₫`
         );
         setLoading(false);
         return;
@@ -792,7 +792,7 @@ export default function CheckoutPage() {
                       name="address"
                       value={formData.address}
                       onChange={handleInputChange}
-                      placeholder="Địa chỉ cụ thể (số nhà, tên đường)"
+                      placeholder="Specific address (house number, street name)"
                       required
                       className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary text-sm"
                     />
@@ -820,7 +820,7 @@ export default function CheckoutPage() {
                             {selectedWard.name}, {selectedDistrict.name}, {selectedProvince.name}
                           </span>
                         ) : (
-                          <span className="text-gray-400">Tỉnh/Thành phố, Quận/Huyện, Phường/Xã</span>
+                          <span className="text-gray-400">Province/City, District, Ward</span>
                         )}
                       </button>
 
@@ -830,9 +830,9 @@ export default function CheckoutPage() {
                           {/* Tab headers */}
                           <div className="flex border-b border-gray-200">
                             {([
-                              { key: "province" as const, label: "Tỉnh / TP" },
-                              { key: "district" as const, label: "Quận / Huyện" },
-                              { key: "ward"     as const, label: "Phường / Xã" },
+                              { key: "province" as const, label: "Province / City" },
+                              { key: "district" as const, label: "District" },
+                              { key: "ward"     as const, label: "Ward" },
                             ]).map(({ key, label }) => (
                               <button
                                 key={key}
@@ -872,7 +872,7 @@ export default function CheckoutPage() {
 
                             {locationTab === "district" && (
                               loadingDistricts
-                                ? <p className="text-center py-6 text-sm text-gray-400">Đang tải...</p>
+                                ? <p className="text-center py-6 text-sm text-gray-400">Loading...</p>
                                 : districts.map((d) => (
                                     <button
                                       key={d.code}
@@ -891,7 +891,7 @@ export default function CheckoutPage() {
 
                             {locationTab === "ward" && (
                               loadingWards
-                                ? <p className="text-center py-6 text-sm text-gray-400">Đang tải...</p>
+                                ? <p className="text-center py-6 text-sm text-gray-400">Loading...</p>
                                 : wards.map((w) => (
                                     <button
                                       key={w.code}
@@ -926,7 +926,7 @@ export default function CheckoutPage() {
                   >
                     <StoreIcon className="w-4 h-4 flex-shrink-0" />
                     <span className="flex-1 text-left truncate">
-                      {selectedStore ? selectedStore.name : "Chọn cửa hàng"}
+                      {selectedStore ? selectedStore.name : "Select a store"}
                     </span>
                     {selectedStore && (
                       <span className="text-xs text-gray-400 truncate max-w-[160px] text-right">
@@ -974,35 +974,35 @@ export default function CheckoutPage() {
                   <div>
                     <div className="flex items-center gap-2">
                       <h2 className="text-sm font-semibold text-gray-800">
-                        Đặt theo nhóm
+                        Group Order
                       </h2>
                       {isGroupOrder && (
                         <span className="px-2 py-0.5 bg-green-100 text-green-700 text-xs font-medium rounded-full">
-                          🎉 Đã thiết lập
+                          🎉 Set up
                         </span>
                       )}
                     </div>
                     {isGroupOrder && navGroupData ? (
                       <div className="mt-1 space-y-0.5">
                         <p className="text-xs text-gray-700">
-                          <span className="font-medium">Nhóm:</span>{" "}
+                          <span className="font-medium">Group:</span>{" "}
                           {navGroupData.groupName}
                         </p>
                       </div>
                     ) : (
                       <p className="text-xs text-gray-500 mt-0.5">
-                        Tiết kiệm hơn khi đặt cùng bạn bè &amp; nhận miễn phí ship
+                        Save more when ordering with friends &amp; get free shipping
                       </p>
                     )}
                   </div>
                 </div>
                 <span className="text-xs text-primary font-medium mt-0.5 flex-shrink-0">
-                  {isGroupOrder ? "Chỉnh sửa" : "Thiết lập"} ›
+                  {isGroupOrder ? "Edit" : "Set up"} ›
                 </span>
               </div>
             </button>
 
-            {/* Đặt hẹn giao định kỳ — Clickable card */}
+            {/* Scheduled Recurring Delivery — Clickable card */}
             <button
               type="button"
               onClick={() => setShowRecurringModal(true)}
@@ -1028,28 +1028,28 @@ export default function CheckoutPage() {
                   <div>
                     <div className="flex items-center gap-2">
                       <h2 className="text-sm font-semibold text-gray-800">
-                        Đặt hẹn giao định kỳ
+                        Schedule Recurring Delivery
                       </h2>
                       {isRecurringOrder && (
                         <span className="px-2 py-0.5 bg-blue-100 text-blue-700 text-xs font-medium rounded-full">
-                          ⏰ Đã lên lịch
+                          ⏰ Scheduled
                         </span>
                       )}
                     </div>
                     {isRecurringOrder && recurringData ? (
                       <div className="mt-1 space-y-0.5">
                         <p className="text-xs font-medium text-blue-700">
-                          ✅ Đã thiết lập
+                          ✅ Set up
                         </p>
                         <p className="text-xs text-blue-600">
                           {FREQUENCY_LABELS[recurringData.recurringFrequency]} ·{" "}
                           {recurringData.recurringFrequency === "monthly"
-                            ? `Ngày ${recurringData.recurringDay} hàng tháng`
+                            ? `Day ${recurringData.recurringDay} of each month`
                             : DAY_LABELS[recurringData.recurringDay]}{" "}
                           · {DURATION_LABELS[recurringData.recurringDuration]}
                         </p>
                         <p className="text-xs text-gray-500">
-                          📅 Bắt đầu:{" "}
+                          📅 Starts:{" "}
                           {new Date(
                             recurringData.recurringStartDate
                           ).toLocaleDateString("vi-VN")}
@@ -1057,13 +1057,13 @@ export default function CheckoutPage() {
                       </div>
                     ) : (
                       <p className="text-xs text-gray-500 mt-0.5">
-                        Tiết kiệm 5% mỗi đơn &amp; không cần đặt lại thủ công
+                        Save 5% on each order &amp; no need to re-order manually
                       </p>
                     )}
                   </div>
                 </div>
                 <span className="text-xs text-primary font-medium mt-0.5 flex-shrink-0">
-                  {isRecurringOrder ? "Chỉnh sửa" : "Thiết lập"} ›
+                  {isRecurringOrder ? "Edit" : "Set up"} ›
                 </span>
               </div>
             </button>
@@ -1095,10 +1095,10 @@ export default function CheckoutPage() {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="text-sm font-medium text-gray-700">
-                        Ví FreshMarket
+                        FreshMarket Wallet
                       </span>
                       {walletLoading ? (
-                        <span className="text-xs text-gray-400">Đang tải...</span>
+                        <span className="text-xs text-gray-400">Loading...</span>
                       ) : (
                         <span
                           className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
@@ -1107,18 +1107,18 @@ export default function CheckoutPage() {
                               : "bg-red-100 text-red-600"
                           }`}
                         >
-                          Số dư: {walletBalance.toLocaleString("vi-VN")}₫
+                          Balance: {walletBalance.toLocaleString("vi-VN")}₫
                         </span>
                       )}
                     </div>
                     {!walletLoading && walletBalance < total && (
                       <p className="text-xs text-red-500 mt-0.5">
-                        Số dư không đủ.{" "}
+                        Insufficient balance.{" "}
                         <Link
                           to="/profile?tab=wallet"
                           className="underline font-medium hover:text-red-600"
                         >
-                          Nạp thêm?
+                          Top up?
                         </Link>
                       </p>
                     )}
@@ -1190,11 +1190,11 @@ export default function CheckoutPage() {
                   <Users className="w-4 h-4 text-green-600 flex-shrink-0" />
                   <div className="flex-1 min-w-0">
                     <p className="text-xs font-semibold text-green-700">
-                      Đặt theo nhóm{navGroupData?.groupName ? ` · ${navGroupData.groupName}` : ""}
+                      Group order{navGroupData?.groupName ? ` · ${navGroupData.groupName}` : ""}
                     </p>
                     {groupDiscountPct > 0 && (
                       <p className="text-xs text-green-600">
-                        Đang áp dụng ưu đãi nhóm {groupDiscountPct}%
+                        Applying group discount of {groupDiscountPct}%
                       </p>
                     )}
                   </div>
@@ -1262,7 +1262,7 @@ export default function CheckoutPage() {
                 </div>
 
                 <div className="mt-4 pt-4 border-t border-gray-200">
-                  <p className="text-xs text-gray-500">invoice : no</p>
+                  <p className="text-xs text-gray-500">Invoice: none</p>
                 </div>
               </div>
 
@@ -1339,7 +1339,7 @@ export default function CheckoutPage() {
                   </div>
                   {isGroupOrder && groupDiscount > 0 && (
                     <div className="flex justify-between text-sm">
-                      <span className="text-green-600">Ưu đãi nhóm ({groupDiscountPct}%)</span>
+                      <span className="text-green-600">Group discount ({groupDiscountPct}%)</span>
                       <span className="font-medium text-green-600">
                         −{groupDiscount.toLocaleString("vi-VN")}₫
                       </span>
@@ -1347,7 +1347,7 @@ export default function CheckoutPage() {
                   )}
                   {isRecurringOrder && (
                     <div className="flex justify-between text-sm">
-                      <span className="text-blue-600">✨ Ưu đãi định kỳ (−5%)</span>
+                      <span className="text-blue-600">✨ Recurring discount (−5%)</span>
                       <span className="font-medium text-blue-600">
                         −{recurringDiscount.toLocaleString("vi-VN")}₫
                       </span>
@@ -1411,8 +1411,8 @@ export default function CheckoutPage() {
                 <Truck className="w-4 h-4 text-white" />
               </div>
               <div>
-                <h2 className="text-sm font-bold text-white leading-tight">Xác nhận đơn hàng</h2>
-                <p className="text-xs text-green-100">Kiểm tra lại trước khi thanh toán</p>
+                <h2 className="text-sm font-bold text-white leading-tight">Order Confirmation</h2>
+                <p className="text-xs text-green-100">Review before checkout</p>
               </div>
               <button
                 onClick={() => setShowConfirmModal(false)}
@@ -1435,12 +1435,12 @@ export default function CheckoutPage() {
                 </div>
                 <div className="min-w-0">
                   <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
-                    {deliveryType === "pickup" ? "Nhận tại cửa hàng" : "Giao tận nơi"}
+                    {deliveryType === "pickup" ? "Store pickup" : "Home delivery"}
                   </p>
                   {deliveryType === "pickup" ? (
                     <>
                       <p className="text-xs font-medium text-gray-800 mt-0.5">
-                        {selectedStore?.name ?? "Chưa chọn cửa hàng"}
+                        {selectedStore?.name ?? "No store selected"}
                       </p>
                       {selectedStore?.address && (
                         <p className="text-xs text-gray-400 truncate">{selectedStore.address}</p>
@@ -1478,9 +1478,9 @@ export default function CheckoutPage() {
                     <div className="flex items-center gap-2">
                       <Users className="w-3.5 h-3.5 text-green-600 flex-shrink-0" />
                       <p className="text-xs text-gray-700 truncate">
-                        <span className="font-semibold">Nhóm: </span>
+                        <span className="font-semibold">Group: </span>
                         {navGroupData?.groupName ?? groupSession?.groupName ?? ""}
-                        {groupDiscountPct > 0 ? ` · ưu đãi ${groupDiscountPct}%` : ""}
+                        {groupDiscountPct > 0 ? ` · discount ${groupDiscountPct}%` : ""}
                       </p>
                     </div>
                   )}
@@ -1488,10 +1488,10 @@ export default function CheckoutPage() {
                     <div className="flex items-center gap-2">
                       <Calendar className="w-3.5 h-3.5 text-blue-500 flex-shrink-0" />
                       <p className="text-xs text-gray-700 truncate">
-                        <span className="font-semibold">Định kỳ: </span>
+                        <span className="font-semibold">Recurring: </span>
                         {FREQUENCY_LABELS[recurringData.recurringFrequency]} ·{": "}
                         {recurringData.recurringFrequency === "monthly"
-                          ? `Ngày ${recurringData.recurringDay} hàng tháng`
+                          ? `Day ${recurringData.recurringDay} of each month`
                           : DAY_LABELS[recurringData.recurringDay]}{": "}
                         · {new Date(recurringData.recurringStartDate).toLocaleDateString("vi-VN")}
                       </p>
@@ -1504,7 +1504,7 @@ export default function CheckoutPage() {
               <div className="rounded-xl border border-gray-100 overflow-hidden">
                 <div className="px-3 py-1.5 bg-gray-50 border-b border-gray-100">
                   <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
-                    Sản phẩm ({cart.length})
+                    Products ({cart.length})
                   </p>
                 </div>
                 <div className="divide-y divide-gray-50">
@@ -1534,7 +1534,7 @@ export default function CheckoutPage() {
                       <span>
                         {formData.paymentMethod === "Momo" ? "🏦" : "🚚"}
                       </span>
-                      Thanh toán
+                      Payment
                     </span>
                     <span className="font-medium text-gray-700">
                       {formData.paymentMethod === "COD" ? "COD" : formData.paymentMethod}
@@ -1543,13 +1543,13 @@ export default function CheckoutPage() {
 
                   {shipping > 0 && (
                     <div className="flex justify-between text-xs">
-                      <span className="text-gray-500">Phí ship</span>
+                      <span className="text-gray-500">Shipping fee</span>
                       <span className="text-gray-700">{shipping.toLocaleString("vi-VN")}₫</span>
                     </div>
                   )}
                   {recurringData && (
                     <div className="flex justify-between text-xs">
-                      <span className="text-emerald-600">Giảm định kỳ (5%)</span>
+                      <span className="text-emerald-600">Recurring discount (5%)</span>
                       <span className="text-emerald-600 font-medium">-{(subtotal * 0.05).toLocaleString("vi-VN")}₫</span>
                     </div>
                   )}
@@ -1564,7 +1564,7 @@ export default function CheckoutPage() {
                     <span>{vat.toLocaleString("vi-VN")}₫</span>
                   </div>
                   <div className="border-t border-dashed border-gray-200 pt-1.5 flex justify-between items-center">
-                    <span className="text-sm font-bold text-gray-800">Tổng cộng</span>
+                    <span className="text-sm font-bold text-gray-800">Total</span>
                     <span className="text-base font-bold text-emerald-600">{total.toLocaleString("vi-VN")}₫</span>
                   </div>
                 </div>
@@ -1579,18 +1579,17 @@ export default function CheckoutPage() {
                 className="w-full py-3 bg-gray-900 text-white rounded-xl font-semibold text-sm hover:bg-black disabled:bg-gray-400 transition-colors flex items-center justify-center gap-2 shadow-md"
               >
                 {loading ? <Loader className="w-4 h-4 animate-spin" /> : <Truck className="w-4 h-4" />}
-                {loading ? "Đang xử lý..." : "Xác nhận & Thanh toán"}
+                {loading ? "Processing..." : "Confirm & Pay"}
               </button>
               <button
                 onClick={() => setShowConfirmModal(false)}
                 className="w-full py-1.5 text-gray-400 text-xs hover:text-gray-700 transition-colors"
               >
-                ← Quay lại chỉnh sửa
+                ← Back to edit
               </button>
               <p className="text-center text-xs text-gray-400 leading-relaxed">
-                Bằng cách nhấn xác nhận, bạn đồng ý với{" "}
-                <span className="underline underline-offset-2 cursor-pointer hover:text-gray-600">điều khoản mua hàng</span>{" "}
-                của FreshMarket.
+                By confirming, you agree to FreshMarket's{" "}
+                <span className="underline underline-offset-2 cursor-pointer hover:text-gray-600">purchase terms</span>.
               </p>
             </div>
           </div>

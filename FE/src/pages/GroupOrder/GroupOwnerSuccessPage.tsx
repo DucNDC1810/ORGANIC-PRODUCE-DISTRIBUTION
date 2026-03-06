@@ -67,8 +67,8 @@ export default function GroupOwnerSuccessPage() {
   const navigate = useNavigate();
 
   const state                 = (location.state as OwnerSuccessState) || {};
-  const ownerName             = state.ownerName             || 'Chủ nhóm';
-  const groupName             = state.groupName             || 'Đơn hàng nhóm';
+  const ownerName             = state.ownerName             || 'Group Owner';
+  const groupName             = state.groupName             || 'Group Order';
   const groupTotal            = state.groupTotal            || 0;
   const subtotal              = state.subtotal              || 0;
   const discount              = state.discount              || 0;
@@ -84,7 +84,7 @@ export default function GroupOwnerSuccessPage() {
   deliveryStart.setDate(deliveryStart.getDate() + 2);
   const deliveryEnd = new Date();
   deliveryEnd.setDate(deliveryEnd.getDate() + 3);
-  const fmt = (d: Date) => d.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' });
+  const fmt = (d: Date) => d.toLocaleDateString('en-US', { day: '2-digit', month: '2-digit', year: 'numeric' });
   const estimatedDelivery = `${fmt(deliveryStart)} – ${fmt(deliveryEnd)}`;
 
   // Generate confetti once on mount
@@ -153,21 +153,21 @@ export default function GroupOwnerSuccessPage() {
             <div className="flex items-center justify-center">
               <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-orange-100 border border-orange-200 text-orange-700 text-xs font-bold">
                 <Crown className="w-3.5 h-3.5" />
-                Chủ nhóm
+                Group Owner
               </span>
             </div>
 
             <div>
               <h1 className="text-2xl sm:text-3xl font-extrabold text-gray-900">
-                Đơn nhóm đã được chốt! 🎉
+                Group order placed! 🎉
               </h1>
               <p className="mt-2 text-gray-600 text-base sm:text-lg leading-relaxed">
-                Chúc mừng{' '}
+                Congratulations{' '}
                 <span className="font-bold text-green-600">{ownerName}</span>!{' '}
-                Đơn hàng nhóm{' '}
+                Group order{' '}
                 <span className="font-semibold text-gray-800">{groupName}</span>{' '}
-                đã xác nhận với{' '}
-                <span className="font-semibold text-green-700">{memberCount} thành viên</span>.
+                confirmed with{' '}
+                <span className="font-semibold text-green-700">{memberCount} members</span>.
               </p>
             </div>
           </motion.div>
@@ -179,19 +179,19 @@ export default function GroupOwnerSuccessPage() {
           >
             <div className="flex items-center gap-2 px-5 py-4 border-b border-gray-100 bg-gradient-to-r from-green-50 to-emerald-50">
               <Receipt className="w-5 h-5 text-green-600" />
-              <h3 className="font-bold text-gray-900 text-sm">Bảng đối soát thanh toán</h3>
+              <h3 className="font-bold text-gray-900 text-sm">Payment Summary</h3>
             </div>
 
             <div className="p-5 space-y-2.5 text-sm">
               {/* Row: Tổng tiền hàng */}
               <div className="flex justify-between items-center">
-                <span className="text-gray-500">Tổng tiền hàng</span>
+                <span className="text-gray-500">Items subtotal</span>
                 <span className="font-semibold text-gray-900">{fmtVND(subtotal)}</span>
               </div>
 
               {/* Row: Phí giao hàng */}
               <div className="flex justify-between items-center">
-                <span className="text-gray-500">Phí giao hàng</span>
+                <span className="text-gray-500">Shipping fee</span>
                 <span className="font-semibold text-gray-900">25.000đ</span>
               </div>
 
@@ -200,7 +200,7 @@ export default function GroupOwnerSuccessPage() {
                 <div className="flex justify-between items-center text-green-600">
                   <span className="flex items-center gap-1">
                     <Star className="w-3.5 h-3.5" />
-                    Ưu đãi nhóm ({activePct}%)
+                    Group discount ({activePct}%)
                   </span>
                   <span className="font-semibold">−{fmtVND(discount)}</span>
                 </div>
@@ -208,7 +208,7 @@ export default function GroupOwnerSuccessPage() {
 
               {/* Divider → Tổng bill */}
               <div className="border-t border-gray-100 pt-2.5 flex justify-between items-center">
-                <span className="font-bold text-gray-800">Tổng bill</span>
+                <span className="font-bold text-gray-800">Total bill</span>
                 <span className="font-extrabold text-gray-900">{fmtVND(groupTotal)}</span>
               </div>
 
@@ -217,7 +217,7 @@ export default function GroupOwnerSuccessPage() {
                 <div className="flex justify-between items-center text-teal-600">
                   <span className="flex items-center gap-1">
                     <Users className="w-3.5 h-3.5" />
-                    Tiền cọc từ thành viên
+                    Member deposits
                   </span>
                   <span className="font-semibold">−{fmtVND(totalMemberDeposits)}</span>
                 </div>
@@ -234,12 +234,12 @@ export default function GroupOwnerSuccessPage() {
                 >
                   <div>
                     <p className={`text-sm font-extrabold ${ownerPaid === 0 ? 'text-teal-700' : 'text-orange-700'}`}>
-                      Thực chi từ ví của bạn
+                      Charged from your wallet
                     </p>
                     {walletBalance !== undefined && (
                       <p className="text-xs text-gray-400 mt-0.5 flex items-center gap-1">
                         <Wallet className="w-3 h-3" />
-                        Số dư ví còn lại: {fmtVND(walletBalance)}
+                        Remaining wallet balance: {fmtVND(walletBalance)}
                       </p>
                     )}
                   </div>
@@ -248,7 +248,7 @@ export default function GroupOwnerSuccessPage() {
                       ownerPaid === 0 ? 'text-teal-600' : 'text-orange-600'
                     }`}
                   >
-                    {ownerPaid === 0 ? 'Đã đủ 🎉' : fmtVND(ownerPaid)}
+                    {ownerPaid === 0 ? 'Fully covered 🎉' : fmtVND(ownerPaid)}
                   </span>
                 </div>
               </div>
@@ -262,7 +262,7 @@ export default function GroupOwnerSuccessPage() {
           >
             <div className="flex items-center gap-2 px-5 py-4 border-b border-gray-100">
               <MapPin className="w-5 h-5 text-green-600" />
-              <h3 className="font-bold text-gray-900 text-sm">Thông tin vận chuyển</h3>
+              <h3 className="font-bold text-gray-900 text-sm">Shipping Information</h3>
             </div>
 
             <div className="p-5 space-y-4">
@@ -271,9 +271,9 @@ export default function GroupOwnerSuccessPage() {
                   <MapPin className="w-4 h-4 text-green-600" />
                 </div>
                 <div>
-                  <p className="text-xs text-gray-400 mb-0.5">Địa chỉ nhận hàng</p>
+                  <p className="text-xs text-gray-400 mb-0.5">Delivery address</p>
                   <p className="text-sm font-medium text-gray-700">
-                    Xem chi tiết trong lịch sử đơn hàng
+                    View in order history
                   </p>
                 </div>
               </div>
@@ -283,10 +283,10 @@ export default function GroupOwnerSuccessPage() {
                   <Clock className="w-4 h-4 text-blue-600" />
                 </div>
                 <div>
-                  <p className="text-xs text-gray-400 mb-0.5">Thời gian giao hàng dự kiến</p>
+                  <p className="text-xs text-gray-400 mb-0.5">Estimated delivery time</p>
                   <p className="text-sm font-bold text-gray-900">{estimatedDelivery}</p>
                   <p className="text-xs text-gray-400 mt-0.5">
-                    Đội ngũ FreshMarket sẽ liên hệ xác nhận trước khi giao
+                    FreshMarket team will contact you to confirm before delivery
                   </p>
                 </div>
               </div>
@@ -301,9 +301,9 @@ export default function GroupOwnerSuccessPage() {
             >
               <Star className="w-5 h-5 text-amber-500 flex-shrink-0" />
               <p className="text-sm text-amber-800">
-                Nhóm của bạn đã đạt{' '}
-                <span className="font-bold">ưu đãi {activePct}%</span>{' '}
-                — phần chiết khấu đã được áp dụng vào đơn hàng. 🎊
+                Your group achieved a{' '}
+                <span className="font-bold">{activePct}% discount</span>{' '}
+                — the discount has been applied to the order. 🎊
               </p>
             </motion.div>
           )}
@@ -316,10 +316,10 @@ export default function GroupOwnerSuccessPage() {
             >
               <div className="flex items-center gap-2 px-5 py-4 border-b border-gray-100">
                 <ShoppingBag className="w-5 h-5 text-gray-500" />
-                <h3 className="font-bold text-gray-900 text-sm">Món bạn đã chọn</h3>
+                <h3 className="font-bold text-gray-900 text-sm">Your selected items</h3>
                 <span className="ml-auto inline-flex items-center gap-1 text-xs text-orange-600 font-semibold">
                   <Crown className="w-3 h-3" />
-                  Chủ nhóm
+                  Owner
                 </span>
               </div>
 
@@ -351,7 +351,7 @@ export default function GroupOwnerSuccessPage() {
               </div>
 
               <div className="flex justify-between items-center px-5 py-3 bg-gray-50 border-t border-gray-100">
-                <span className="text-sm text-gray-600 font-medium">Tổng phần của bạn</span>
+                <span className="text-sm text-gray-600 font-medium">Your subtotal</span>
                 <span className="font-bold text-green-600 text-base">{fmtVND(ownerSubtotal)}</span>
               </div>
             </motion.div>
@@ -363,7 +363,7 @@ export default function GroupOwnerSuccessPage() {
               onClick={() => navigate('/profile?tab=orders')}
               className="flex-1 flex items-center justify-center gap-2 py-3.5 rounded-xl bg-green-600 text-white font-bold text-sm hover:bg-green-700 active:scale-95 transition-all shadow-sm"
             >
-              Xem chi tiết trong Lịch sử đơn hàng
+              View in Order History
               <ArrowRight className="w-4 h-4" />
             </button>
             <button
@@ -371,7 +371,7 @@ export default function GroupOwnerSuccessPage() {
               className="flex-1 flex items-center justify-center gap-2 py-3.5 rounded-xl bg-white border border-gray-200 text-gray-700 font-semibold text-sm hover:bg-gray-50 active:scale-95 transition-all"
             >
               <Home className="w-4 h-4" />
-              Về trang sản phẩm
+              Browse Products
             </button>
           </motion.div>
         </motion.div>

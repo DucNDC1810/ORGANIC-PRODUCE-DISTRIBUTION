@@ -7,6 +7,7 @@ import { Transaction } from '../models/Transaction.model';
 import momoService from '../services/momo.service';
 import { AuthRequest } from '../middlewares/auth.middleware';
 import { AppError } from '../utils/AppError';
+import { getIO } from '../socket';
 
 export class MoMoController {
   /**
@@ -192,6 +193,12 @@ export class MoMoController {
         // Nạp ví thành công — dùng Mongoose Session để đảm bảo nguyên tử
         const session = await mongoose.startSession();
         session.startTransaction();
+
+        // Capture context for socket emit after session commits
+        let topupGroupId: string | undefined;
+        let topupUserId: string | undefined;
+        let topupNewBalance: number | undefined;
+
         try {
           const txn = await Transaction.findById(transactionId).session(session);
           if (!txn) {
@@ -203,19 +210,28 @@ export class MoMoController {
             return void res.json(result);
           }
 
+          // Capture groupId stored by wallet controller
+          topupGroupId = txn.metadata?.groupId as string | undefined;
+          topupUserId  = txn.userId.toString();
+
           if (txn.status !== 'success') {
-            // Cộng tiền vào ví
-            await User.findByIdAndUpdate(
+            // Cộng tiền vào ví – capture new balance
+            const updatedUser = await User.findByIdAndUpdate(
               txn.userId,
               { $inc: { walletBalance: txn.amount } },
-              { session }
+              { new: true, session }
             );
-            // Cập nhật transaction thành success
+            topupNewBalance = updatedUser?.walletBalance;
+
+            // Cập nhật transaction thành success (giữ lại groupId trong metadata)
             await Transaction.findByIdAndUpdate(
               transactionId,
               {
-                status: 'success',
-                metadata: { momoTransId: transId, callbackTime: new Date(), callbackData: req.body }
+                $set: {
+                  status: 'success',
+                  'metadata.momoTransId': transId,
+                  'metadata.callbackTime': new Date(),
+                }
               },
               { session }
             );
@@ -225,11 +241,12 @@ export class MoMoController {
             const FIRST_TOPUP_BONUS = 10000;
             const user = await User.findById(txn.userId).session(session);
             if (user && !user.firstTopupBonusClaimed) {
-              await User.findByIdAndUpdate(
+              const bonusUpdated = await User.findByIdAndUpdate(
                 txn.userId,
                 { $inc: { walletBalance: FIRST_TOPUP_BONUS }, $set: { firstTopupBonusClaimed: true } },
-                { session }
+                { new: true, session }
               );
+              if (bonusUpdated) topupNewBalance = bonusUpdated.walletBalance;
               await Transaction.create(
                 [{
                   userId: txn.userId,
@@ -254,6 +271,20 @@ export class MoMoController {
           session.endSession();
           console.error('❌ Wallet top-up session error:', err);
         }
+
+        // ── Emit real-time socket event to the group room ──────────────────
+        if (topupGroupId && topupNewBalance !== undefined) {
+          try {
+            getIO().to(`group:${topupGroupId}`).emit('wallet:topup_success', {
+              userId: topupUserId,
+              newBalance: topupNewBalance,
+            });
+            console.log(`🔌 Socket wallet:topup_success → group:${topupGroupId}, balance=${topupNewBalance}`);
+          } catch (socketErr) {
+            console.warn('⚠️ Socket emit wallet:topup_success failed:', socketErr);
+          }
+        }
+        // ── END socket emit ────────────────────────────────────────────────
 
         result.resultCode = 0;
         result.message = 'success';

@@ -33,8 +33,11 @@ const walletService = {
   getWalletInfo: (): Promise<{ success: boolean; data: WalletInfo }> =>
     api.get('/wallet/balance') as any,
 
-  topUp: (amount: number): Promise<{ success: boolean; data: { payUrl: string; transactionId: string } }> =>
-    api.post('/wallet/topup', { amount }) as any,
+  topUp: (
+    amount: number,
+    options?: { groupId?: string; returnPath?: string }
+  ): Promise<{ success: boolean; data: { payUrl: string; transactionId: string } }> =>
+    api.post('/wallet/topup', { amount, ...options }) as any,
 
   payWithWallet: (payload: WalletPayPayload): Promise<{ success: boolean; data: { order: any; walletBalance: number } }> =>
     api.post('/wallet/pay', payload) as any,

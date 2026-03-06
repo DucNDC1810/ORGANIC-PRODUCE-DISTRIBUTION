@@ -210,7 +210,7 @@ export default function Profile() {
                   }`}
                 >
                   <CalendarClock className="w-5 h-5" />
-                  <span className="font-medium">Đặt hàng định kỳ</span>
+                  <span className="font-medium">Recurring Orders</span>
                 </button>
 
                 <button
@@ -222,7 +222,7 @@ export default function Profile() {
                   }`}
                 >
                   <Wallet className="w-5 h-5" />
-                  <span className="font-medium">Ví của tôi</span>
+                  <span className="font-medium">My Wallet</span>
                 </button>
 
                 <button

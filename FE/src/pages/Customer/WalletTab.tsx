@@ -38,10 +38,10 @@ function txColor(type: Transaction['type']) {
 
 function txLabel(tx: Transaction) {
   if (tx.description) return tx.description;
-  if (tx.type === 'topup')   return 'Nạp tiền vào ví';
-  if (tx.type === 'payment') return `Thanh toán đơn hàng${tx.orderId ? ` #${String(tx.orderId).slice(-6)}` : ''}`;
-  if (tx.type === 'bonus')   return 'Thưởng nạp tiền lần đầu';
-  return 'Hoàn tiền';
+  if (tx.type === 'topup')   return 'Top-up to wallet';
+  if (tx.type === 'payment') return `Payment for order${tx.orderId ? ` #${String(tx.orderId).slice(-6)}` : ''}`;
+  if (tx.type === 'bonus')   return 'First top-up bonus';
+  return 'Refund';
 }
 
 function fmtDate(iso: string) {
@@ -93,7 +93,7 @@ function TopUpModal({ onClose }: TopUpModalProps) {
 
   const handleTopUp = async () => {
     const amt = parseInt(amount.replace(/[^0-9]/g, ''));
-    if (!amt || amt < 10000) { toast.error('Số tiền nạp tối thiểu là 10,000₫'); return; }
+    if (!amt || amt < 10000) { toast.error('Minimum top-up amount is 10,000₫'); return; }
     setLoading(true);
     try {
       const res = await walletService.topUp(amt);
@@ -102,10 +102,10 @@ function TopUpModal({ onClose }: TopUpModalProps) {
         onClose();
         window.location.href = payUrl;
       } else {
-        toast.error('Không thể tạo link thanh toán');
+        toast.error('Could not create payment link');
       }
     } catch (err: any) {
-      toast.error(err.response?.data?.message || 'Lỗi kết nối MoMo');
+      toast.error(err.response?.data?.message || 'MoMo connection error');
     } finally {
       setLoading(false);
     }
@@ -117,7 +117,7 @@ function TopUpModal({ onClose }: TopUpModalProps) {
         <div className="flex items-center justify-between px-6 py-4 bg-gradient-to-r from-pink-500 to-rose-500 text-white">
           <div className="flex items-center gap-2">
             <Plus className="w-5 h-5" />
-            <h3 className="text-lg font-bold">Nạp tiền vào ví</h3>
+            <h3 className="text-lg font-bold">Top Up Wallet</h3>
           </div>
           <button onClick={onClose} className="hover:bg-white/20 rounded-full p-1 transition-colors">
             <X className="w-5 h-5" />
@@ -126,7 +126,7 @@ function TopUpModal({ onClose }: TopUpModalProps) {
 
         <div className="p-6 space-y-5">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1.5">Chọn mệnh giá</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1.5">Select amount</label>
             <div className="grid grid-cols-3 gap-2">
               {presets.map((p) => (
                 <button
@@ -145,24 +145,24 @@ function TopUpModal({ onClose }: TopUpModalProps) {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1.5">Hoặc nhập số tiền</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1.5">Or enter custom amount</label>
             <input
               type="text"
               value={amount ? parseInt(amount).toLocaleString('vi-VN') : ''}
               onChange={(e) => setAmount(e.target.value.replace(/[^0-9]/g, ''))}
-              placeholder="Tối thiểu 10,000₫"
+              placeholder="Minimum 10,000₫"
               className="w-full px-4 py-2.5 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-pink-400 focus:border-transparent"
             />
           </div>
 
           <div className="flex items-center gap-2 text-xs text-gray-500 bg-pink-50 rounded-xl p-3">
             <span className="text-pink-500 font-bold text-base">ⓘ</span>
-            Thanh toán qua MoMo. Số tiền sẽ được cộng vào ví ngay sau khi giao dịch thành công.
+            Pay via MoMo. Amount will be added to your wallet immediately after a successful transaction.
           </div>
 
           <div className="flex gap-3">
             <button onClick={onClose} className="flex-1 py-2.5 rounded-xl border border-gray-200 text-sm font-medium text-gray-600 hover:bg-gray-50">
-              Huỷ
+              Cancel
             </button>
             <button
               onClick={handleTopUp}
@@ -170,7 +170,7 @@ function TopUpModal({ onClose }: TopUpModalProps) {
               className="flex-1 py-2.5 rounded-xl bg-gradient-to-r from-pink-500 to-rose-500 text-white text-sm font-semibold hover:from-pink-600 hover:to-rose-600 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
             >
               {loading && <Loader2 className="w-4 h-4 animate-spin" />}
-              Thanh toán qua MoMo
+              Pay via MoMo
             </button>
           </div>
         </div>
@@ -204,9 +204,9 @@ export default function WalletTab() {
     const diff = balance - prevBalanceRef.current;
     if (diff === 0) return;
     if (diff > 0) {
-      toast.success(`Ví của bạn vừa được cộng +${fmt(diff)} 🎉`, { duration: 4000 });
+      toast.success(`Your wallet was topped up +${fmt(diff)} 🎉`, { duration: 4000 });
     } else {
-      toast.info(`Ví của bạn vừa bị trừ ${fmt(Math.abs(diff))}`, { duration: 4000 });
+      toast.info(`Your wallet was charged ${fmt(Math.abs(diff))}`, { duration: 4000 });
     }
     prevBalanceRef.current = balance;
   }, [balance]);
@@ -232,7 +232,7 @@ export default function WalletTab() {
       const allTxData: Transaction[] = (txAllRes as any)?.data ?? [];
       setTxAll(allTxData);
     } catch {
-      if (!silent) toast.error('Không thể tải thông tin ví');
+      if (!silent) toast.error('Could not load wallet information');
     } finally {
       if (!silent) setLoading(false);
     }
@@ -255,7 +255,7 @@ export default function WalletTab() {
         const allTxData: Transaction[] = (txAllRes as any)?.data ?? [];
         setTxAll(allTxData);
       } catch {
-        toast.error('Không thể tải thông tin ví');
+        toast.error('Could not load wallet information');
       } finally {
         setLoading(false);
         isInitialLoad.current = false;
@@ -291,10 +291,10 @@ export default function WalletTab() {
   const chartData = aggregateSpending(txAll, chartMode);
 
   const filterTabs: { key: typeof filterType; label: string }[] = [
-    { key: 'all',     label: 'Tất cả' },
-    { key: 'topup',   label: 'Nạp tiền' },
-    { key: 'payment', label: 'Thanh toán' },
-    { key: 'refund',  label: 'Hoàn tiền' },
+    { key: 'all',     label: 'All' },
+    { key: 'topup',   label: 'Top Up' },
+    { key: 'payment', label: 'Payment' },
+    { key: 'refund',  label: 'Refund' },
   ];
 
   if (loading) {
@@ -318,10 +318,10 @@ export default function WalletTab() {
         <div className="relative px-6 py-7">
           <div className="flex items-center gap-2 mb-1">
             <Wallet className="w-5 h-5 text-white/80" />
-            <span className="text-sm text-white/80 font-medium tracking-wide">Số dư khả dụng</span>
+            <span className="text-sm text-white/80 font-medium tracking-wide">Available Balance</span>
           </div>
           <p className="text-4xl font-bold text-white mb-1 tracking-tight">{fmt(balance)}</p>
-          <p className="text-xs text-white/60 mb-6">Ví FreshMarket · Cập nhật theo thời gian thực</p>
+          <p className="text-xs text-white/60 mb-6">FreshMarket Wallet · Real-time updates</p>
 
           {/* Action buttons */}
           <div className="flex gap-3">
@@ -330,7 +330,7 @@ export default function WalletTab() {
               className="flex items-center gap-2 px-5 py-2.5 bg-white text-emerald-600 rounded-xl text-sm font-semibold shadow-md hover:bg-emerald-50 active:scale-95 transition-all"
             >
               <Plus className="w-4 h-4" />
-              Nạp tiền
+              Top Up
             </button>
           </div>
         </div>
@@ -368,9 +368,9 @@ export default function WalletTab() {
               <div className="absolute inset-0 rounded-full border-4 border-emerald-100 animate-ping opacity-40" />
             </div>
 
-            <h3 className="text-lg font-extrabold text-gray-800 mb-1">Chào mừng đến FreshMarket Wallet!</h3>
+            <h3 className="text-lg font-extrabold text-gray-800 mb-1">Welcome to FreshMarket Wallet!</h3>
             <p className="text-sm text-gray-500 max-w-xs mb-6 leading-relaxed">
-              Ví của bạn đang trống. Nạp tiền ngay để thanh toán nhanh, nhận hoàn tiền và nhiều ưu đãi độc quyền.
+              Your wallet is empty. Top up now to pay quickly, receive refunds, and enjoy exclusive offers.
             </p>
 
             {/* Special first-topup CTA */}
@@ -379,15 +379,15 @@ export default function WalletTab() {
               className="flex items-center gap-2 px-7 py-3 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-500 text-white text-sm font-bold shadow-lg shadow-emerald-200 hover:from-emerald-600 hover:to-teal-600 active:scale-95 transition-all"
             >
               <Plus className="w-4 h-4" />
-              Nạp tiền lần đầu để nhận ưu đãi 10k
+              Top up now and get 10k bonus
             </button>
 
             {/* Trust badges */}
             <div className="flex items-center gap-4 mt-6">
               {[
-                { icon: '🔒', label: 'Bảo mật SSL' },
-                { icon: '⚡', label: 'Thanh toán tức thì' },
-                { icon: '🎁', label: 'Ưu đãi thành viên' },
+                { icon: '🔒', label: 'SSL Secured' },
+                { icon: '⚡', label: 'Instant Payment' },
+                { icon: '🎁', label: 'Member Perks' },
               ].map((b) => (
                 <div key={b.label} className="flex flex-col items-center gap-1">
                   <span className="text-xl">{b.icon}</span>
@@ -407,7 +407,7 @@ export default function WalletTab() {
           <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
             <TrendingUp className="w-5 h-5 text-emerald-500" />
-            <h3 className="text-sm font-semibold text-gray-800">Chi tiêu thực phẩm hữu cơ</h3>
+            <h3 className="text-sm font-semibold text-gray-800">Organic Food Spending</h3>
           </div>
           {/* Toggle week / month */}
           <div className="flex bg-gray-100 rounded-lg p-0.5">
@@ -419,7 +419,7 @@ export default function WalletTab() {
                   chartMode === m ? 'bg-white text-emerald-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'
                 }`}
               >
-                {m === 'month' ? 'Theo tháng' : 'Theo tuần'}
+                {m === 'month' ? 'Monthly' : 'Weekly'}
               </button>
             ))}
           </div>
@@ -428,7 +428,7 @@ export default function WalletTab() {
         {chartData.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-10 text-gray-400">
             <ShoppingCart className="w-10 h-10 mb-2 opacity-40" />
-            <p className="text-sm">Chưa có giao dịch nào để hiển thị</p>
+            <p className="text-sm">No transactions to display</p>
           </div>
         ) : (
           <ResponsiveContainer width="100%" height={200}>
@@ -456,7 +456,7 @@ export default function WalletTab() {
         )}
         {chartData.length > 0 && (
           <p className="text-xs text-gray-400 text-right mt-1">
-            Tổng chi: <span className="text-emerald-600 font-semibold">{fmt(chartData.reduce((s, d) => s + d.value, 0))}</span>
+            Total spent: <span className="text-emerald-600 font-semibold">{fmt(chartData.reduce((s, d) => s + d.value, 0))}</span>
           </p>
         )}
       </div>
@@ -465,7 +465,7 @@ export default function WalletTab() {
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
         {/* Header + filter */}
         <div className="px-5 pt-5 pb-3 border-b border-gray-100">
-          <h3 className="text-sm font-semibold text-gray-800 mb-3">Lịch sử giao dịch</h3>
+          <h3 className="text-sm font-semibold text-gray-800 mb-3">Transaction History</h3>
           <div className="flex gap-2 flex-wrap">
             {filterTabs.map((f) => (
               <button
@@ -487,7 +487,7 @@ export default function WalletTab() {
         {txPage.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-12 text-gray-400">
             <Wallet className="w-10 h-10 mb-2 opacity-40" />
-            <p className="text-sm">Chưa có giao dịch nào</p>
+            <p className="text-sm">No transactions yet</p>
           </div>
         ) : (
           <ul className="divide-y divide-gray-50">
@@ -505,12 +505,12 @@ export default function WalletTab() {
                     <span className="text-xs text-gray-400">{fmtDate(tx.createdAt)}</span>
                     {tx.status === 'pending' && (
                       <span className="text-xs bg-amber-100 text-amber-600 px-2 py-0.5 rounded-full font-medium">
-                        Đang xử lý
+                        Processing
                       </span>
                     )}
                     {tx.status === 'failed' && (
                       <span className="text-xs bg-red-100 text-red-600 px-2 py-0.5 rounded-full font-medium">
-                        Thất bại
+                        Failed
                       </span>
                     )}
                   </div>
@@ -533,17 +533,17 @@ export default function WalletTab() {
               disabled={page === 1}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-gray-600 hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
             >
-              <ChevronLeft className="w-4 h-4" /> Trước
+              <ChevronLeft className="w-4 h-4" /> Prev
             </button>
             <span className="text-xs text-gray-500">
-              Trang <span className="font-semibold text-gray-700">{page}</span> / {totalPages}
+              Page <span className="font-semibold text-gray-700">{page}</span> / {totalPages}
             </span>
             <button
               onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
               disabled={page === totalPages}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-gray-600 hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
             >
-              Tiếp <ChevronRight className="w-4 h-4" />
+              Next <ChevronRight className="w-4 h-4" />
             </button>
           </div>
         )}

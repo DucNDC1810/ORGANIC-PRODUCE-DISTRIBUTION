@@ -215,6 +215,29 @@ export class GroupController {
     }
   };
 
+  /** PUT /api/groups/:id/members/:memberId/items — Đồng bộ toàn bộ món của thành viên (replace) */
+  syncMemberItems = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const { id: groupId, memberId } = req.params;
+      const { items } = req.body;
+
+      if (!Array.isArray(items)) {
+        throw new AppError('items phải là mảng', 400);
+      }
+
+      const updated = await groupService.syncMemberItems(memberId, items);
+      if (!updated) throw new AppError('Không tìm thấy thành viên', 404);
+
+      try {
+        getIO().to(`group:${groupId}`).emit('member:item_added', updated);
+      } catch (_) {}
+
+      res.json({ success: true, data: updated });
+    } catch (err) {
+      next(err);
+    }
+  };
+
   /** POST /api/groups/:id/members/:memberId/items — Thêm món vào giỏ của thành viên */
   addMemberItem = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {

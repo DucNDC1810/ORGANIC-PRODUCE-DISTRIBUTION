@@ -207,8 +207,8 @@ export class GroupService {
       }
     }
 
-    group.status = 'completed';
-    await group.save();
+    await GroupMember.deleteMany({ groupId });
+    await group.deleteOne();
     return group;
   }
 
@@ -343,13 +343,28 @@ export class GroupService {
 
     const existing = member.cartItems.find((i) => i.productId === item.productId);
     if (existing) {
-      existing.qty += item.qty;
+      existing.qty = item.qty; // Frontend sends full new qty, not a delta
     } else {
       member.cartItems.push(item);
     }
-    // Tự động đánh dấu đã chọn món khi có ít nhất 1 item
-    member.isReady = member.cartItems.length > 0;
+    // isReady is NOT auto-set here — member must explicitly click "Xác nhận" button
     await member.save();
+    return member;
+  }
+
+  /**
+   * Đồng bộ toàn bộ danh sách món của một thành viên (replace, dùng cho Owner sync).
+   * Tự động cập nhật isReady dựa trên số lượng item.
+   */
+  async syncMemberItems(
+    memberId: string,
+    items: { productId: string; name: string; price: number; image: string; qty: number }[]
+  ) {
+    const member = await GroupMember.findByIdAndUpdate(
+      memberId,
+      { cartItems: items, isReady: items.length > 0 },
+      { new: true }
+    ).populate('userId', 'name email');
     return member;
   }
 }

@@ -29,6 +29,9 @@ router.patch('/:id/members/:memberId/ready', authenticate as any, groupControlle
 // Thêm món vào giỏ của thành viên (bắt buộc đăng nhập)
 router.post('/:id/members/:memberId/items', authenticate as any, groupController.addMemberItem as any);
 
+// Đồng bộ toàn bộ món của thành viên / Owner sync (replace)
+router.put('/:id/members/:memberId/items', authenticate as any, groupController.syncMemberItems as any);
+
 // Đặt cọc phần tiền qua ví (bắt buộc đăng nhập)
 router.post('/:id/members/:memberId/wallet-hold', authenticate as any, groupController.holdWalletShare as any);
 
