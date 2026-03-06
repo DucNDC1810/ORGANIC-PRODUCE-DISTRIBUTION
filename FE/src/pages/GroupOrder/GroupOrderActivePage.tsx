@@ -28,6 +28,152 @@ import { QRCodeSVG } from "qrcode.react";
 import { toast } from "sonner";
 import Header from "../../components/Header";
 import { groupService, type GroupMember as APIMember } from "../../services/groupService";
+import walletService from "../../services/walletService";
+
+// ─── QuickTopupModal ─────────────────────────────────────────────────────────
+
+interface QuickTopupModalProps {
+  shortfall: number;
+  groupId: string;
+  /** Serialised cart items saved to sessionStorage so they survive the MoMo redirect */
+  cartSnapshot: string;
+  groupName: string;
+  onClose: () => void;
+}
+
+function roundUpTo(amount: number, step: number): number {
+  return Math.ceil(amount / step) * step;
+}
+
+function QuickTopupModal({ shortfall, groupId, cartSnapshot, groupName, onClose }: QuickTopupModalProps) {
+  const presets = (() => {
+    const exact  = Math.max(shortfall, 10000);
+    const buffer = roundUpTo(shortfall + 50000, 50000);
+    const candidates = [exact, buffer, 100000, 200000, 500000];
+    const uniq = Array.from(new Set(candidates)).filter((v) => v >= 10000).sort((a, b) => a - b);
+    return uniq.slice(0, 4);
+  })();
+
+  const [selected, setSelected] = useState<number>(presets[0]);
+  const [loading,  setLoading]  = useState(false);
+
+  const handleTopup = async () => {
+    if (!groupId) return;
+    setLoading(true);
+    try {
+      // Persist cart to sessionStorage so TopupResultPage can restore it
+      sessionStorage.setItem(`goa_cart_${groupId}`,  cartSnapshot);
+      sessionStorage.setItem(`goa_name_${groupId}`,  groupName);
+
+      const res = await walletService.topUp(selected, {
+        groupId,
+        returnPath: `/group-order/active`,
+      });
+      const payUrl: string | undefined = (res as any)?.data?.payUrl ?? (res as any)?.payUrl;
+      if (payUrl) {
+        // Open MoMo in a NEW TAB — current page stays alive so socket update works in real-time
+        window.open(payUrl, "_blank", "noopener,noreferrer");
+        onClose();
+        toast.info("Cửa sổ MoMo đã được mở. Hoàn tất thanh toán rồi quay lại đây nhé!", {
+          duration: 10000,
+          icon: "💜",
+        });
+      } else {
+        toast.error("Không nhận được link thanh toán từ MoMo.");
+        setLoading(false);
+      }
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message ?? "Không thể khởi tạo thanh toán MoMo. Vui lòng thử lại.");
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-sm p-4"
+      onClick={onClose}
+    >
+      <div
+        className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="px-6 py-5 bg-gradient-to-r from-pink-500 to-rose-500 flex items-center gap-3">
+          <Wallet className="w-5 h-5 text-white" />
+          <p className="text-white font-bold text-lg flex-1">Nạp tiền nhanh qua MoMo</p>
+          <button
+            onClick={onClose}
+            className="w-7 h-7 rounded-full bg-white/20 text-white hover:bg-white/30 flex items-center justify-center"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        <div className="p-6 space-y-4">
+          {/* Shortfall banner */}
+          <div className="flex items-center gap-3 bg-red-50 border border-red-100 rounded-xl px-4 py-3">
+            <AlertTriangle className="w-4 h-4 text-red-500 flex-shrink-0" />
+            <p className="text-sm text-red-700">
+              Ví còn thiếu <span className="font-extrabold">{fmtVND(shortfall)}</span> để chốt đơn
+            </p>
+          </div>
+
+          {/* Preset grid */}
+          <div>
+            <p className="text-xs font-semibold text-gray-500 mb-2 uppercase tracking-wide">Chọn số tiền nạp</p>
+            <div className="grid grid-cols-2 gap-2">
+              {presets.map((amt) => (
+                <button
+                  key={amt}
+                  onClick={() => setSelected(amt)}
+                  className={`py-3 rounded-xl text-sm font-bold border-2 transition-all ${
+                    selected === amt
+                      ? "border-pink-500 bg-pink-50 text-pink-700"
+                      : "border-gray-200 bg-white text-gray-700 hover:border-pink-300"
+                  }`}
+                >
+                  {amt === presets[0] && shortfall > 0 ? (
+                    <span>
+                      {fmtVND(amt)}
+                      <span className="block text-xs font-normal text-pink-500">đúng số thiếu</span>
+                    </span>
+                  ) : (
+                    fmtVND(amt)
+                  )}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Action buttons */}
+          <div className="flex gap-3 pt-1">
+            <button
+              onClick={onClose}
+              className="flex-1 py-3 rounded-xl border border-gray-200 text-sm font-medium text-gray-600 hover:bg-gray-50"
+            >
+              Huỷ
+            </button>
+            <button
+              onClick={handleTopup}
+              disabled={loading}
+              className="flex-1 py-3 rounded-xl bg-gradient-to-r from-pink-500 to-rose-500 text-white text-sm font-bold hover:from-pink-600 hover:to-rose-600 transition-all flex items-center justify-center gap-2 disabled:opacity-60"
+            >
+              {loading ? (
+                <><Loader2 className="w-4 h-4 animate-spin" /> Đang mở MoMo…</>
+              ) : (
+                <>💜 Nạp {fmtVND(selected)}</>
+              )}
+            </button>
+          </div>
+
+          <p className="text-xs text-gray-400 text-center leading-relaxed">
+            Thanh toán qua MoMo sẽ mở trong tab mới. Sau khi nạp xong, ví sẽ cập nhật tự động và bạn có thể chốt đơn ngay tại trang này.
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 // ─── Types & Constants ────────────────────────────────────────────────────────
 
@@ -114,6 +260,10 @@ export default function GroupOrderActivePage() {
     groupId ? `${window.location.origin}/join-group/${groupId}` : ""
   );
 
+  // Wallet balance for owner — checked before placing order
+  const [walletBalance,    setWalletBalance]   = useState<number>(0);
+  const [showTopupModal,   setShowTopupModal]  = useState(false);
+
   // Owner's member ID in DB – for syncing cart items to server
   const ownerMemberIdRef = useRef<string | null>(null);
 
@@ -145,6 +295,13 @@ export default function GroupOrderActivePage() {
       .catch(console.error)
       .finally(() => setMembersLoading(false));
   }, [groupId]);
+
+  // ── Fetch owner wallet balance ──────────────────────────────────────────
+  useEffect(() => {
+    walletService.getWalletInfo()
+      .then((res: any) => setWalletBalance(res?.data?.walletBalance ?? res?.walletBalance ?? 0))
+      .catch(() => setWalletBalance(0));
+  }, []);
 
   // ── Đồng bộ giỏ của Owner lên DB mỗi khi cart thay đổi (debounce 800ms) ──
   const syncOwnerCart = useCallback(
@@ -216,6 +373,16 @@ export default function GroupOrderActivePage() {
     // Chủ nhóm đổi hình thức thanh toán: cập nhật cho tất cả
     socket.on("group:payment_option_changed", (data: { groupId: string; paymentOption: string }) => {
       setPaymentOption(data.paymentOption as 'owner_only' | 'individual' | 'equal_split');
+    });
+    // Ví chủ nhóm vừa được nạp tiền — cập nhật số dư & reset warning
+    socket.on("wallet:topup_success", (data: { newBalance: number }) => {
+      setWalletBalance(data.newBalance);
+      toast.success("Nạp tiền thành công! Số dư ví đã được cập nhật.", {
+        description: `Số dư mới: ${data.newBalance.toLocaleString("vi-VN")}đ`,
+        icon: "💚",
+        id: "wallet-topup-success",
+        duration: 6000,
+      });
     });
     return () => { socket.disconnect(); };
   }, [groupId]);
@@ -932,40 +1099,66 @@ export default function GroupOrderActivePage() {
             );
           })()}
 
-          {/* ── Chốt đơn button ── */}
-          <button
-            onClick={() => {
-              if (paymentOption === 'owner_only') {
-                navigate("/checkout", {
-                  state: {
-                    groupCheckout: {
-                      groupId,
-                      groupName,
-                      activePct,
-                      discount,
-                      subtotal,
-                      shipping: 25000,
-                      total: total + 25000,
+          {/* ── Wallet balance indicator (non-owner_only modes) ── */}
+          {paymentOption !== 'owner_only' && ownerRemaining > 0 && (
+            <div className={`flex items-center justify-between px-4 py-2.5 rounded-xl text-xs font-medium ${
+              walletBalance >= ownerRemaining
+                ? "bg-green-50 border border-green-200 text-green-700"
+                : "bg-red-50 border border-red-200 text-red-600"
+            }`}>
+              <span className="flex items-center gap-1.5">
+                <Wallet className="w-3.5 h-3.5" />
+                Số dư ví của bạn
+              </span>
+              <span className="font-bold">{fmtVND(walletBalance)}</span>
+            </div>
+          )}
+
+          {/* ── Chốt đơn / Nạp thêm button ── */}
+          {paymentOption !== 'owner_only' && walletBalance < ownerRemaining && ownerRemaining > 0 ? (
+            <button
+              onClick={() => setShowTopupModal(true)}
+              disabled={cart.length === 0}
+              className="w-full py-4 rounded-2xl bg-gradient-to-r from-pink-500 to-rose-500 text-white text-base font-extrabold shadow-lg hover:from-pink-600 hover:to-rose-600 active:scale-[0.98] transition-all duration-150 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <Wallet className="w-5 h-5" />
+              Nạp thêm {fmtVND(ownerRemaining - walletBalance)} để thanh toán
+            </button>
+          ) : (
+            <button
+              onClick={() => {
+                if (paymentOption === 'owner_only') {
+                  navigate("/checkout", {
+                    state: {
+                      groupCheckout: {
+                        groupId,
+                        groupName,
+                        activePct,
+                        discount,
+                        subtotal,
+                        shipping: 25000,
+                        total: total + 25000,
+                      },
                     },
-                  },
-                });
-              } else {
-                setShowPlaceConfirm(true);
-              }
-            }}
-            disabled={placeOrderLoading || cart.length === 0 || (paymentOption === 'equal_split' && !allNonOwnerPaid)}
-            className="w-full py-4 rounded-2xl bg-gradient-to-r from-green-600 to-emerald-500 text-white text-base font-extrabold shadow-lg hover:from-green-700 hover:to-emerald-600 active:scale-[0.98] transition-all duration-150 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {placeOrderLoading ? (
-              <><Loader2 className="w-5 h-5 animate-spin" /> Đang xử lý...</>
-            ) : paymentOption === 'individual' ? (
-              <><ShoppingCart className="w-5 h-5" /> Thanh toán phần tôi & Chốt đơn →</>
-            ) : paymentOption !== 'owner_only' ? (
-              <><ShoppingCart className="w-5 h-5" /> Gửi yêu cầu thanh toán →</>
-            ) : (
-              <><ShoppingCart className="w-5 h-5" /> Chốt đơn hàng nhóm →</>
-            )}
-          </button>
+                  });
+                } else {
+                  setShowPlaceConfirm(true);
+                }
+              }}
+              disabled={placeOrderLoading || cart.length === 0 || (paymentOption === 'equal_split' && !allNonOwnerPaid)}
+              className="w-full py-4 rounded-2xl bg-gradient-to-r from-green-600 to-emerald-500 text-white text-base font-extrabold shadow-lg hover:from-green-700 hover:to-emerald-600 active:scale-[0.98] transition-all duration-150 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {placeOrderLoading ? (
+                <><Loader2 className="w-5 h-5 animate-spin" /> Đang xử lý...</>
+              ) : paymentOption === 'individual' ? (
+                <><ShoppingCart className="w-5 h-5" /> Thanh toán phần tôi & Chốt đơn →</>
+              ) : paymentOption !== 'owner_only' ? (
+                <><ShoppingCart className="w-5 h-5" /> Gửi yêu cầu thanh toán →</>
+              ) : (
+                <><ShoppingCart className="w-5 h-5" /> Chốt đơn hàng nhóm →</>
+              )}
+            </button>
+          )}
           {paymentOption === 'equal_split' && !allNonOwnerPaid && nonOwnerCount > 0 && (
             <p className="text-center text-xs text-amber-500 font-medium -mt-1">
               ⚠ Còn {members.filter((m) => m.role !== 'owner' && !m.walletPaid).length}/{nonOwnerCount} thành viên chưa đóng góp
@@ -1293,6 +1486,17 @@ export default function GroupOrderActivePage() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* ════════════ QUICK TOPUP MODAL ════════════ */}
+      {showTopupModal && groupId && (
+        <QuickTopupModal
+          shortfall={Math.max(0, ownerRemaining - walletBalance)}
+          groupId={groupId}
+          cartSnapshot={JSON.stringify(cart)}
+          groupName={groupName}
+          onClose={() => setShowTopupModal(false)}
+        />
       )}
     </div>
   );

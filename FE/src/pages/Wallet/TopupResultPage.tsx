@@ -64,6 +64,9 @@ export default function TopupResultPage() {
   const partnerCode  = searchParams.get('partnerCode');
   const momoOrderId  = searchParams.get('orderId') ?? '';
   const momoRequestId = searchParams.get('requestId') ?? '';
+  // Context params embedded by our wallet topup flow
+  const returnPath    = searchParams.get('returnPath');   // e.g. /group-order/active
+  const returnGroupId = searchParams.get('groupId');      // MongoDB group ObjectId
 
   // resultCode '0' === success (new flow); "topup=success" === legacy flow
   const isSuccess   = resultCode === '0' || topupParam === 'success';
@@ -75,6 +78,7 @@ export default function TopupResultPage() {
   const [loading,    setLoading]    = useState(isSuccess);   // only fetch if success
   const [bonusAwarded, setBonusAwarded] = useState(false);
   const [now]        = useState(() => new Date());
+  const [countdown,  setCountdown]  = useState(returnPath ? 5 : 0);
 
   // ── Fetch fresh wallet info to confirm balance ─────────────────────────────
   useEffect(() => {
@@ -115,6 +119,36 @@ export default function TopupResultPage() {
     const t = window.setTimeout(verifyAndFetch, 1200);
     return () => { cancelled = true; window.clearTimeout(t); };
   }, [isSuccess]);
+
+  // ── Auto-redirect countdown when returnPath is set and topup succeeds ─────────
+  useEffect(() => {
+    if (!isSuccess || loading || !returnPath || countdown <= 0) return;
+    const timer = window.setInterval(() => {
+      setCountdown((c) => {
+        if (c <= 1) {
+          clearInterval(timer);
+          // Restore cart from sessionStorage and navigate back
+          const savedCart  = returnGroupId ? sessionStorage.getItem(`goa_cart_${returnGroupId}`) : null;
+          const savedName  = returnGroupId ? sessionStorage.getItem(`goa_name_${returnGroupId}`) : null;
+          if (returnGroupId) {
+            sessionStorage.removeItem(`goa_cart_${returnGroupId}`);
+            sessionStorage.removeItem(`goa_name_${returnGroupId}`);
+          }
+          navigate(returnPath, {
+            replace: true,
+            state: {
+              groupId:    returnGroupId ?? undefined,
+              groupName:  savedName ?? undefined,
+              cartItems:  savedCart ? JSON.parse(savedCart) : undefined,
+            },
+          });
+          return 0;
+        }
+        return c - 1;
+      });
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [isSuccess, loading, returnPath, returnGroupId, navigate, countdown]);
 
   // ── Direct navigation guard ────────────────────────────────────────────────
   if (isDirectNav) {
@@ -285,16 +319,57 @@ export default function TopupResultPage() {
               </div>
             </motion.div>
 
+            {/* ── Return to Group Order banner (when topup was triggered from group page) ── */}
+            {returnPath && returnGroupId && (
+              <motion.div variants={item}>
+                <div className="bg-gradient-to-r from-green-50 to-emerald-50 border border-emerald-200 rounded-2xl px-5 py-4 flex items-center gap-3 shadow-sm">
+                  <span className="text-2xl leading-none">👥</span>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-bold text-emerald-800">Ví đã sẵn sàng — quay về đơn nhóm!</p>
+                    <p className="text-xs text-emerald-600 mt-0.5">
+                      {countdown > 0
+                        ? `Tự động chuyển hướng sau ${countdown}s…`
+                        : "Nhấn nút bên dưới để tiếp tục chốt đơn."}
+                    </p>
+                  </div>
+                </div>
+              </motion.div>
+            )}
+
             {/* ── CTA buttons ── */}
             <motion.div variants={item} className="flex flex-col sm:flex-row gap-3 pt-1">
-              <button
-                onClick={() => navigate('/profile?tab=wallet')}
-                className="flex-1 flex items-center justify-center gap-2 py-3.5 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-500 text-white font-bold text-sm shadow-lg shadow-emerald-200 hover:from-emerald-600 hover:to-teal-600 active:scale-[0.98] transition-all"
-              >
-                <Wallet className="w-4 h-4" />
-                Xem ví của tôi
-                <ArrowRight className="w-4 h-4" />
-              </button>
+              {returnPath && returnGroupId ? (
+                <button
+                  onClick={() => {
+                    const savedCart = sessionStorage.getItem(`goa_cart_${returnGroupId}`);
+                    const savedName = sessionStorage.getItem(`goa_name_${returnGroupId}`);
+                    sessionStorage.removeItem(`goa_cart_${returnGroupId}`);
+                    sessionStorage.removeItem(`goa_name_${returnGroupId}`);
+                    navigate(returnPath, {
+                      replace: true,
+                      state: {
+                        groupId:   returnGroupId,
+                        groupName: savedName ?? undefined,
+                        cartItems: savedCart ? JSON.parse(savedCart) : undefined,
+                      },
+                    });
+                  }}
+                  className="flex-1 flex items-center justify-center gap-2 py-3.5 rounded-2xl bg-gradient-to-r from-green-500 to-emerald-500 text-white font-bold text-sm shadow-lg shadow-green-200 hover:from-green-600 hover:to-emerald-600 active:scale-[0.98] transition-all"
+                >
+                  <span>👥</span>
+                  Quay lại đơn hàng nhóm
+                  <ArrowRight className="w-4 h-4" />
+                </button>
+              ) : (
+                <button
+                  onClick={() => navigate('/profile?tab=wallet')}
+                  className="flex-1 flex items-center justify-center gap-2 py-3.5 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-500 text-white font-bold text-sm shadow-lg shadow-emerald-200 hover:from-emerald-600 hover:to-teal-600 active:scale-[0.98] transition-all"
+                >
+                  <Wallet className="w-4 h-4" />
+                  Xem ví của tôi
+                  <ArrowRight className="w-4 h-4" />
+                </button>
+              )}
 
               <button
                 onClick={() => navigate('/products')}

@@ -47,7 +47,7 @@ export class WalletController {
       const userId = req.user?.id;
       if (!userId) throw new AppError('User not authenticated', 401);
 
-      const { amount } = req.body;
+      const { amount, groupId: rawGroupId, returnPath: rawReturnPath } = req.body;
       if (!amount || amount <= 0) {
         throw new AppError('Amount must be a positive number', 400);
       }
@@ -55,20 +55,34 @@ export class WalletController {
         throw new AppError('Minimum top-up amount is 10,000 VND', 400);
       }
 
+      // Sanitise optional context params to prevent injection
+      const safeGroupId =
+        typeof rawGroupId === 'string' && /^[a-fA-F0-9]{24}$/.test(rawGroupId)
+          ? rawGroupId
+          : null;
+      const safeReturnPath =
+        typeof rawReturnPath === 'string' && rawReturnPath.startsWith('/') && rawReturnPath.length <= 200
+          ? rawReturnPath
+          : null;
+
       // Tạo transaction pending để lưu trước khi gọi MoMo
       const transaction = await Transaction.create({
         userId,
         amount: Math.floor(amount),
         type: 'topup',
         status: 'pending',
-        description: `Nạp tiền vào ví FreshMarket`
+        description: `Nạp tiền vào ví FreshMarket`,
+        metadata: safeGroupId ? { groupId: safeGroupId } : {}
       });
 
       // orderId gửi MoMo = "topup_<transactionId>" để webhook phân biệt với đơn hàng thường
       const momoOrderId = `topup_${transaction._id.toString()}`;
 
       const feOrigin = req.headers.origin || process.env.FE_BASE_URL || 'http://localhost:5173';
-      const redirectUrl = `${feOrigin}/wallet-topup`;
+      // Embed returnPath & groupId so MoMo redirects user back to the correct page
+      const redirectUrl = safeReturnPath || safeGroupId
+        ? `${feOrigin}/wallet-topup?returnPath=${encodeURIComponent(safeReturnPath ?? '/group-order/active')}${safeGroupId ? '&groupId=' + encodeURIComponent(safeGroupId) : ''}`
+        : `${feOrigin}/wallet-topup`;
 
       try {
         const momoResponse = await momoService.createPayment(
@@ -79,11 +93,11 @@ export class WalletController {
           momoOrderId
         );
 
-        // Lưu momoOrderId vào metadata để webhook tra cứu
+        // Lưu momoOrderId vào metadata để webhook tra cứu (giữ lại groupId đã lưu)
         await Transaction.findByIdAndUpdate(transaction._id, {
-          metadata: {
-            momoOrderId: momoResponse.orderId,
-            requestId: momoResponse.requestId
+          $set: {
+            'metadata.momoOrderId': momoResponse.orderId,
+            'metadata.requestId': momoResponse.requestId
           }
         });
 
