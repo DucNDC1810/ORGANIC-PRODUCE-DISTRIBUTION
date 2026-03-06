@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { toast } from "sonner";
 import { groupService } from "../../services/groupService";
+import { useAuth } from "../../context/AuthContext";
 import {
   ArrowLeft,
   Clock,
@@ -119,8 +120,9 @@ export default function GroupOrderPage() {
   const navigate = useNavigate();
   const location  = useLocation();
   const passedCartItems = (location.state as any)?.cartItems ?? [];
+  const { user } = useAuth();
 
-  const [groupName,    setGroupName]    = useState("Đơn hàng nhóm của tôi");
+  const [groupName,    setGroupName]    = useState(`Đơn hàng của ${user?.username ?? user?.name ?? "tôi"}`);
   const [editingName,  setEditingName]  = useState(false);
   const [paymentMode,  setPaymentMode]  = useState<PaymentOption>('owner_only');
   const [timeLimit,    setTimeLimit]    = useState("Không có");
@@ -429,22 +431,8 @@ export default function GroupOrderPage() {
                 })}
               </div>
 
-              {/* External payment methods hint */}
-              <div className="mt-4 border-t border-gray-100 pt-4">
-                <p className="text-xs text-gray-400 mb-3 font-medium">Phương thức thanh toán khác</p>
-                <div className="flex items-center gap-3">
-                  {[
-                    { key: "momo", label: "MoMo", icon: <span className="text-white text-[9px] font-black leading-none">mo<br />mo</span>, bg: "bg-pink-600" },
-                    { key: "card", label: "Thẻ", icon: <CreditCard className="w-4 h-4 text-gray-500" />, bg: "bg-gray-100" },
-                  ].map((m) => (
-                    <button key={m.key} className="flex items-center gap-2 px-3 py-2 rounded-xl bg-gray-50 hover:bg-gray-100 transition-colors text-xs text-gray-600 font-medium">
-                      <div className={`w-7 h-7 rounded-full ${m.bg} flex items-center justify-center flex-shrink-0`}>{m.icon}</div>
-                      {m.label}
-                      <ChevronRight className="w-3.5 h-3.5 text-gray-400" />
-                    </button>
-                  ))}
-                </div>
-              </div>
+              
+            
             </div>
           </div>
         </div>

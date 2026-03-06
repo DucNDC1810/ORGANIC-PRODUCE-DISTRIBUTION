@@ -207,8 +207,8 @@ export class GroupService {
       }
     }
 
-    group.status = 'completed';
-    await group.save();
+    await GroupMember.deleteMany({ groupId });
+    await group.deleteOne();
     return group;
   }
 
@@ -343,12 +343,11 @@ export class GroupService {
 
     const existing = member.cartItems.find((i) => i.productId === item.productId);
     if (existing) {
-      existing.qty += item.qty;
+      existing.qty = item.qty; // Frontend sends full new qty, not a delta
     } else {
       member.cartItems.push(item);
     }
-    // Tự động đánh dấu đã chọn món khi có ít nhất 1 item
-    member.isReady = member.cartItems.length > 0;
+    // isReady is NOT auto-set here — member must explicitly click "Xác nhận" button
     await member.save();
     return member;
   }
