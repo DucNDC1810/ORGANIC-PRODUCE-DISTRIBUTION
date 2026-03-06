@@ -30,10 +30,6 @@ const GroupOrderPage       = lazy(() => import('./pages/GroupOrder/GroupOrderPag
 const GroupOrderActivePage = lazy(() => import('./pages/GroupOrder/GroupOrderActivePage'));
 const JoinGroupPage        = lazy(() => import('./pages/GroupOrder/JoinGroupPage'));
 const GroupMemberPage      = lazy(() => import('./pages/GroupOrder/GroupMemberPage'));
-import GroupOrderPage from './pages/GroupOrder/GroupOrderPage';
-import GroupOrderActivePage from './pages/GroupOrder/GroupOrderActivePage';
-import JoinGroupPage from './pages/GroupOrder/JoinGroupPage';
-import GroupMemberPage from './pages/GroupOrder/GroupMemberPage';
 import GroupOrderSuccess from './pages/GroupOrder/GroupOrderSuccess';
 import GroupOwnerSuccessPage from './pages/GroupOrder/GroupOwnerSuccessPage';
 import TopupResultPage from './pages/Wallet/TopupResultPage';

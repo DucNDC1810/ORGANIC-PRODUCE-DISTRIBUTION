@@ -67,9 +67,11 @@ export default function OrderSuccessPage() {
   const orderIdFromUrl = searchParams.get('orderId');
   const orderId = orderIdFromUrl || location.state?.orderId;
   
-  const [paymentType, setPaymentType] = useState<"momo" | null>(null);
+  const [paymentType, setPaymentType] = useState<"momo" | "zalopay" | null>(null);
   // Check for MoMo return by checking partnerCode or orderId in URL
   const isMoMoReturn = searchParams.get('partnerCode') === 'MOMO' || !!searchParams.get('orderId') || !!sessionStorage.getItem('pendingMoMoOrder');
+  // Check for ZaloPay return by checking apptransid or status in URL
+  const isZaloPayReturn = searchParams.get('apptransid') !== null || searchParams.get('status') !== null;
 
   useEffect(() => {
     const verifyAndLoadOrder = async () => {
@@ -290,32 +292,10 @@ export default function OrderSuccessPage() {
           }
           setPaymentType('zalopay');
 
-          // If coming from ZaloPay return, verify payment status
+          // If coming from ZaloPay return, mark as verified
           if (isZaloPayReturn && appTransId) {
             setVerificationStatus("verifying");
-            
-            // In dev mode, simulate callback
-            if (import.meta.env.DEV) {
-              try {
-                await zalopayService.testCallback(appTransId);
-              } catch (e) {
-                console.warn("Test callback failed, continuing:", e);
-              }
-            }
-
-            // Verify payment status with backend
-            try {
-              const response = await zalopayService.verifyReturn(data?.orderId || appTransId, appTransId);
-              const paymentStatus = (response as any).data?.paymentStatus;
-              if (paymentStatus === "paid") {
-                setVerificationStatus("verified");
-              } else {
-                setVerificationStatus("verified");
-              }
-            } catch (error) {
-              console.error("Payment verification error:", error);
-              setVerificationStatus("verified");
-            }
+            setVerificationStatus("verified");
           }
 
         }

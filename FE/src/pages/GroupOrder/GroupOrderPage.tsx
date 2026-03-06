@@ -8,7 +8,6 @@ import {
   Clock,
   Users,
   CreditCard,
-  ChevronRight,
   Check,
   Edit3,
 } from "lucide-react";
