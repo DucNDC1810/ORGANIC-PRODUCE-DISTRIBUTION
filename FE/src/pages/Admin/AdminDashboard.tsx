@@ -110,9 +110,9 @@ export default function AdminDashboard() {
             <button
               onClick={() => setSidebarOpen(!sidebarOpen)}
               className="flex items-center gap-3 cursor-pointer group relative"
-              aria-label={sidebarOpen ? "Đóng sidebar" : "Mở sidebar"}
+              aria-label={sidebarOpen ? "Close sidebar" : "Open sidebar"}
             >
-              {/* Logo với hiệu ứng */}
+              {/* Logo with animation effect */}
               <div className="relative">
                 <div className="w-12 h-12 bg-gradient-to-br from-emerald-500 via-green-500 to-teal-600 rounded-xl flex items-center justify-center shadow-md group-hover:shadow-xl transition-all duration-300 relative overflow-hidden group-active:scale-95">
                   {/* Gradient overlay khi hover */}
@@ -125,7 +125,7 @@ export default function AdminDashboard() {
                     "group-hover:scale-110",
                     sidebarOpen ? "rotate-[360deg]" : "rotate-0"
                   )} />
-                  {/* Indicator dots - hiển thị trạng thái sidebar */}
+                  {/* Indicator dots - shows sidebar state */}
                   <div className="absolute -bottom-1 -right-1 flex gap-0.5">
                     <div className={cn(
                       "w-1.5 h-1.5 rounded-full transition-all duration-300",
@@ -140,7 +140,7 @@ export default function AdminDashboard() {
                 {/* Tooltip */}
                 <div className="absolute top-full left-1/2 -translate-x-1/2 mt-2 px-3 py-1.5 bg-gray-900 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-all duration-200 pointer-events-none whitespace-nowrap shadow-lg z-50">
                   <div className="absolute -top-1 left-1/2 -translate-x-1/2 w-2 h-2 bg-gray-900 rotate-45" />
-                  {sidebarOpen ? 'Click để đóng menu' : 'Click để mở menu'}
+                  {sidebarOpen ? 'Click to close menu' : 'Click to open menu'}
                 </div>
               </div>
               
@@ -162,7 +162,7 @@ export default function AdminDashboard() {
             <button
               onClick={() => navigate('/')}
               className="flex items-center gap-2 px-4 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 hover:text-emerald-800 rounded-xl text-sm font-medium transition-all duration-200 border border-emerald-200 hover:border-emerald-300 group"
-              title="Quay lại trang Store"
+              title="Back to Store"
             >
               <Store className="w-4 h-4 group-hover:scale-110 transition-transform duration-200" />
               <span className="hidden sm:block">Visit Store</span>

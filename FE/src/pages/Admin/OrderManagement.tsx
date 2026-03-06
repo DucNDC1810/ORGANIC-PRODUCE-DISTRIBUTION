@@ -8,19 +8,19 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 
 // Mock data
 const mockOrders = [
-  { id: '#ORD-001', customer: 'Nguyễn Văn A', date: '2025-01-26', total: 45.90, status: 'Đang giao', items: 3, payment: 'Đã thanh toán' },
-  { id: '#ORD-002', customer: 'Trần Thị B', date: '2025-01-26', total: 32.50, status: 'Đang xử lý', items: 2, payment: 'Đã thanh toán' },
-  { id: '#ORD-003', customer: 'Lê Văn C', date: '2025-01-25', total: 78.30, status: 'Hoàn thành', items: 5, payment: 'Đã thanh toán' },
-  { id: '#ORD-004', customer: 'Phạm Thị D', date: '2025-01-25', total: 55.20, status: 'Đang giao', items: 4, payment: 'Đã thanh toán' },
-  { id: '#ORD-005', customer: 'Hoàng Văn E', date: '2025-01-24', total: 29.90, status: 'Đã hủy', items: 2, payment: 'Đã hoàn tiền' },
+  { id: '#ORD-001', customer: 'John Smith', date: '2025-01-26', total: 45.90, status: 'Shipping', items: 3, payment: 'Paid' },
+  { id: '#ORD-002', customer: 'Jane Doe', date: '2025-01-26', total: 32.50, status: 'Processing', items: 2, payment: 'Paid' },
+  { id: '#ORD-003', customer: 'Michael Lee', date: '2025-01-25', total: 78.30, status: 'Completed', items: 5, payment: 'Paid' },
+  { id: '#ORD-004', customer: 'Sarah Johnson', date: '2025-01-25', total: 55.20, status: 'Shipping', items: 4, payment: 'Paid' },
+  { id: '#ORD-005', customer: 'David Brown', date: '2025-01-24', total: 29.90, status: 'Cancelled', items: 2, payment: 'Refunded' },
 ];
 
 const getStatusBadge = (status: string) => {
   const statusConfig: any = {
-    'Đang giao': { variant: 'default', className: 'bg-blue-500 hover:bg-blue-600' },
-    'Đang xử lý': { variant: 'secondary', className: 'bg-yellow-500 hover:bg-yellow-600 text-white' },
-    'Hoàn thành': { variant: 'default', className: 'bg-green-500 hover:bg-green-600' },
-    'Đã hủy': { variant: 'destructive', className: '' },
+    'Shipping': { variant: 'default', className: 'bg-blue-500 hover:bg-blue-600' },
+    'Processing': { variant: 'secondary', className: 'bg-yellow-500 hover:bg-yellow-600 text-white' },
+    'Completed': { variant: 'default', className: 'bg-green-500 hover:bg-green-600' },
+    'Cancelled': { variant: 'destructive', className: '' },
   };
   return statusConfig[status] || { variant: 'default', className: '' };
 };

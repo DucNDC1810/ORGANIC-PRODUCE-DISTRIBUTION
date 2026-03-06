@@ -55,57 +55,57 @@ const menuItems: MenuItem[] = [
     id: 'overview', 
     label: 'Overview', 
     icon: LayoutDashboard,
-    description: 'Dashboard và thống kê',
-    ariaLabel: 'Xem tổng quan và thống kê'
+    description: 'Dashboard and analytics',
+    ariaLabel: 'View overview and analytics'
   },
   { 
     id: 'products', 
     label: 'Products', 
     icon: Package,
-    description: 'Quản lý sản phẩm',
-    ariaLabel: 'Quản lý sản phẩm'
+    description: 'Manage products',
+    ariaLabel: 'Manage products'
   },
   { 
     id: 'orders', 
     label: 'Orders', 
     icon: ShoppingCart,
-    description: 'Quản lý đơn hàng',
-    ariaLabel: 'Quản lý đơn hàng'
+    description: 'Manage orders',
+    ariaLabel: 'Manage orders'
   },
   { 
     id: 'customers', 
     label: 'Customers', 
     icon: Users,
-    description: 'Quản lý khách hàng',
-    ariaLabel: 'Quản lý khách hàng'
+    description: 'Manage customers',
+    ariaLabel: 'Manage customers'
   },
   { 
     id: 'categories', 
     label: 'Categories', 
     icon: FolderTree,
-    description: 'Quản lý danh mục',
-    ariaLabel: 'Quản lý danh mục sản phẩm'
+    description: 'Manage categories',
+    ariaLabel: 'Manage product categories'
   },
   { 
     id: 'blogs', 
     label: 'Blog Management', 
     icon: FileText,
-    description: 'Duyệt bài viết người dùng',
-    ariaLabel: 'Quản lý và duyệt bài viết blog'
+    description: 'Review user posts',
+    ariaLabel: 'Manage and review blog posts'
   },
   { 
     id: 'reports', 
     label: 'Reports', 
     icon: BarChart3,
-    description: 'Báo cáo và phân tích',
-    ariaLabel: 'Xem báo cáo và phân tích'
+    description: 'Reports and analytics',
+    ariaLabel: 'View reports and analytics'
   },
   { 
     id: 'settings', 
     label: 'Settings', 
     icon: Settings,
-    description: 'Quản lý tài khoản admin',
-    ariaLabel: 'Cài đặt tài khoản'
+    description: 'Manage admin account',
+    ariaLabel: 'Account settings'
   },
 ] as const;
 
@@ -168,7 +168,7 @@ const MenuItemButton = memo<MenuItemButtonProps>(({ item, isActive, onClick }) =
               ? "bg-white/20 text-white"
               : "bg-red-500 text-white"
           )}
-          aria-label={`${item.badge} mục mới`}
+          aria-label={`${item.badge} new items`}
         >
           {item.badge}
         </span>
@@ -256,7 +256,7 @@ const Sidebar = ({
       {/* Sidebar */}
       <aside
         role="navigation"
-        aria-label="Điều hướng chính"
+        aria-label="Main navigation"
         onKeyDown={handleKeyDown}
         className={cn(
           "fixed lg:fixed top-16 left-0 h-[calc(100vh-4rem)] bg-gradient-to-b from-white to-gray-50/50",
@@ -268,7 +268,7 @@ const Sidebar = ({
         {/* Navigation Menu */}
         <nav 
           className="px-3 py-4 space-y-1 overflow-y-auto h-[calc(100%-7rem)] scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-transparent"
-          aria-label="Menu điều hướng chính"
+          aria-label="Main navigation menu"
         >
           {renderedMenuItems}
         </nav>
@@ -302,8 +302,8 @@ const Sidebar = ({
             <button
               onClick={handleLogout}
               className="flex-shrink-0 p-1.5 rounded-md hover:bg-red-50 transition-colors group"
-              aria-label="Đăng xuất"
-              title="Đăng xuất"
+              aria-label="Log out"
+              title="Log out"
             >
               <LogOut className="w-4 h-4 text-gray-400 group-hover:text-red-500 transition-colors" />
             </button>
