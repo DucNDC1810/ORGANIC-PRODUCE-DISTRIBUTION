@@ -2,7 +2,7 @@ import mongoose, { Document, Schema } from 'mongoose';
 
 export interface IPayment extends Document {
   orderId: mongoose.Types.ObjectId;
-  paymentMethod: 'credit_card' | 'debit_card' | 'cash' | 'bank_transfer' | 'e_wallet' | 'zalopay' | 'momo';
+  paymentMethod: 'credit_card' | 'debit_card' | 'cash' | 'bank_transfer' | 'e_wallet' | 'momo';
   paymentStatus: 'pending' | 'paid' | 'failed' | 'refunded' | 'cancelled';
   paymentDate: Date;
   amount: number;
@@ -25,7 +25,7 @@ const paymentSchema = new Schema<IPayment>(
     },
     paymentMethod: {
       type: String,
-      enum: ['credit_card', 'debit_card', 'cash', 'bank_transfer', 'e_wallet', 'zalopay', 'momo'],
+      enum: ['credit_card', 'debit_card', 'cash', 'bank_transfer', 'e_wallet', 'momo'],
       required: [true, 'Payment method is required']
     },
     paymentStatus: {

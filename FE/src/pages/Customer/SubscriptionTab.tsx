@@ -20,7 +20,6 @@ const FREQUENCY_LABEL: Record<string, string> = {
 const PAYMENT_LABELS: Record<string, string> = {
   cod:     'COD',
   momo:    'MoMo',
-  zalopay: 'ZaloPay',
   cash:    'Tiền mặt',
 };
 

@@ -6,7 +6,7 @@
  *  - Tìm các gói subscription "active" có nextDeliveryDate <= hôm nay
  *  - Tạo Order mới cho mỗi gói
  *  - Cập nhật nextDeliveryDate theo frequency (7 / 14 / 30 ngày)
- *  - Gửi email nhắc thanh toán (MoMo/ZaloPay) hoặc log thành công (COD)
+ *  - Gửi email nhắc thanh toán (MoMo) hoặc log thành công (COD)
  *
  * Ngoài ra còn chạy job nhắc thanh toán lúc 08:00 sáng:
  *  - Tìm đơn subscription với paymentStatus = 'unpaid' và ngày giao là NGÀY MAI
@@ -166,7 +166,7 @@ async function processSubscriptionOrders(): Promise<void> {
           );
         }
       } else {
-        // MoMo / ZaloPay — gửi link thanh toán
+        // MoMo — gửi link thanh toán
         console.log(
           `[SubscriptionCron] 💳 Online-payment order created — Order #${newOrder._id} for user ${user?.email ?? sub.userId}. Awaiting payment.`
         );

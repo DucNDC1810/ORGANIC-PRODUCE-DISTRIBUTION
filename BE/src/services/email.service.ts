@@ -237,7 +237,7 @@ export class EmailService {
     }
   }
 
-  /** Gửi yêu cầu thanh toán online cho đơn hàng định kỳ MoMo/ZaloPay */
+  /** Gửi yêu cầu thanh toán online cho đơn hàng định kỳ MoMo */
   async sendSubscriptionPaymentRequest(
     to: string,
     name: string,
@@ -251,7 +251,7 @@ export class EmailService {
       weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
     });
     const paymentUrl = `${process.env.FRONTEND_URL}/profile?tab=orders&highlight=${orderId}`;
-    const methodLabel = paymentMethod?.toLowerCase() === 'momo' ? 'MoMo' : paymentMethod?.toLowerCase() === 'zalopay' ? 'ZaloPay' : paymentMethod;
+    const methodLabel = paymentMethod?.toLowerCase() === 'momo' ? 'MoMo' : paymentMethod;
 
     const mailOptions = {
       from: `"Organic Produce Distribution" <${process.env.EMAIL_USER}>`,
@@ -313,7 +313,7 @@ export class EmailService {
   ): Promise<void> {
     const formattedAmount = totalAmount.toLocaleString('vi-VN') + ' ₫';
     const paymentUrl = `${process.env.FRONTEND_URL}/profile?tab=orders&highlight=${orderId}`;
-    const methodLabel = paymentMethod?.toLowerCase() === 'momo' ? 'MoMo' : paymentMethod?.toLowerCase() === 'zalopay' ? 'ZaloPay' : paymentMethod;
+    const methodLabel = paymentMethod?.toLowerCase() === 'momo' ? 'MoMo' : paymentMethod;
 
     const mailOptions = {
       from: `"Organic Produce Distribution" <${process.env.EMAIL_USER}>`,

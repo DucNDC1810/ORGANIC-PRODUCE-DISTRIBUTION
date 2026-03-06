@@ -315,13 +315,6 @@ export default function GroupOrderModal({
                             </div>,
                       label: "MoMo",
                     },
-                    {
-                      key: "ZaloPay",
-                      icon: <div className="w-10 h-10 rounded-full border border-gray-200 flex items-center justify-center">
-                              <span className="text-blue-600 text-[9px] font-black leading-none text-center">Zalo<br/>pay</span>
-                            </div>,
-                      label: "Zalopay",
-                    },
                   ].map((m) => (
                     <button
                       key={m.key}
