@@ -352,4 +352,20 @@ export class GroupService {
     await member.save();
     return member;
   }
+
+  /**
+   * Đồng bộ toàn bộ danh sách món của một thành viên (replace, dùng cho Owner sync).
+   * Tự động cập nhật isReady dựa trên số lượng item.
+   */
+  async syncMemberItems(
+    memberId: string,
+    items: { productId: string; name: string; price: number; image: string; qty: number }[]
+  ) {
+    const member = await GroupMember.findByIdAndUpdate(
+      memberId,
+      { cartItems: items, isReady: items.length > 0 },
+      { new: true }
+    ).populate('userId', 'name email');
+    return member;
+  }
 }

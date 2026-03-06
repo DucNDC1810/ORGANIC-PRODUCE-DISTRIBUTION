@@ -104,6 +104,16 @@ export const groupService = {
     return res.data;
   },
 
+  /** PUT /api/groups/:id/members/:memberId/items — Đồng bộ toàn bộ danh sách món (replace, dùng cho Owner sync) */
+  syncGroupItems: async (
+    groupId: string,
+    memberId: string,
+    items: Array<{ productId: string; name: string; price: number; image: string; qty: number }>
+  ): Promise<GroupMember> => {
+    const res: any = await api.put(`/groups/${groupId}/members/${memberId}/items`, { items });
+    return res.data;
+  },
+
   /** POST /api/groups/:id/members/:memberId/wallet-hold — Đặt cọc phần tiền qua ví */
   holdWalletShare: async (
     groupId: string,

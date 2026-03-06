@@ -16,6 +16,7 @@ import {
   Lock,
   Wallet,
   Loader2,
+  ChevronDown,
 } from "lucide-react";
 import { io, type Socket } from "socket.io-client";
 import { motion, AnimatePresence } from "framer-motion";
@@ -67,13 +68,14 @@ export default function GroupMemberPage() {
   const { groupSession, clearGroupSession } = useGroup();
   const { user } = useAuth();
 
-  const [group,      setGroup]      = useState<Group | null>(null);
-  const [members,    setMembers]    = useState<GroupMember[]>([]);
-  const [loading,    setLoading]    = useState(true);
-  const [error,      setError]      = useState("");
-  const [myCart,     setMyCart]     = useState<GroupCartItem[]>([]);
-  const [confirming, setConfirming] = useState(false);
-  const [leaving,    setLeaving]    = useState(false);
+  const [group,           setGroup]           = useState<Group | null>(null);
+  const [members,         setMembers]         = useState<GroupMember[]>([]);
+  const [loading,         setLoading]         = useState(true);
+  const [error,           setError]           = useState("");
+  const [myCart,          setMyCart]          = useState<GroupCartItem[]>([]);
+  const [confirming,      setConfirming]      = useState(false);
+  const [leaving,         setLeaving]         = useState(false);
+  const [expandedMember,  setExpandedMember]  = useState<string | null>(null);
 
   // Hold wallet share
   const [holdConfirm, setHoldConfirm] = useState(false);
@@ -130,6 +132,10 @@ export default function GroupMemberPage() {
     socket.on("member:item_added", (m: GroupMember) => {
       setMembers((prev) => prev.map((x) => (x._id === m._id ? m : x)));
       if (m._id === memberId) setMyCart(m.cartItems ?? []);
+      // Nếu là Owner cập nhật món, tự động mở rộng để Members thấy
+      if (m.role === 'owner' && m.cartItems?.length > 0) {
+        setExpandedMember(m._id);
+      }
     });
     socket.on("member:wallet_paid", (m: GroupMember) => {
       setMembers((prev) => prev.map((x) => (x._id === m._id ? m : x)));
@@ -157,7 +163,9 @@ export default function GroupMemberPage() {
       const me = latestMembers.find((x) => x._id === memberId);
       const memberName   = me ? getMemberName(me) : "Thành viên";
       const subtotal     = latestMyCart.reduce((s, i) => s + i.price * i.qty, 0);
-      const orderedCount = latestMembers.filter((m) => m.isReady).length;
+      const orderedCount = latestMembers.filter((m) =>
+        m.role === 'owner' ? (m.cartItems ?? []).length > 0 : m.isReady
+      ).length;
       const tierIdx      = TIERS.reduce((acc, t, i) => (orderedCount >= t.members ? i : acc), -1);
       const pct          = tierIdx >= 0 ? TIERS[tierIdx].pct : 0;
 
@@ -261,7 +269,10 @@ export default function GroupMemberPage() {
   const isReady     = myMember?.isReady ?? false;
   const isLocked    = group?.status === "locked" || group?.status === "completed";
 
-  const orderedCount  = members.filter((m) => m.isReady).length;
+  // Cho Owner: tính là "đã chọn" khi có ít nhất 1 món trong cartItems
+  const orderedCount  = members.filter((m) =>
+    m.role === 'owner' ? (m.cartItems ?? []).length > 0 : m.isReady
+  ).length;
   const activeTierIdx = TIERS.reduce((acc, t, i) => (orderedCount >= t.members ? i : acc), -1);
   const activePct     = activeTierIdx >= 0 ? TIERS[activeTierIdx].pct : 0;
   const nextTier      = TIERS[activeTierIdx + 1];
@@ -284,9 +295,14 @@ export default function GroupMemberPage() {
   const myDiscountPct = members.length > 0 ? activePct / members.length : 0;
   const myDiscount = Math.round(mySubtotal * myDiscountPct / 100);
 
+  // equal_split: full bill (after group discount + full shipping) divided equally
+  const groupDiscount = Math.round(groupTotal * activePct / 100);
+  const groupNetTotal = groupTotal - groupDiscount + SHIPPING_FEE;
+  const equalShare    = members.length > 0 ? Math.round(groupNetTotal / members.length) : 0;
+
   const myShare =
     paymentOpt === 'equal_split' && members.length > 0
-      ? Math.round(groupTotal / members.length)
+      ? equalShare
       : paymentOpt === 'individual'
         ? mySubtotal + sharedShipping - myDiscount
         : mySubtotal;
@@ -579,8 +595,14 @@ export default function GroupMemberPage() {
             <div className="space-y-2.5">
               <AnimatePresence initial={false}>
               {members.map((m, idx) => {
-                const isMe    = m._id === memberId;
-                const isOwner = m.role === "owner";
+                const isMe       = m._id === memberId;
+                const isOwner    = m.role === "owner";
+                const memberItems = isMe ? myCart : (m.cartItems ?? []);
+                const isExpanded  = expandedMember === m._id;
+                // Trạng thái thực tế: owner được xem là "sẵn sàng" khi có ít nhất 1 món
+                const effectivelyReady = isOwner
+                  ? memberItems.length > 0
+                  : m.isReady;
                 return (
                   <motion.div
                     key={m._id}
@@ -590,62 +612,112 @@ export default function GroupMemberPage() {
                     transition={{ duration: 0.25 }}
                     className="overflow-hidden"
                   >
-                  <div
-                    className={`flex items-center gap-4 p-3.5 rounded-xl border transition-colors ${
-                      isMe
-                        ? "bg-green-50 border-green-100"
-                        : "bg-gray-50 border-gray-100"
-                    }`}
-                  >
-                    {/* Avatar with crown badge */}
-                    <div className="relative flex-shrink-0">
-                      <div className={`w-10 h-10 rounded-full flex items-center justify-center text-xl border-2 shadow-sm ${
-                        isMe ? "border-green-300 bg-green-100" : "border-gray-200 bg-white"
-                      }`}>
-                        {getAvatar(idx)}
-                      </div>
-                      {isOwner && (
-                        <div className="absolute -bottom-1 -right-1 w-5 h-5 bg-orange-400 rounded-full flex items-center justify-center text-[9px] text-white font-bold border-2 border-white">
-                          👑
+                  <div className={`rounded-xl border overflow-hidden ${
+                    isMe ? "border-green-100" : "border-gray-100"
+                  }`}>
+                    {/* Member row */}
+                    <div
+                      className={`flex items-center gap-4 p-3.5 transition-colors ${
+                        isMe ? "bg-green-50" : "bg-gray-50 hover:bg-gray-100"
+                      }`}
+                    >
+                      {/* Avatar with crown badge */}
+                      <div className="relative flex-shrink-0">
+                        <div className={`w-10 h-10 rounded-full flex items-center justify-center text-xl border-2 shadow-sm ${
+                          isMe ? "border-green-300 bg-green-100" : "border-gray-200 bg-white"
+                        }`}>
+                          {getAvatar(idx)}
                         </div>
+                        {isOwner && (
+                          <div className="absolute -bottom-1 -right-1 w-5 h-5 bg-orange-400 rounded-full flex items-center justify-center text-[9px] text-white font-bold border-2 border-white">
+                            👑
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Name & role / item summary */}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className={`text-sm font-semibold truncate ${isMe ? "text-green-700" : "text-gray-900"}`}>
+                            {getMemberName(m)}
+                          </span>
+                          {isMe && (
+                            <span className="text-xs bg-green-100 text-green-700 rounded-full px-2 py-0.5 font-medium flex-shrink-0">
+                              bạn
+                            </span>
+                          )}
+                        </div>
+                        {effectivelyReady && memberItems.length > 0 ? (
+                          <p className="text-xs text-green-600 font-medium mt-0.5">
+                            {memberItems.length} món · {memberItems.reduce((s, i) => s + i.price * i.qty, 0).toLocaleString("vi-VN")}đ
+                          </p>
+                        ) : (
+                          <p className="text-xs text-gray-400 mt-0.5">
+                            {isOwner ? "Chủ nhóm" : "Thành viên"}
+                          </p>
+                        )}
+                      </div>
+
+                      {/* Status badge */}
+                      {effectivelyReady ? (
+                        <span className="flex items-center gap-1 text-xs text-green-600 font-semibold bg-green-50 border border-green-200 px-2.5 py-1 rounded-full flex-shrink-0">
+                          <Check className="w-3 h-3" />
+                          Đã chọn xong
+                        </span>
+                      ) : (
+                        <span className="text-xs text-yellow-600 font-semibold bg-yellow-50 border border-yellow-200 px-2.5 py-1 rounded-full flex-shrink-0">
+                          Đang chọn
+                        </span>
+                      )}
+
+                      {/* Wallet payment status badge */}
+                      {m.walletPaid && (
+                        <span className="flex items-center gap-1 text-xs text-teal-700 font-semibold bg-teal-50 border border-teal-200 px-2.5 py-1 rounded-full flex-shrink-0">
+                          <Wallet className="w-3 h-3" />
+                          Đã cọc
+                        </span>
+                      )}
+
+                      {/* Expand toggle – show if member has items */}
+                      {memberItems.length > 0 && (
+                        <button
+                          onClick={() => setExpandedMember(isExpanded ? null : m._id)}
+                          className="w-7 h-7 rounded-full bg-white border border-gray-200 flex items-center justify-center flex-shrink-0 transition-transform duration-200"
+                          style={{ transform: isExpanded ? 'rotate(180deg)' : 'rotate(0deg)' }}
+                        >
+                          <ChevronDown className="w-3.5 h-3.5 text-gray-500" />
+                        </button>
                       )}
                     </div>
 
-                    {/* Name & role */}
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-1.5 flex-wrap">
-                        <span className={`text-sm font-semibold truncate ${isMe ? "text-green-700" : "text-gray-900"}`}>
-                          {getMemberName(m)}
-                        </span>
-                        {isMe && (
-                          <span className="text-xs bg-green-100 text-green-700 rounded-full px-2 py-0.5 font-medium flex-shrink-0">
-                            bạn
+                    {/* Expandable items list */}
+                    {isExpanded && memberItems.length > 0 && (
+                      <div className="divide-y divide-gray-50 bg-white">
+                        {memberItems.map((item, iIdx) => (
+                          <div key={iIdx} className="flex items-center gap-3 px-4 py-2.5">
+                            <div className="w-8 h-8 rounded-lg bg-gray-50 border border-gray-100 flex items-center justify-center overflow-hidden flex-shrink-0">
+                              {item.image?.startsWith('http') ? (
+                                <img src={item.image} alt={item.name} className="w-full h-full object-cover" />
+                              ) : (
+                                <span className="text-base">🛒</span>
+                              )}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-xs text-gray-700 truncate">{item.name}</p>
+                              <p className="text-xs text-gray-400">{item.price.toLocaleString("vi-VN")}đ / phần</p>
+                            </div>
+                            <span className="text-xs text-gray-400 flex-shrink-0">×{item.qty}</span>
+                            <span className="text-xs font-semibold text-gray-900 flex-shrink-0 w-16 text-right">
+                              {(item.price * item.qty).toLocaleString("vi-VN")}đ
+                            </span>
+                          </div>
+                        ))}
+                        <div className="flex justify-end px-4 py-2 bg-green-50">
+                          <span className="text-xs font-bold text-green-700">
+                            Tổng: {memberItems.reduce((s, i) => s + i.price * i.qty, 0).toLocaleString("vi-VN")}đ
                           </span>
-                        )}
+                        </div>
                       </div>
-                      <p className="text-xs text-gray-400 mt-0.5">
-                        {isOwner ? "Chủ nhóm" : "Thành viên"}
-                      </p>
-                    </div>
-
-                    {/* Status badge */}
-                    {m.isReady ? (
-                      <span className="flex items-center gap-1 text-xs text-green-600 font-semibold bg-green-50 border border-green-200 px-2.5 py-1 rounded-full flex-shrink-0">
-                        <Check className="w-3 h-3" />
-                        Đã chọn xong
-                      </span>
-                    ) : (
-                      <span className="text-xs text-yellow-600 font-semibold bg-yellow-50 border border-yellow-200 px-2.5 py-1 rounded-full flex-shrink-0">
-                        Đang chọn
-                      </span>
-                    )}
-
-                    {/* Wallet payment status badge */}
-                    {m.walletPaid && (
-                      <span className="flex items-center gap-1 text-xs text-teal-700 font-semibold bg-teal-50 border border-teal-200 px-2.5 py-1 rounded-full flex-shrink-0">
-                        <Wallet className="w-3 h-3" />
-                        Đã cọc
-                      </span>
                     )}
                   </div>
                   </motion.div>
@@ -670,6 +742,16 @@ export default function GroupMemberPage() {
           {/* ── Group order summary ── */}
           <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
             <h3 className="text-base font-bold text-gray-900 mb-5">Tóm tắt đơn nhóm</h3>
+
+            {/* equal_split banner */}
+            {paymentOpt === 'equal_split' && (
+              <div className="mb-4 flex items-start gap-2 bg-green-50 border border-green-200 rounded-xl px-4 py-3">
+                <span className="text-lg flex-shrink-0 mt-0.5">⚖️</span>
+                <p className="text-sm text-green-700 font-medium leading-snug">
+                  Nhóm đang chia đều hóa đơn. Mọi người cùng đóng góp một khoản bằng nhau.
+                </p>
+              </div>
+            )}
 
             {/* Per-member rows */}
             <div className="space-y-2.5 mb-4">
@@ -699,37 +781,69 @@ export default function GroupMemberPage() {
               })}
             </div>
 
-            <div className="border-t border-gray-100 pt-4 space-y-2.5 text-sm text-gray-600">
-              {paymentOpt !== 'individual' && (
+            {paymentOpt === 'equal_split' ? (
+              /* ── equal_split breakdown ── */
+              <div className="border-t border-gray-100 pt-4 space-y-2.5 text-sm text-gray-600">
                 <div className="flex justify-between">
                   <span>Tạm tính (cả nhóm)</span>
                   <span className="font-semibold text-gray-900">{fmtVND(groupTotal)}</span>
                 </div>
-              )}
-              {paymentOpt === 'individual' && sharedShipping > 0 && (
+                <div className="flex justify-between">
+                  <span>Phí giao hàng</span>
+                  <span className="font-semibold text-gray-900">{fmtVND(SHIPPING_FEE)}</span>
+                </div>
+                {activePct > 0 && (
+                  <div className="flex justify-between text-green-600">
+                    <span>Ưu đãi nhóm ({activePct}%)</span>
+                    <span className="font-medium">−{fmtVND(groupDiscount)}</span>
+                  </div>
+                )}
                 <div className="flex justify-between text-gray-500">
-                  <span>Phí ship (phần của bạn)</span>
-                  <span className="font-medium">+{fmtVND(sharedShipping)}</span>
+                  <span>Số lượng thành viên</span>
+                  <span className="font-medium">{members.length} người</span>
                 </div>
-              )}
-              {paymentOpt === 'individual' && myDiscount > 0 && (
-                <div className="flex justify-between text-green-600">
-                  <span>Ưu đãi của bạn ({myDiscountPct.toFixed(1).replace(/\.0$/, '')}%)</span>
-                  <span className="font-medium">−{fmtVND(myDiscount)}</span>
+                <div className="border-t border-green-100 pt-2.5 flex justify-between">
+                  <span className="font-bold text-gray-900">Tổng hóa đơn nhóm</span>
+                  <span className="font-extrabold text-green-600 text-base">{fmtVND(groupNetTotal)}</span>
                 </div>
-              )}
-              
-              <div className="border-t border-gray-100 pt-2.5 flex justify-between">
-                <span className="font-bold text-gray-900">Tổng cộng2</span>
-                <span className="font-extrabold text-green-600 text-base">
-                  {fmtVND(groupTotal)}
-                </span>
+                <div className="bg-green-50 rounded-xl px-4 py-3 flex justify-between items-center">
+                  <span className="font-bold text-green-800 text-sm">Phần đóng góp của bạn</span>
+                  <span className="font-extrabold text-green-600 text-lg">{fmtVND(equalShare)}</span>
+                </div>
               </div>
-              <p className="text-xs text-gray-400 text-center">
-                {paymentOpt === 'individual' ? 'Bạn cần thanh toán' : paymentOpt === 'equal_split' ? 'Phần của bạn (chia đều)' : 'Phần của bạn'}:{" "}
-                <span className="font-semibold text-gray-700">{fmtVND(myShare)}</span>
-              </p>
-            </div>
+            ) : (
+              /* ── individual / owner_only breakdown ── */
+              <div className="border-t border-gray-100 pt-4 space-y-2.5 text-sm text-gray-600">
+                {paymentOpt !== 'individual' && (
+                  <div className="flex justify-between">
+                    <span>Tạm tính (cả nhóm)</span>
+                    <span className="font-semibold text-gray-900">{fmtVND(groupTotal)}</span>
+                  </div>
+                )}
+                {paymentOpt === 'individual' && sharedShipping > 0 && (
+                  <div className="flex justify-between text-gray-500">
+                    <span>Phí ship (phần của bạn)</span>
+                    <span className="font-medium">+{fmtVND(sharedShipping)}</span>
+                  </div>
+                )}
+                {paymentOpt === 'individual' && myDiscount > 0 && (
+                  <div className="flex justify-between text-green-600">
+                    <span>Ưu đãi của bạn ({myDiscountPct.toFixed(1).replace(/\.0$/, '')}%)</span>
+                    <span className="font-medium">−{fmtVND(myDiscount)}</span>
+                  </div>
+                )}
+                <div className="border-t border-gray-100 pt-2.5 flex justify-between">
+                  <span className="font-bold text-gray-900">Tổng cộng</span>
+                  <span className="font-extrabold text-green-600 text-base">
+                    {fmtVND(groupTotal)}
+                  </span>
+                </div>
+                <p className="text-xs text-gray-400 text-center">
+                  {paymentOpt === 'individual' ? 'Bạn cần thanh toán' : 'Phần của bạn'}:{" "}
+                  <span className="font-semibold text-gray-700">{fmtVND(myShare)}</span>
+                </p>
+              </div>
+            )}
 
             {/* ── Wallet-hold CTA ── */}
             {myMember?.role !== 'owner' && (
@@ -772,11 +886,13 @@ export default function GroupMemberPage() {
                   ) : (
                     <button
                       onClick={() => setHoldConfirm(true)}
-                      disabled={mySubtotal === 0 || !isReady}
+                      disabled={(paymentOpt === 'equal_split' ? equalShare <= 0 : mySubtotal === 0) || !isReady}
                       className="mt-3 w-full py-3 rounded-xl bg-gradient-to-r from-teal-500 to-emerald-500 text-white text-sm font-bold shadow hover:from-teal-600 hover:to-emerald-600 active:scale-[0.98] transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       <Wallet className="w-4 h-4" />
-                      Thanh toán phần tôi{mySubtotal > 0 ? ` · ${fmtVND(myShare)}` : ''}
+                      {paymentOpt === 'equal_split'
+                        ? `Đóng góp phần chia đều · ${fmtVND(equalShare)}`
+                        : `Thanh toán phần tôi${mySubtotal > 0 ? ` · ${fmtVND(myShare)}` : ''}`}
                     </button>
                   )
                 )}
@@ -793,22 +909,27 @@ export default function GroupMemberPage() {
           <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
             <h3 className="text-sm font-bold text-gray-900 mb-3">Trạng thái thành viên</h3>
             <div className="flex items-center gap-2 flex-wrap">
-              {members.map((m, idx) => (
-                <div key={m._id} title={getMemberName(m)} className="relative">
-                  <div className={`w-10 h-10 rounded-full border-2 flex items-center justify-center text-xl ${
-                    m.isReady
-                      ? "border-green-400 bg-green-50"
-                      : "border-yellow-300 bg-yellow-50"
-                  }`}>
-                    {getAvatar(idx)}
-                  </div>
-                  {m.isReady && (
-                    <div className="absolute -bottom-0.5 -right-0.5 w-4 h-4 bg-green-500 rounded-full border-2 border-white flex items-center justify-center">
-                      <Check className="w-2 h-2 text-white" />
+              {members.map((m, idx) => {
+                const avatarReady = m.role === 'owner'
+                  ? (m.cartItems ?? []).length > 0
+                  : m.isReady;
+                return (
+                  <div key={m._id} title={getMemberName(m)} className="relative">
+                    <div className={`w-10 h-10 rounded-full border-2 flex items-center justify-center text-xl ${
+                      avatarReady
+                        ? "border-green-400 bg-green-50"
+                        : "border-yellow-300 bg-yellow-50"
+                    }`}>
+                      {getAvatar(idx)}
                     </div>
-                  )}
+                    {avatarReady && (
+                      <div className="absolute -bottom-0.5 -right-0.5 w-4 h-4 bg-green-500 rounded-full border-2 border-white flex items-center justify-center">
+                        <Check className="w-2 h-2 text-white" />
+                      </div>
+                    )}
                 </div>
-              ))}
+                );
+              })}
             </div>
             <p className="text-xs text-gray-400 mt-3">
               {orderedCount}/{members.length} đã xác nhận xong
@@ -871,7 +992,9 @@ export default function GroupMemberPage() {
             {/* Header */}
             <div className="flex items-center gap-2 px-6 py-4 bg-gradient-to-r from-teal-500 to-emerald-500 text-white">
               <Wallet className="w-5 h-5" />
-              <h3 className="text-lg font-bold flex-1">Đặt cọc phần của bạn</h3>
+              <h3 className="text-lg font-bold flex-1">
+                {paymentOpt === 'equal_split' ? 'Đóng góp phần chia đều' : 'Đặt cọc phần của bạn'}
+              </h3>
             </div>
 
             <div className="p-6 space-y-4">

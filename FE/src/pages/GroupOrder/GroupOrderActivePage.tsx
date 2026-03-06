@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useGroup } from "../../context/GroupContext";
 import {
@@ -114,6 +114,9 @@ export default function GroupOrderActivePage() {
     groupId ? `${window.location.origin}/join-group/${groupId}` : ""
   );
 
+  // Owner's member ID in DB – for syncing cart items to server
+  const ownerMemberIdRef = useRef<string | null>(null);
+
   // Place order / cancel state
   const [placeOrderLoading,  setPlaceOrderLoading]  = useState(false);
   const [cancelLoading,      setCancelLoading]      = useState(false);
@@ -135,10 +138,39 @@ export default function GroupOrderActivePage() {
       .then(([ms, g]) => {
         setMembers(ms);
         if (g.paymentOption) setPaymentOption(g.paymentOption);
+        // Lưu lại memberId của Owner để dùng cho việc đồng bộ giỏ hàng
+        const ownerMember = ms.find((m) => m.role === 'owner');
+        if (ownerMember) ownerMemberIdRef.current = ownerMember._id;
       })
       .catch(console.error)
       .finally(() => setMembersLoading(false));
   }, [groupId]);
+
+  // ── Đồng bộ giỏ của Owner lên DB mỗi khi cart thay đổi (debounce 800ms) ──
+  const syncOwnerCart = useCallback(
+    (items: CartItem[]) => {
+      const ownerId = ownerMemberIdRef.current;
+      if (!groupId || !ownerId) return;
+      const payload = items.map((i) => ({
+        productId: i.productId || String(i.id),
+        name:      i.name,
+        price:     i.price,
+        image:     i.image,
+        qty:       i.qty,
+      }));
+      groupService.syncGroupItems(groupId, ownerId, payload).catch(() => {
+        // silent fail – trạng thái có thể sync lại lần sau
+      });
+    },
+    [groupId]
+  );
+
+  const syncTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => {
+    if (syncTimerRef.current) clearTimeout(syncTimerRef.current);
+    syncTimerRef.current = setTimeout(() => syncOwnerCart(cart), 800);
+    return () => { if (syncTimerRef.current) clearTimeout(syncTimerRef.current); };
+  }, [cart, syncOwnerCart]);
 
   // ── Socket.io – realtime khi có thành viên mới join ─────────────────────
   useEffect(() => {
@@ -220,13 +252,24 @@ export default function GroupOrderActivePage() {
   const ownerSharedShipping = members.length > 0 ? Math.round(25000 / members.length) : 25000;
   const ownerDiscountPct = members.length > 0 ? activePct / members.length : activePct;
   const ownerDiscount = Math.round(ownerCartSubtotal * ownerDiscountPct / 100);
+
+  // equal_split rounding: non-owner members pay ceil, owner pays remainder
+  const groupNetTotal    = total + 25000;
+  const nonOwnerCount    = members.filter((m) => m.role !== 'owner').length;
+  const memberEqualShare = members.length > 0 ? Math.ceil(groupNetTotal / members.length) : groupNetTotal;
+  const ownerEqualShare  = Math.max(0, groupNetTotal - nonOwnerCount * memberEqualShare);
+  const allNonOwnerPaid  = nonOwnerCount > 0 && members.filter((m) => m.role !== 'owner').every((m) => m.walletPaid);
+
   const allOrdered = members.length > 0 && members.every(isMemberOrdered);
 
   // Total amount already held from members' wallets (deposits)
   const totalHeld      = members
     .filter((m) => m.walletPaid)
     .reduce((s, m) => s + (m.walletHoldAmount ?? 0), 0);
-  const ownerRemaining = Math.max(0, total + 25000 - totalHeld);
+  // For equal_split: owner pays a fixed ownerEqualShare regardless of what others held
+  const ownerRemaining = paymentOption === 'equal_split'
+    ? ownerEqualShare
+    : Math.max(0, total + 25000 - totalHeld);
 
   const handleCopy = () => {
     navigator.clipboard.writeText(inviteLink).catch(() => {});
@@ -588,7 +631,12 @@ export default function GroupOrderActivePage() {
                             {fmtVND(memberItems.reduce((s, i) => s + i.price * i.qty, 0))}
                           </p>
                         )}
-                        {paymentOption !== 'individual' && (
+                        {paymentOption === 'equal_split' && (
+                          <p className="text-xs text-teal-600 font-medium mt-0.5">
+                            Phần đóng góp: {fmtVND(m.role === 'owner' ? ownerEqualShare : memberEqualShare)}
+                          </p>
+                        )}
+                        {paymentOption !== 'individual' && paymentOption !== 'equal_split' && (
                           <p className="text-xs text-gray-400 mt-0.5">
                             {m.isReady ? `Đã chọn ${memberItems.length} món` : "Chưa chọn món"}
                           </p>
@@ -609,7 +657,9 @@ export default function GroupOrderActivePage() {
                       {m.walletPaid && (
                         <span className="flex items-center gap-1 text-xs text-teal-700 font-semibold bg-teal-50 border border-teal-200 px-2.5 py-1 rounded-full">
                           <Wallet className="w-3 h-3" />
-                          Đã cọc {m.walletHoldAmount ? `${m.walletHoldAmount.toLocaleString("vi-VN")}đ` : ""}
+                          {paymentOption === 'equal_split'
+                            ? 'Đã đóng góp'
+                            : `Đã cọc ${m.walletHoldAmount ? `${m.walletHoldAmount.toLocaleString("vi-VN")}đ` : ""}`}
                         </span>
                       )}
                       {/* Expand toggle */}
@@ -710,8 +760,8 @@ export default function GroupOrderActivePage() {
                 const memberCart = m.role === "owner" ? cart : (m.cartItems ?? []);
                 const rawAmount  = memberCart.reduce((s, i) => s + i.price * i.qty, 0);
                 const memberShare =
-                  paymentOption === 'equal_split' && members.length > 0
-                    ? Math.round((total + 25000) / members.length)
+                  paymentOption === 'equal_split'
+                    ? (m.role === 'owner' ? ownerEqualShare : memberEqualShare)
                     : rawAmount;
                 return (
                   <div key={m._id} className="flex items-center gap-3">
@@ -786,7 +836,7 @@ export default function GroupOrderActivePage() {
                     <span className={`font-bold ${
                       ownerRemaining === 0 ? "text-teal-700" : "text-orange-700"
                     }`}>
-                      {paymentOption === 'equal_split' ? 'Phần của bạn (chia đều)' : paymentOption === 'individual' ? 'Phần của bạn' : 'Chủ nhóm cần trả nốt'}
+                      {paymentOption === 'equal_split' ? 'Phần của bạn (Owner)' : paymentOption === 'individual' ? 'Phần của bạn' : 'Chủ nhóm cần trả nốt'}
                     </span>
                     <span className={`font-extrabold text-base ${
                       ownerRemaining === 0 ? "text-teal-600" : "text-orange-600"
@@ -903,7 +953,7 @@ export default function GroupOrderActivePage() {
                 setShowPlaceConfirm(true);
               }
             }}
-            disabled={placeOrderLoading || cart.length === 0}
+            disabled={placeOrderLoading || cart.length === 0 || (paymentOption === 'equal_split' && !allNonOwnerPaid)}
             className="w-full py-4 rounded-2xl bg-gradient-to-r from-green-600 to-emerald-500 text-white text-base font-extrabold shadow-lg hover:from-green-700 hover:to-emerald-600 active:scale-[0.98] transition-all duration-150 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {placeOrderLoading ? (
@@ -916,7 +966,12 @@ export default function GroupOrderActivePage() {
               <><ShoppingCart className="w-5 h-5" /> Chốt đơn hàng nhóm →</>
             )}
           </button>
-          {!allOrdered && (
+          {paymentOption === 'equal_split' && !allNonOwnerPaid && nonOwnerCount > 0 && (
+            <p className="text-center text-xs text-amber-500 font-medium -mt-1">
+              ⚠ Còn {members.filter((m) => m.role !== 'owner' && !m.walletPaid).length}/{nonOwnerCount} thành viên chưa đóng góp
+            </p>
+          )}
+          {!allOrdered && !(paymentOption === 'equal_split' && !allNonOwnerPaid) && (
             <p className="text-center text-xs text-amber-500 font-medium -mt-1">
               ⚠ Còn {members.filter((m) => !m.isReady).length} thành viên chưa chọn món
             </p>
@@ -995,7 +1050,7 @@ export default function GroupOrderActivePage() {
                   <span className={`font-bold ${
                     ownerRemaining === 0 ? "text-teal-700" : "text-orange-700"
                   }`}>
-                    {paymentOption === 'equal_split' ? 'Phần của bạn (chia đều)' : paymentOption === 'individual' ? 'Phần của bạn' : 'Chủ nhóm cần trả nốt'}
+                    {paymentOption === 'equal_split' ? 'Phần của bạn (Owner)' : paymentOption === 'individual' ? 'Phần của bạn' : 'Chủ nhóm cần trả nốt'}
                   </span>
                   <span className={`font-extrabold ${
                     ownerRemaining === 0 ? "text-teal-600" : "text-orange-600"
