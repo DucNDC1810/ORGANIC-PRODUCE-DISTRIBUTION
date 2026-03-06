@@ -201,13 +201,6 @@ export default function ProductsPage() {
                   <SelectItem value="fruits">Fruits</SelectItem>
                   <SelectItem value="grains">Grains</SelectItem>
                   <SelectItem value="dairy">Dairy</SelectItem>
-                  <SelectItem value="meat">Meat</SelectItem>
-                  <SelectItem value="seafood">Seafood</SelectItem>
-                  <SelectItem value="herbs">Herbs</SelectItem>
-                  <SelectItem value="nuts">Nuts</SelectItem>
-                  <SelectItem value="beverages">Beverages</SelectItem>
-                  <SelectItem value="processed">Processed Foods</SelectItem>
-                  <SelectItem value="other">Other</SelectItem>
                 </SelectContent>
               </Select>
 
