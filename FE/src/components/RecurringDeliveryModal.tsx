@@ -31,27 +31,27 @@ const DEFAULT_DATA: RecurringData = {
 };
 
 const FREQUENCY_LABELS: Record<string, string> = {
-  weekly: "Hàng tuần",
-  biweekly: "2 tuần / lần",
-  monthly: "Hàng tháng",
+  weekly: "Weekly",
+  biweekly: "Every 2 weeks",
+  monthly: "Monthly",
 };
 
 const DAY_LABELS: Record<string, string> = {
-  monday: "Thứ Hai",
-  tuesday: "Thứ Ba",
-  wednesday: "Thứ Tư",
-  thursday: "Thứ Năm",
-  friday: "Thứ Sáu",
-  saturday: "Thứ Bảy",
-  sunday: "Chủ Nhật",
+  monday: "Monday",
+  tuesday: "Tuesday",
+  wednesday: "Wednesday",
+  thursday: "Thursday",
+  friday: "Friday",
+  saturday: "Saturday",
+  sunday: "Sunday",
 };
 
 const DURATION_LABELS: Record<string, string> = {
-  "1": "1 tháng",
-  "3": "3 tháng",
-  "6": "6 tháng",
-  "12": "12 tháng",
-  unlimited: "Không giới hạn",
+  "1": "1 month",
+  "3": "3 months",
+  "6": "6 months",
+  "12": "12 months",
+  unlimited: "Unlimited",
 };
 
 export { FREQUENCY_LABELS, DAY_LABELS, DURATION_LABELS };
@@ -158,7 +158,7 @@ export default function RecurringDeliveryModal({
             <X className="w-5 h-5 text-gray-500" />
           </button>
           <h2 className="text-base font-semibold text-gray-900">
-            Đặt hẹn giao định kỳ
+            Schedule Recurring Delivery
           </h2>
         </div>
 
@@ -168,15 +168,15 @@ export default function RecurringDeliveryModal({
           <div className="flex items-start gap-3 p-3 bg-blue-50 border border-blue-200 rounded-xl">
             <Calendar className="w-4 h-4 text-blue-600 mt-0.5 flex-shrink-0" />
             <p className="text-sm text-blue-700">
-              Lên lịch giao hàng định kỳ để tiết kiệm thời gian và nhận ưu đãi
-              giảm <strong>5%</strong> mỗi đơn!
+              Schedule recurring deliveries to save time and get{" "}
+              <strong>5%</strong> off every order!
             </p>
           </div>
 
           {/* Frequency */}
           <div>
             <label className="block text-xs font-medium text-gray-600 mb-1">
-              Tần suất giao hàng
+              Delivery frequency
             </label>
             <select
               name="recurringFrequency"
@@ -184,9 +184,9 @@ export default function RecurringDeliveryModal({
               onChange={handleChange}
               className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-gray-400 text-sm appearance-none bg-white"
             >
-              <option value="weekly">Hàng tuần</option>
-              <option value="biweekly">Mỗi 2 tuần</option>
-              <option value="monthly">Hàng tháng</option>
+              <option value="weekly">Weekly</option>
+              <option value="biweekly">Every 2 weeks</option>
+              <option value="monthly">Monthly</option>
             </select>
           </div>
 
@@ -194,7 +194,7 @@ export default function RecurringDeliveryModal({
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-xs font-medium text-gray-600 mb-1">
-                {data.recurringFrequency === "monthly" ? "Ngày trong tháng" : "Thứ trong tuần"}
+                {data.recurringFrequency === "monthly" ? "Day of the month" : "Day of the week"}
               </label>
               {data.recurringFrequency === "monthly" ? (
                 <select
@@ -205,7 +205,7 @@ export default function RecurringDeliveryModal({
                 >
                   {Array.from({ length: 28 }, (_, i) => i + 1).map((d) => (
                     <option key={d} value={String(d)}>
-                      Ngày {d}
+                      Day {d}
                     </option>
                   ))}
                 </select>
@@ -216,20 +216,20 @@ export default function RecurringDeliveryModal({
                   onChange={handleChange}
                   className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-gray-400 text-sm appearance-none bg-white"
                 >
-                  <option value="monday">Thứ Hai</option>
-                  <option value="tuesday">Thứ Ba</option>
-                  <option value="wednesday">Thứ Tư</option>
-                  <option value="thursday">Thứ Năm</option>
-                  <option value="friday">Thứ Sáu</option>
-                  <option value="saturday">Thứ Bảy</option>
-                  <option value="sunday">Chủ Nhật</option>
+                  <option value="monday">Monday</option>
+                  <option value="tuesday">Tuesday</option>
+                  <option value="wednesday">Wednesday</option>
+                  <option value="thursday">Thursday</option>
+                  <option value="friday">Friday</option>
+                  <option value="saturday">Saturday</option>
+                  <option value="sunday">Sunday</option>
                 </select>
               )}
             </div>
 
             <div>
               <label className="block text-xs font-medium text-gray-600 mb-1">
-                Thời gian duy trì
+                Duration
               </label>
               <select
                 name="recurringDuration"
@@ -237,11 +237,11 @@ export default function RecurringDeliveryModal({
                 onChange={handleChange}
                 className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-gray-400 text-sm appearance-none bg-white"
               >
-                <option value="1">1 tháng</option>
-                <option value="3">3 tháng</option>
-                <option value="6">6 tháng</option>
-                <option value="12">12 tháng</option>
-                <option value="unlimited">Không giới hạn</option>
+                <option value="1">1 month</option>
+                <option value="3">3 months</option>
+                <option value="6">6 months</option>
+                <option value="12">12 months</option>
+                <option value="unlimited">Unlimited</option>
               </select>
             </div>
           </div>
@@ -249,7 +249,7 @@ export default function RecurringDeliveryModal({
           {/* Start date */}
           <div>
             <label className="block text-xs font-medium text-gray-600 mb-1">
-              Ngày bắt đầu <span className="text-red-500">*</span>
+              Start date <span className="text-red-500">*</span>
             </label>
             <input
               type="date"
@@ -265,8 +265,8 @@ export default function RecurringDeliveryModal({
           {isEdgeCase && (
             <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl space-y-2">
               <p className="text-xs font-semibold text-amber-800">
-                Ngày bắt đầu bạn chọn đúng vào{" "}
-                {DAY_LABELS[data.recurringDay]} — bạn muốn:
+                Your start date falls on a{" "}
+                {DAY_LABELS[data.recurringDay]} — would you like to:
               </p>
               <label className="flex items-center gap-2 cursor-pointer">
                 <input
@@ -278,7 +278,7 @@ export default function RecurringDeliveryModal({
                   className="accent-green-600"
                 />
                 <span className="text-xs text-amber-900 font-medium">
-                  Giao ngay hôm nay ({data.recurringStartDate.split("-").reverse().join("/")})
+                  Deliver today ({data.recurringStartDate.split("-").reverse().join("/")})
                 </span>
               </label>
               <label className="flex items-center gap-2 cursor-pointer">
@@ -291,7 +291,7 @@ export default function RecurringDeliveryModal({
                   className="accent-green-600"
                 />
                 <span className="text-xs text-amber-900 font-medium">
-                  Bắt đầu từ {DAY_LABELS[data.recurringDay]} tuần sau
+                  Start from next {DAY_LABELS[data.recurringDay]}
                 </span>
               </label>
             </div>
@@ -302,7 +302,7 @@ export default function RecurringDeliveryModal({
             <div className="flex items-center gap-2.5 p-3 bg-green-50 border border-green-200 rounded-xl">
               <Truck className="w-4 h-4 text-green-600 flex-shrink-0" />
               <p className="text-sm text-green-800">
-                Ngày nhận hàng đầu tiên:{" "}
+                First delivery date:{" "}
                 <span className="font-bold">{formatDateVN(firstDelivery)}</span>
               </p>
             </div>
@@ -312,29 +312,29 @@ export default function RecurringDeliveryModal({
           {data.recurringStartDate && (
             <div className="p-3 bg-gray-50 rounded-xl border border-gray-200">
               <p className="text-xs font-medium text-gray-700 mb-1">
-                Tóm tắt lịch giao hàng:
+                Delivery schedule summary:
               </p>
               <p className="text-xs text-gray-600 leading-relaxed">
-                Giao{" "}
+                Deliver{" "}
                 <span className="font-semibold text-gray-900">
                   {FREQUENCY_LABELS[data.recurringFrequency]}
                 </span>{" "}
                 {data.recurringFrequency === "monthly" ? (
                   <>
-                    vào{" "}
+                    on{" "}
                     <span className="font-semibold text-gray-900">
-                      ngày {data.recurringDay} hàng tháng
+                      day {data.recurringDay} of each month
                     </span>
                   </>
                 ) : (
                   <>
-                    vào{" "}
+                    on{" "}
                     <span className="font-semibold text-gray-900">
                       {DAY_LABELS[data.recurringDay]}
                     </span>
                   </>
                 )}
-                , trong{" "}
+                , for{" "}
                 <span className="font-semibold text-gray-900">
                   {DURATION_LABELS[data.recurringDuration]}
                 </span>
@@ -351,7 +351,7 @@ export default function RecurringDeliveryModal({
             disabled={!data.recurringStartDate}
             className="w-full py-3 rounded-xl bg-gray-900 text-white text-sm font-semibold hover:bg-black transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
           >
-            Xác nhận
+            Confirm
           </button>
         </div>
       </div>

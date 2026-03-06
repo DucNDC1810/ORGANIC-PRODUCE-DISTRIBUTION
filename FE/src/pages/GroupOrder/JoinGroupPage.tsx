@@ -41,7 +41,7 @@ export default function JoinGroupPage() {
     groupService
       .getGroup(groupId)
       .then(setGroup)
-      .catch(() => setGroupError("Không tìm thấy nhóm hoặc nhóm đã đóng."))
+      .catch(() => setGroupError("Group not found or already closed."))
       .finally(() => setLoadingGroup(false));
   }, [groupId, isAuthenticated]);
 
@@ -62,7 +62,7 @@ export default function JoinGroupPage() {
       });
       setJoined(true);
     } catch (err: any) {
-      setError(err?.response?.data?.message ?? "Có lỗi xảy ra. Vui lòng thử lại.");
+      setError(err?.response?.data?.message ?? "An error occurred. Please try again.");
     } finally {
       setJoining(false);
     }
@@ -110,7 +110,7 @@ export default function JoinGroupPage() {
           <div className="w-16 h-16 rounded-full bg-red-50 flex items-center justify-center mx-auto mb-4">
             <Users className="w-8 h-8 text-red-400" />
           </div>
-          <h2 className="text-xl font-extrabold text-gray-900 mb-2">Nhóm không tồn tại</h2>
+          <h2 className="text-xl font-extrabold text-gray-900 mb-2">Group not found</h2>
           <p className="text-sm text-gray-500">{groupError}</p>
         </div>
       </div>
@@ -125,11 +125,11 @@ export default function JoinGroupPage() {
           <div className="w-16 h-16 rounded-full bg-green-50 flex items-center justify-center mx-auto mb-4">
             <CheckCircle className="w-8 h-8 text-green-500" />
           </div>
-          <h2 className="text-2xl font-extrabold text-gray-900 mb-2">Đã tham gia nhóm!</h2>
+          <h2 className="text-2xl font-extrabold text-gray-900 mb-2">You've joined the group!</h2>
           <p className="text-sm text-gray-500 leading-relaxed">
-            Bạn (<span className="font-bold text-gray-700">{user?.name}</span>) đã được thêm vào nhóm{" "}
+            You (<span className="font-bold text-gray-700">{user?.name}</span>) have been added to the group{" "}
             <span className="font-bold text-gray-700">"{group.groupName}"</span>.{" "}
-            Chủ nhóm sẽ thấy tên bạn trong danh sách thành viên.
+            The group owner will see your name in the members list.
           </p>
 
           {/* Nút hành động chính */}
@@ -138,13 +138,13 @@ export default function JoinGroupPage() {
             className="mt-6 w-full py-3.5 rounded-2xl bg-gradient-to-r from-green-600 to-emerald-500 text-white font-bold text-base hover:from-green-700 hover:to-emerald-600 active:scale-[0.98] transition-all flex items-center justify-center gap-2 shadow-lg"
           >
             <ShoppingBag className="w-5 h-5" />
-            Bắt đầu chọn món ngay
+            Start selecting items
           </button>
 
           {/* Thông báo đếm ngược */}
           <p className="mt-3 text-xs text-gray-400">
-            Đang chuyển bạn đến menu sau{" "}
-            <span className="font-semibold text-green-600">{countdown}</span> giây...
+            Redirecting to menu in{" "}
+            <span className="font-semibold text-green-600">{countdown}</span> seconds...
           </p>
         </div>
       </div>
@@ -160,7 +160,7 @@ export default function JoinGroupPage() {
           <div className="w-14 h-14 rounded-full bg-white/20 flex items-center justify-center mx-auto mb-3">
             <Users className="w-7 h-7 text-white" />
           </div>
-          <p className="text-green-100 text-xs font-medium mb-1">Bạn được mời tham gia nhóm</p>
+          <p className="text-green-100 text-xs font-medium mb-1">You're invited to join</p>
           <h1 className="text-xl font-extrabold text-white leading-tight">
             {group.groupName}
           </h1>
@@ -174,7 +174,7 @@ export default function JoinGroupPage() {
               {user?.name?.charAt(0).toUpperCase() ?? "?"}
             </div>
             <div className="min-w-0">
-              <p className="text-xs text-gray-500 font-medium">Tham gia với tên</p>
+              <p className="text-xs text-gray-500 font-medium">Joining as</p>
               <p className="text-sm font-bold text-gray-800 truncate">{user?.name}</p>
             </div>
           </div>
@@ -189,9 +189,9 @@ export default function JoinGroupPage() {
             className="w-full py-3.5 rounded-2xl bg-green-600 text-white font-bold text-base hover:bg-green-700 active:scale-[0.98] transition-all disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2"
           >
             {joining ? (
-              <><Loader2 className="w-4 h-4 animate-spin" /> Đang tham gia...</>
+              <><Loader2 className="w-4 h-4 animate-spin" /> Joining...</>
             ) : (
-              <><LogIn className="w-4 h-4" /> Tham gia nhóm →</>
+              <><LogIn className="w-4 h-4" /> Join Group →</>
             )}
           </button>
         </div>

@@ -52,11 +52,11 @@ export default function GroupOrderSuccess() {
   const navigate = useNavigate();
 
   const state = (location.state as SuccessState) || {};
-  const memberName      = state.memberName      || 'Bạn';
+  const memberName      = state.memberName      || 'You';
   const myCart          = state.myCart          || [];
   const mySubtotal      = state.mySubtotal      || 0;
   const walletHoldAmount = state.walletHoldAmount ?? 0;
-  const groupName       = state.groupName       || 'Đơn hàng nhóm';
+  const groupName       = state.groupName       || 'Group Order';
   const activePct       = state.activePct       || 0;
 
   // Generate confetti once on mount
@@ -121,14 +121,14 @@ export default function GroupOrderSuccess() {
 
             <div>
               <h1 className="text-2xl sm:text-3xl font-extrabold text-gray-900">
-                Đơn hàng đã được xác nhận! 🎉
+                Order Confirmed! 🎉
               </h1>
               <p className="mt-2 text-gray-600 text-base sm:text-lg leading-relaxed">
-                Chúc mừng{' '}
+                Congratulations{' '}
                 <span className="font-bold text-green-600">{memberName}</span>!{' '}
-                Đơn hàng của nhóm{' '}
-                <span className="font-semibold text-gray-800">{groupName}</span>{' '}
-                đã được xác nhận thành công.
+                The group order{' '}
+                <span className="font-semibold text-gray-800">{groupName}</span>
+                {' '}has been confirmed successfully.
               </p>
             </div>
           </motion.div>
@@ -142,13 +142,13 @@ export default function GroupOrderSuccess() {
               <Wallet className="w-6 h-6 text-green-600" />
             </div>
             <div>
-              <h3 className="font-bold text-green-800 text-sm mb-1">Lịch sử đặt cọc</h3>
+              <h3 className="font-bold text-green-800 text-sm mb-1">Deposit History</h3>
               <p className="text-sm text-green-700 leading-relaxed">
-                Số tiền{' '}
+                The amount{' '}
                 <span className="font-extrabold text-green-600">
                   {fmtVND(walletHoldAmount)}
                 </span>{' '}
-                đã được trừ từ ví FreshMarket của bạn để thanh toán cho các món trong đơn này.
+                has been deducted from your FreshMarket wallet to pay for items in this order.
               </p>
             </div>
           </motion.div>
@@ -161,9 +161,9 @@ export default function GroupOrderSuccess() {
             >
               <Star className="w-5 h-5 text-amber-500 flex-shrink-0" />
               <p className="text-sm text-amber-800">
-                Nhóm bạn đã đạt{' '}
-                <span className="font-bold">ưu đãi {activePct}%</span>{' '}
-                — phần chiết khấu đã được tính vào đơn hàng. 🎊
+                Your group achieved a{' '}
+                <span className="font-bold">{activePct}% discount</span>{' '}
+                — the discount has been applied to the order. 🎊
               </p>
             </motion.div>
           )}
@@ -176,7 +176,7 @@ export default function GroupOrderSuccess() {
             >
               <div className="flex items-center gap-2 px-5 py-4 border-b border-gray-100">
                 <ShoppingBag className="w-5 h-5 text-gray-500" />
-                <h3 className="font-bold text-gray-900 text-sm">Món bạn đã chọn</h3>
+                <h3 className="font-bold text-gray-900 text-sm">Your selected items</h3>
               </div>
 
               <div className="divide-y divide-gray-50">
@@ -207,7 +207,7 @@ export default function GroupOrderSuccess() {
               </div>
 
               <div className="flex justify-between items-center px-5 py-3 bg-gray-50 border-t border-gray-100">
-                <span className="text-sm text-gray-600 font-medium">Tổng phần của bạn</span>
+                <span className="text-sm text-gray-600 font-medium">Your subtotal</span>
                 <span className="font-bold text-green-600 text-base">{fmtVND(mySubtotal)}</span>
               </div>
             </motion.div>
@@ -219,7 +219,7 @@ export default function GroupOrderSuccess() {
               onClick={() => navigate('/profile?tab=orders')}
               className="flex-1 flex items-center justify-center gap-2 py-3.5 rounded-xl bg-green-600 text-white font-bold text-sm hover:bg-green-700 active:scale-95 transition-all shadow-sm"
             >
-              Xem chi tiết trong Lịch sử đơn hàng
+              View in Order History
               <ArrowRight className="w-4 h-4" />
             </button>
             <button
@@ -227,7 +227,7 @@ export default function GroupOrderSuccess() {
               className="flex-1 flex items-center justify-center gap-2 py-3.5 rounded-xl bg-white border border-gray-200 text-gray-700 font-semibold text-sm hover:bg-gray-50 active:scale-95 transition-all"
             >
               <Home className="w-4 h-4" />
-              Về trang sản phẩm
+              Browse Products
             </button>
           </motion.div>
         </motion.div>

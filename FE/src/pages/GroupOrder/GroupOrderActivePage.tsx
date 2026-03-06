@@ -74,16 +74,16 @@ function QuickTopupModal({ shortfall, groupId, cartSnapshot, groupName, onClose 
         // Open MoMo in a NEW TAB — current page stays alive so socket update works in real-time
         window.open(payUrl, "_blank", "noopener,noreferrer");
         onClose();
-        toast.info("Cửa sổ MoMo đã được mở. Hoàn tất thanh toán rồi quay lại đây nhé!", {
+        toast.info("MoMo window opened. Complete payment and come back here!", {
           duration: 10000,
           icon: "💜",
         });
       } else {
-        toast.error("Không nhận được link thanh toán từ MoMo.");
+        toast.error("Did not receive payment link from MoMo.");
         setLoading(false);
       }
     } catch (err: any) {
-      toast.error(err?.response?.data?.message ?? "Không thể khởi tạo thanh toán MoMo. Vui lòng thử lại.");
+      toast.error(err?.response?.data?.message ?? "Could not initiate MoMo payment. Please try again.");
       setLoading(false);
     }
   };
@@ -100,7 +100,7 @@ function QuickTopupModal({ shortfall, groupId, cartSnapshot, groupName, onClose 
         {/* Header */}
         <div className="px-6 py-5 bg-gradient-to-r from-pink-500 to-rose-500 flex items-center gap-3">
           <Wallet className="w-5 h-5 text-white" />
-          <p className="text-white font-bold text-lg flex-1">Nạp tiền nhanh qua MoMo</p>
+          <p className="text-white font-bold text-lg flex-1">Quick Top-up via MoMo</p>
           <button
             onClick={onClose}
             className="w-7 h-7 rounded-full bg-white/20 text-white hover:bg-white/30 flex items-center justify-center"
@@ -114,13 +114,13 @@ function QuickTopupModal({ shortfall, groupId, cartSnapshot, groupName, onClose 
           <div className="flex items-center gap-3 bg-red-50 border border-red-100 rounded-xl px-4 py-3">
             <AlertTriangle className="w-4 h-4 text-red-500 flex-shrink-0" />
             <p className="text-sm text-red-700">
-              Ví còn thiếu <span className="font-extrabold">{fmtVND(shortfall)}</span> để chốt đơn
+              Wallet needs <span className="font-extrabold">{fmtVND(shortfall)}</span> more to place order
             </p>
           </div>
 
           {/* Preset grid */}
           <div>
-            <p className="text-xs font-semibold text-gray-500 mb-2 uppercase tracking-wide">Chọn số tiền nạp</p>
+            <p className="text-xs font-semibold text-gray-500 mb-2 uppercase tracking-wide">Select top-up amount</p>
             <div className="grid grid-cols-2 gap-2">
               {presets.map((amt) => (
                 <button
@@ -135,7 +135,7 @@ function QuickTopupModal({ shortfall, groupId, cartSnapshot, groupName, onClose 
                   {amt === presets[0] && shortfall > 0 ? (
                     <span>
                       {fmtVND(amt)}
-                      <span className="block text-xs font-normal text-pink-500">đúng số thiếu</span>
+                      <span className="block text-xs font-normal text-pink-500">exact shortfall</span>
                     </span>
                   ) : (
                     fmtVND(amt)
@@ -151,7 +151,7 @@ function QuickTopupModal({ shortfall, groupId, cartSnapshot, groupName, onClose 
               onClick={onClose}
               className="flex-1 py-3 rounded-xl border border-gray-200 text-sm font-medium text-gray-600 hover:bg-gray-50"
             >
-              Huỷ
+              Cancel
             </button>
             <button
               onClick={handleTopup}
@@ -159,15 +159,15 @@ function QuickTopupModal({ shortfall, groupId, cartSnapshot, groupName, onClose 
               className="flex-1 py-3 rounded-xl bg-gradient-to-r from-pink-500 to-rose-500 text-white text-sm font-bold hover:from-pink-600 hover:to-rose-600 transition-all flex items-center justify-center gap-2 disabled:opacity-60"
             >
               {loading ? (
-                <><Loader2 className="w-4 h-4 animate-spin" /> Đang mở MoMo…</>
+                <><Loader2 className="w-4 h-4 animate-spin" /> Opening MoMo…</>
               ) : (
-                <>💜 Nạp {fmtVND(selected)}</>
+                <>💜 Top up {fmtVND(selected)}</>
               )}
             </button>
           </div>
 
           <p className="text-xs text-gray-400 text-center leading-relaxed">
-            Thanh toán qua MoMo sẽ mở trong tab mới. Sau khi nạp xong, ví sẽ cập nhật tự động và bạn có thể chốt đơn ngay tại trang này.
+            MoMo payment will open in a new tab. Once topped up, your wallet will update automatically and you can place the order right here.
           </p>
         </div>
       </div>
@@ -216,7 +216,7 @@ function calcProgress(count: number) {
 const AVATARS = ["🧑‍🌾", "👩‍🍳", "🧑‍💼", "👩‍🌾", "👨‍🍳", "🧑‍🦱", "👩‍🦰", "🧑‍🦳"];
 
 function getMemberName(m: APIMember): string {
-  return m.userId?.name || m.tempName || "Khách";
+  return m.userId?.name || m.tempName || "Guest";
 }
 
 function getMemberAvatar(idx: number): string {
@@ -228,7 +228,7 @@ export default function GroupOrderActivePage() {
   const navigate  = useNavigate();
   const location  = useLocation();
   const { groupSession } = useGroup();
-  const groupName = (location.state as any)?.groupName ?? groupSession?.groupName ?? "Đơn hàng nhóm";
+  const groupName = (location.state as any)?.groupName ?? groupSession?.groupName ?? "Group Order";
   const groupId   = ((location.state as any)?.groupId as string | undefined) ?? groupSession?.groupId;
 
   // Map cart items from checkout (CartContext shape) → local CartItem shape
@@ -246,7 +246,7 @@ export default function GroupOrderActivePage() {
         price: item.price,
         qty: item.quantity,
         image: item.image || "🛒",
-        unit: "phần",
+        unit: "serving",
       }))
     : [];
 
@@ -347,10 +347,10 @@ export default function GroupOrderActivePage() {
     });
     socket.on("member:item_added", (updated: APIMember) => {
       setMembers((prev) => prev.map((m) => (m._id === updated._id ? updated : m)));
-      const name = updated.userId?.name || updated.tempName || "Thành viên";
+      const name = updated.userId?.name || updated.tempName || "Member";
       const latestItem = updated.cartItems?.[updated.cartItems.length - 1];
       if (latestItem) {
-        toast.success(`${name} đã thêm món!`, {
+        toast.success(`${name} added items!`, {
           description: latestItem.name,
           icon: "🛒",
           id: `item:${updated._id}:${latestItem.productId}`,
@@ -362,13 +362,13 @@ export default function GroupOrderActivePage() {
     // Thành viên đặt cọc: cập nhật badge
     socket.on("member:wallet_paid", (updated: APIMember) => {
       setMembers((prev) => prev.map((m) => (m._id === updated._id ? { ...m, walletPaid: updated.walletPaid, walletHoldAmount: updated.walletHoldAmount } : m)));
-      const name = updated.userId?.name || updated.tempName || "Thành viên";
-      toast.success(`${name} đã đặt cọc phần của mình!`, { icon: "💰" });
+      const name = updated.userId?.name || updated.tempName || "Member";
+      toast.success(`${name} deposited their share!`, { icon: "💰" });
     });
-    // Thành viên rời nhóm: xóa khỏi danh sách
+    // Member left: remove from list
     socket.on("member:left", (leftMemberId: string) => {
       setMembers((prev) => prev.filter((m) => m._id !== leftMemberId));
-      toast.info("Một thành viên vừa rời khỏi nhóm.", { icon: "🚪" });
+      toast.info("A member just left the group.", { icon: "🚪" });
     });
     // Chủ nhóm đổi hình thức thanh toán: cập nhật cho tất cả
     socket.on("group:payment_option_changed", (data: { groupId: string; paymentOption: string }) => {
@@ -377,8 +377,8 @@ export default function GroupOrderActivePage() {
     // Ví chủ nhóm vừa được nạp tiền — cập nhật số dư & reset warning
     socket.on("wallet:topup_success", (data: { newBalance: number }) => {
       setWalletBalance(data.newBalance);
-      toast.success("Nạp tiền thành công! Số dư ví đã được cập nhật.", {
-        description: `Số dư mới: ${data.newBalance.toLocaleString("vi-VN")}đ`,
+      toast.success("Top-up successful! Wallet balance updated.", {
+        description: `New balance: ${data.newBalance.toLocaleString("vi-VN")}đ`,
         icon: "💚",
         id: "wallet-topup-success",
         duration: 6000,
@@ -470,7 +470,7 @@ export default function GroupOrderActivePage() {
       }));
       const result = await groupService.placeGroupOrder(groupId, ownerCartItems);
       const ownerMember = members.find((m) => m.role === "owner");
-      const ownerName   = ownerMember ? getMemberName(ownerMember) : "Chủ nhóm";
+      const ownerName   = ownerMember ? getMemberName(ownerMember) : "Group Owner";
       navigate("/group-order/owner-success", {
         replace: true,
         state: {
@@ -489,7 +489,7 @@ export default function GroupOrderActivePage() {
         },
       });
     } catch (err: any) {
-      const msg = err?.response?.data?.message || "Chốt đơn thất bại. Vui lòng thử lại.";
+      const msg = err?.response?.data?.message || "Failed to place order. Please try again."; 
       toast.error(msg);
     } finally {
       setPlaceOrderLoading(false);
@@ -504,12 +504,12 @@ export default function GroupOrderActivePage() {
     try {
       await groupService.cancelGroup(groupId);
       const msg = paymentOption === 'owner_only'
-        ? "Đã xóa đơn hàng nhóm thành công."
-        : "Đã hủy đơn nhóm. Tiền đặt cọc đã được hoàn lại cho tất cả thành viên.";
+        ? "Group order deleted successfully."
+        : "Group order cancelled. Deposits have been refunded to all members."; 
       toast.success(msg, { duration: 6000 });
       navigate("/checkout");
     } catch (err: any) {
-      const msg = err?.response?.data?.message || "Hủy đơn thất bại. Vui lòng thử lại.";
+      const msg = err?.response?.data?.message || "Cancellation failed. Please try again."; 
       toast.error(msg);
     } finally {
       setCancelLoading(false);
@@ -525,9 +525,9 @@ export default function GroupOrderActivePage() {
     setPayOptionLoading(true);
     try {
       await groupService.updatePaymentOption(groupId, option);
-      toast.success('Đã cập nhật hình thức thanh toán!', { icon: '💳' });
+      toast.success('Payment method updated!', { icon: '💳' });
     } catch (err: any) {
-      toast.error(err?.response?.data?.message || 'Không thể cập nhật. Vui lòng thử lại.');
+      toast.error(err?.response?.data?.message || 'Could not update. Please try again.');
     } finally {
       setPayOptionLoading(false);
     }
@@ -545,46 +545,21 @@ export default function GroupOrderActivePage() {
             className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-green-600 transition-colors"
           >
             <ArrowLeft className="w-4 h-4" />
-            Quay lại
+            Back
           </button>
           <div className="h-5 w-px bg-gray-200" />
-          <span className="text-sm text-gray-400">Đặt đơn nhóm</span>
+          <span className="text-sm text-gray-400">Group Order</span>
           <ChevronRight className="w-3.5 h-3.5 text-gray-300" />
           <span className="text-sm font-semibold text-gray-900 truncate max-w-[200px]">{groupName}</span>
           <span className="ml-auto flex items-center gap-2">
             <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-green-100 text-green-700 text-xs font-semibold">
               <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-              Đang mở
+              Active
             </span>
           </span>
         </div>
       </div>
 
-      {/* ── Group identity banner ── */}
-      <div className="bg-orange-50 border-b border-orange-100">
-        <div className="max-w-7xl mx-auto px-6 py-3 flex items-center gap-3">
-          <div className="w-9 h-9 rounded-full bg-orange-400 flex items-center justify-center flex-shrink-0">
-            <span className="text-white text-lg">👥</span>
-          </div>
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-bold text-orange-700 truncate">{groupName}</p>
-            <p className="text-xs text-orange-500">{joinedCount}/{members.length} thành viên đã thêm món</p>
-          </div>
-          <button
-            onClick={handleCopy}
-            className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium transition-all ${
-              copied ? "bg-green-500 text-white" : "bg-orange-100 text-orange-700 hover:bg-orange-200"
-            }`}
-          >
-            {copied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
-            {copied ? "Đã sao chép link" : "Sao chép link mời"}
-          </button>
-          <button className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-orange-400 text-white text-xs font-semibold hover:bg-orange-500 transition-colors">
-            <Share2 className="w-3.5 h-3.5" />
-            Chia sẻ
-          </button>
-        </div>
-      </div>
 
       {/* ── Main two-column grid ── */}
       <div className="max-w-7xl mx-auto px-6 py-8 grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
@@ -598,13 +573,13 @@ export default function GroupOrderActivePage() {
           <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
             <div className="flex items-start justify-between mb-1">
               <div>
-                <h2 className="text-lg font-extrabold text-gray-900">Nhận ưu đãi lên đến 10%!</h2>
+                <h2 className="text-lg font-extrabold text-gray-900">Get up to 10% off!</h2>
                 <p className="text-sm text-gray-500 mt-0.5">
-                  Hãy mời thêm thành viên và đảm bảo mọi thành viên đều đặt ít nhất 1 món.
+                  Invite more members and make sure everyone orders at least 1 item.
                 </p>
               </div>
               <button className="flex items-center gap-1 text-sm text-green-600 font-medium hover:underline flex-shrink-0 ml-4">
-                Tìm hiểu thêm <ChevronRight className="w-3.5 h-3.5" />
+                Learn more <ChevronRight className="w-3.5 h-3.5" />
               </button>
             </div>
 
@@ -636,7 +611,7 @@ export default function GroupOrderActivePage() {
                           {tier.pct}%
                         </span>
                         <span className={`text-xs whitespace-nowrap ${active ? "text-gray-600" : "text-gray-400"}`}>
-                          {tier.members} người
+                          {tier.members} people
                         </span>
                       </div>
                     </div>
@@ -651,21 +626,21 @@ export default function GroupOrderActivePage() {
                 <div className="flex items-center gap-2 bg-green-50 border border-green-200 rounded-xl px-4 py-2.5 flex-1">
                   <ShieldCheck className="w-4 h-4 text-green-600 flex-shrink-0" />
                   <p className="text-sm font-bold text-green-700">
-                    Nhóm đang được giảm <span className="text-green-600 text-base">{activePct}%</span>
+                    Group getting <span className="text-green-600 text-base">{activePct}%</span> off
                   </p>
                 </div>
               ) : (
                 <div className="flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-xl px-4 py-2.5 flex-1">
                   <Zap className="w-4 h-4 text-gray-400 flex-shrink-0" />
                   <p className="text-sm text-gray-500">
-                    Cần <span className="font-bold text-gray-700">{TIERS[0].members} thành viên</span> để mở khoá ưu đãi đầu tiên
+                    Need <span className="font-bold text-gray-700">{TIERS[0].members} members</span> to unlock the first discount
                   </p>
                 </div>
               )}
               {nextTier && (
                 <div className="text-xs text-gray-500 bg-orange-50 border border-orange-100 rounded-xl px-3 py-2.5 text-center flex-shrink-0">
-                  Thêm <span className="font-bold text-orange-600">{nextTier.members - joinedCount} người</span><br />
-                  để đạt <span className="font-bold">{nextTier.pct}%</span>
+                  Add <span className="font-bold text-orange-600">{nextTier.members - joinedCount} more</span><br />
+                  to reach <span className="font-bold">{nextTier.pct}%</span>
                 </div>
               )}
             </div>
@@ -676,7 +651,7 @@ export default function GroupOrderActivePage() {
             <div className="flex items-center justify-between mb-5">
               <h3 className="text-base font-bold text-gray-900 flex items-center gap-2">
                 <ShoppingCart className="w-5 h-5 text-green-600" />
-                Món của bạn
+                Your items
                 <span className="px-2 py-0.5 bg-green-100 text-green-700 text-xs font-bold rounded-full">
                   {cart.length}
                 </span>
@@ -686,14 +661,14 @@ export default function GroupOrderActivePage() {
                 className="flex items-center gap-1.5 text-sm text-green-600 font-medium hover:underline"
               >
                 <Plus className="w-3.5 h-3.5" />
-                Thêm món
+                Add items
               </button>
             </div>
 
             {cart.length === 0 ? (
               <div className="text-center py-10 text-gray-400">
                 <ShoppingCart className="w-12 h-12 mx-auto mb-3 opacity-30" />
-                <p className="text-sm">Chưa có món nào. Hãy thêm vào giỏ hàng!</p>
+                <p className="text-sm">No items yet. Add something to your cart!</p>
               </div>
             ) : (
               <div className="space-y-3">
@@ -746,7 +721,7 @@ export default function GroupOrderActivePage() {
             <div className="flex items-center justify-between mb-5">
               <h3 className="text-base font-bold text-gray-900 flex items-center gap-2">
                 <span className="text-lg">👥</span>
-                Thành viên nhóm
+                Group members
                 <span className="px-2 py-0.5 bg-green-100 text-green-700 text-xs font-bold rounded-full">
                   {members.length}
                 </span>
@@ -755,15 +730,15 @@ export default function GroupOrderActivePage() {
                 onClick={() => setShowQRModal(true)}
               >
                 <UserPlus className="w-3.5 h-3.5" />
-                Mời thêm thành viên
+                Invite members
               </button>
             </div>
 
             <div className="space-y-2.5">
               {membersLoading ? (
-                <div className="py-6 text-center text-sm text-gray-400">Đang tải thành viên...</div>
+                <div className="py-6 text-center text-sm text-gray-400">Loading members...</div>
               ) : members.length === 0 ? (
-                <div className="py-6 text-center text-sm text-gray-400">Chưa có thành viên nào.</div>
+                <div className="py-6 text-center text-sm text-gray-400">No members yet.</div>
               ) : (
               <AnimatePresence initial={false}>
               {members.map((m, idx) => {
@@ -800,12 +775,12 @@ export default function GroupOrderActivePage() {
                         )}
                         {paymentOption === 'equal_split' && (
                           <p className="text-xs text-teal-600 font-medium mt-0.5">
-                            Phần đóng góp: {fmtVND(m.role === 'owner' ? ownerEqualShare : memberEqualShare)}
+                            Contribution: {fmtVND(m.role === 'owner' ? ownerEqualShare : memberEqualShare)}
                           </p>
                         )}
                         {paymentOption !== 'individual' && paymentOption !== 'equal_split' && (
                           <p className="text-xs text-gray-400 mt-0.5">
-                            {m.isReady ? `Đã chọn ${memberItems.length} món` : "Chưa chọn món"}
+                            {m.isReady ? `Chose ${memberItems.length} items` : "No items yet"}
                           </p>
                         )}
                       </div>
@@ -813,11 +788,11 @@ export default function GroupOrderActivePage() {
                       {m.isReady ? (
                         <span className="flex items-center gap-1 text-xs text-green-600 font-semibold bg-green-50 border border-green-200 px-2.5 py-1 rounded-full">
                           <Check className="w-3 h-3" />
-                          Đã chọn món
+                          Ready
                         </span>
                       ) : (
                         <span className="text-xs text-yellow-600 font-semibold bg-yellow-50 border border-yellow-200 px-2.5 py-1 rounded-full">
-                          Đang chọn
+                          Choosing
                         </span>
                       )}
                       {/* Wallet payment badge */}
@@ -825,8 +800,8 @@ export default function GroupOrderActivePage() {
                         <span className="flex items-center gap-1 text-xs text-teal-700 font-semibold bg-teal-50 border border-teal-200 px-2.5 py-1 rounded-full">
                           <Wallet className="w-3 h-3" />
                           {paymentOption === 'equal_split'
-                            ? 'Đã đóng góp'
-                            : `Đã cọc ${m.walletHoldAmount ? `${m.walletHoldAmount.toLocaleString("vi-VN")}đ` : ""}`}
+                            ? 'Contributed'
+                            : `Deposited ${m.walletHoldAmount ? `${m.walletHoldAmount.toLocaleString("vi-VN")}đ` : ""}`}
                         </span>
                       )}
                       {/* Expand toggle */}
@@ -863,7 +838,7 @@ export default function GroupOrderActivePage() {
                             </div>
                             <div className="flex-1 min-w-0">
                               <p className="text-xs text-gray-700 truncate">{item.name}</p>
-                              <p className="text-xs text-gray-400">{fmtVND(item.price)} / phần</p>
+                              <p className="text-xs text-gray-400">{fmtVND(item.price)} / serving</p>
                             </div>
                             <span className="text-xs text-gray-400 flex-shrink-0">×{item.qty}</span>
                             <span className="text-xs font-semibold text-gray-900 flex-shrink-0 w-16 text-right">
@@ -873,7 +848,7 @@ export default function GroupOrderActivePage() {
                         ))}
                         <div className="flex justify-end px-4 py-2 bg-green-50">
                           <span className="text-xs font-bold text-green-700">
-                            Tổng: {fmtVND(memberItems.reduce((s, i) => s + i.price * i.qty, 0))}
+                            Total: {fmtVND(memberItems.reduce((s, i) => s + i.price * i.qty, 0))}
                           </span>
                         </div>
                       </div>
@@ -898,11 +873,11 @@ export default function GroupOrderActivePage() {
                 }`}
               >
                 {copied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
-                {copied ? "Đã sao chép" : "Sao chép"}
+                {copied ? "Copied!" : "Copy"}
               </button>
               <button className="flex items-center gap-1.5 px-3 py-2.5 rounded-xl bg-green-600 text-white text-xs font-semibold hover:bg-green-700 transition-colors flex-shrink-0">
                 <Share2 className="w-3.5 h-3.5" />
-                Chia sẻ
+                Share
               </button>
             </div>
           </div>
@@ -915,12 +890,12 @@ export default function GroupOrderActivePage() {
 
           {/* ── Order summary card ── */}
           <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
-            <h3 className="text-base font-bold text-gray-900 mb-5">Tóm tắt đơn nhóm</h3>
+            <h3 className="text-base font-bold text-gray-900 mb-5">Group order summary</h3>
 
             {/* Per-member rows – amount shown depends on paymentOption */}
             <div className="space-y-2.5">
               {membersLoading ? (
-                <div className="py-6 text-center text-sm text-gray-400">Đang tải...</div>
+                <div className="py-6 text-center text-sm text-gray-400">Loading...</div>
               ) : members.map((m, idx) => {
                 const ordered    = isMemberOrdered(m);
                 const itemsQty   = getMemberTotalQty(m);
@@ -948,7 +923,7 @@ export default function GroupOrderActivePage() {
                       <span className={`text-xs font-semibold ${
                         ordered ? "text-green-600" : "text-gray-400"
                       }`}>
-                        {ordered ? `${itemsQty} món` : "Đang chọn"}
+                        {ordered ? `${itemsQty} items` : "Choosing"}
                       </span>
                     </div>
                   </div>
@@ -958,25 +933,25 @@ export default function GroupOrderActivePage() {
 
             <div className="border-t border-gray-100 pt-4 space-y-2.5 text-sm text-gray-600">
               <div className="flex justify-between">
-                <span>Tạm tính <span className="text-gray-400 font-normal">(cả nhóm)</span></span>
+                <span>Subtotal <span className="text-gray-400 font-normal">(whole group)</span></span>
                 <span className="font-semibold text-gray-900">{fmtVND(subtotal)}</span>
               </div>
               <div className="flex justify-between">
-                <span>{paymentOption === 'individual' ? 'Phí ship (phần của bạn)' : 'Phí giao hàng'}</span>
+                <span>{paymentOption === 'individual' ? 'Shipping (your share)' : 'Shipping fee'}</span>
                 <span className="font-semibold text-gray-900">{paymentOption === 'individual' ? fmtVND(ownerSharedShipping) : '25.000đ'}</span>
               </div>
               {activePct > 0 && (
                 <div className="flex justify-between text-green-600">
                   <span>
                     {paymentOption === 'individual'
-                      ? `Ưu đãi của bạn (${ownerDiscountPct.toFixed(1).replace(/\.0$/, '')}%)`
-                      : `Ưu đãi nhóm (${activePct}%)`}
+                      ? `Your discount (${ownerDiscountPct.toFixed(1).replace(/\.0$/, '')}%)`
+                      : `Group discount (${activePct}%)`}
                   </span>
                   <span className="font-semibold">−{fmtVND(paymentOption === 'individual' ? ownerDiscount : discount)}</span>
                 </div>
               )}
               <div className="border-t border-gray-100 pt-2.5 flex justify-between">
-                <span className="font-bold text-gray-900">Tổng cộng</span>
+                <span className="font-bold text-gray-900">Total</span>
                 <span className="font-extrabold text-green-600 text-base">{fmtVND(total + 25000)}</span>
               </div>
 
@@ -988,10 +963,10 @@ export default function GroupOrderActivePage() {
                       <span className="flex items-center gap-1 flex-col items-start gap-0">
                         <span className="flex items-center gap-1">
                           <Wallet className="w-3.5 h-3.5" />
-                          Tổng tiền đã cọc
+                          Total deposited
                         </span>
                         <span className="text-xs text-teal-500 font-normal">
-                          Đã thu cọc từ {members.filter((m) => m.walletPaid).length}/{members.filter((m) => m.role !== 'owner').length} thành viên
+                          Deposits from {members.filter((m) => m.walletPaid).length}/{members.filter((m) => m.role !== 'owner').length} members
                         </span>
                       </span>
                       <span className="font-semibold">−{fmtVND(totalHeld)}</span>
@@ -1003,17 +978,17 @@ export default function GroupOrderActivePage() {
                     <span className={`font-bold ${
                       ownerRemaining === 0 ? "text-teal-700" : "text-orange-700"
                     }`}>
-                      {paymentOption === 'equal_split' ? 'Phần của bạn (Owner)' : paymentOption === 'individual' ? 'Phần của bạn' : 'Chủ nhóm cần trả nốt'}
+                      {paymentOption === 'equal_split' ? 'Your share (Owner)' : paymentOption === 'individual' ? 'Your share' : 'Owner still owes'}
                     </span>
                     <span className={`font-extrabold text-base ${
                       ownerRemaining === 0 ? "text-teal-600" : "text-orange-600"
                     }`}>
-                      {ownerRemaining === 0 ? "Đã đủ 🎉" : fmtVND(ownerRemaining)}
+                      {ownerRemaining === 0 ? "Fully covered 🎉" : fmtVND(ownerRemaining)}
                     </span>
                   </div>
                   {ownerRemaining > 0 && (
                     <p className="text-xs text-orange-500 leading-relaxed">
-                      💡 Số tiền này sẽ bị trừ từ ví của bạn khi chốt đơn.
+                      💡 This amount will be deducted from your wallet when placing the order.
                     </p>
                   )}
                 </>
@@ -1025,25 +1000,25 @@ export default function GroupOrderActivePage() {
           <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-xs text-gray-400 font-medium">Hình thức thanh toán</p>
+                <p className="text-xs text-gray-400 font-medium">Payment method</p>
                 <p className="text-sm font-semibold text-gray-800 mt-0.5">
-                  {paymentOption === 'owner_only'   ? 'Chủ nhóm trả cho mọi người'
-                   : paymentOption === 'individual' ? 'Mỗi người trả theo món'
-                   : 'Chia đều hoá đơn'}
+                  {paymentOption === 'owner_only'   ? 'Owner pays for everyone'
+                   : paymentOption === 'individual' ? 'Each person pays for their own'
+                   : 'Split bill equally'}
                 </p>
               </div>
               <button
                 onClick={() => setShowPayOptionModal(true)}
                 className="text-xs font-semibold text-green-600 hover:underline flex-shrink-0 ml-3"
               >
-                Thay đổi
+                Change
               </button>
             </div>
           </div>
 
           {/* ── Member readiness ── */}
           <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
-            <h3 className="text-sm font-bold text-gray-900 mb-3">Trạng thái thành viên</h3>
+            <h3 className="text-sm font-bold text-gray-900 mb-3">Member status</h3>
             <div className="flex items-center gap-2 flex-wrap">
               {members.map((m, idx) => {
                 const ordered = isMemberOrdered(m);
@@ -1072,10 +1047,10 @@ export default function GroupOrderActivePage() {
               </button>
             </div>
             {allOrdered ? (
-              <p className="text-xs text-green-600 font-semibold mt-3">✅ Tất cả thành viên đã chọn món!</p>
+              <p className="text-xs text-green-600 font-semibold mt-3">✅ All members have selected their items!</p>
             ) : (
               <p className="text-xs text-gray-400 mt-3">
-                {joinedCount}/{members.length} đã thêm món
+                {joinedCount}/{members.length} have added items
               </p>
             )}
           </div>
@@ -1089,11 +1064,11 @@ export default function GroupOrderActivePage() {
               <div className="bg-teal-50 border border-teal-100 rounded-2xl p-4">
                 <div className="flex items-center gap-2 mb-1">
                   <Wallet className="w-4 h-4 text-teal-600" />
-                  <span className="text-sm font-bold text-teal-700">Đặt cọc qua ví</span>
+                  <span className="text-sm font-bold text-teal-700">Deposits via wallet</span>
                 </div>
-                <p className="text-xs text-teal-600">{paidCount}/{regularCount} thành viên đã đặt cọc</p>
+                <p className="text-xs text-teal-600">{paidCount}/{regularCount} members have deposited</p>
                 {totalHeld > 0 && (
-                  <p className="text-xs font-semibold text-teal-700 mt-0.5">Tổng giữ: {fmtVND(totalHeld)}</p>
+                  <p className="text-xs font-semibold text-teal-700 mt-0.5">Total held: {fmtVND(totalHeld)}</p>
                 )}
               </div>
             );
@@ -1108,7 +1083,7 @@ export default function GroupOrderActivePage() {
             }`}>
               <span className="flex items-center gap-1.5">
                 <Wallet className="w-3.5 h-3.5" />
-                Số dư ví của bạn
+                Your wallet balance
               </span>
               <span className="font-bold">{fmtVND(walletBalance)}</span>
             </div>
@@ -1122,7 +1097,7 @@ export default function GroupOrderActivePage() {
               className="w-full py-4 rounded-2xl bg-gradient-to-r from-pink-500 to-rose-500 text-white text-base font-extrabold shadow-lg hover:from-pink-600 hover:to-rose-600 active:scale-[0.98] transition-all duration-150 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <Wallet className="w-5 h-5" />
-              Nạp thêm {fmtVND(ownerRemaining - walletBalance)} để thanh toán
+              Top up {fmtVND(ownerRemaining - walletBalance)} to pay
             </button>
           ) : (
             <button
@@ -1149,24 +1124,24 @@ export default function GroupOrderActivePage() {
               className="w-full py-4 rounded-2xl bg-gradient-to-r from-green-600 to-emerald-500 text-white text-base font-extrabold shadow-lg hover:from-green-700 hover:to-emerald-600 active:scale-[0.98] transition-all duration-150 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {placeOrderLoading ? (
-                <><Loader2 className="w-5 h-5 animate-spin" /> Đang xử lý...</>
+                <><Loader2 className="w-5 h-5 animate-spin" /> Processing...</>
               ) : paymentOption === 'individual' ? (
-                <><ShoppingCart className="w-5 h-5" /> Thanh toán phần tôi & Chốt đơn →</>
+                <><ShoppingCart className="w-5 h-5" /> Pay my share & Place order →</>
               ) : paymentOption !== 'owner_only' ? (
-                <><ShoppingCart className="w-5 h-5" /> Gửi yêu cầu thanh toán →</>
+                <><ShoppingCart className="w-5 h-5" /> Finalize order →</>
               ) : (
-                <><ShoppingCart className="w-5 h-5" /> Chốt đơn hàng nhóm →</>
+                <><ShoppingCart className="w-5 h-5" /> Place group order →</>
               )}
             </button>
           )}
           {paymentOption === 'equal_split' && !allNonOwnerPaid && nonOwnerCount > 0 && (
             <p className="text-center text-xs text-amber-500 font-medium -mt-1">
-              ⚠ Còn {members.filter((m) => m.role !== 'owner' && !m.walletPaid).length}/{nonOwnerCount} thành viên chưa đóng góp
+              ⚠ {members.filter((m) => m.role !== 'owner' && !m.walletPaid).length}/{nonOwnerCount} members haven't contributed yet
             </p>
           )}
           {!allOrdered && !(paymentOption === 'equal_split' && !allNonOwnerPaid) && (
             <p className="text-center text-xs text-amber-500 font-medium -mt-1">
-              ⚠ Còn {members.filter((m) => !m.isReady).length} thành viên chưa chọn món
+              ⚠ {members.filter((m) => !m.isReady).length} members haven't chosen items yet
             </p>
           )}
 
@@ -1177,13 +1152,13 @@ export default function GroupOrderActivePage() {
             className="w-full py-3 rounded-2xl border border-red-200 text-red-500 text-sm font-semibold hover:bg-red-50 transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
           >
             {cancelLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <AlertTriangle className="w-4 h-4" />}
-            {paymentOption === 'owner_only' ? 'Xóa đơn hàng nhóm' : 'Hủy đơn & hoàn tiền'}
+            {paymentOption === 'owner_only' ? 'Delete group order' : 'Cancel & refund'}
           </button>
 
           {/* ── Delivery scheduling ── */}
           <button className="w-full py-3 rounded-2xl border-2 border-dashed border-gray-300 text-gray-500 text-sm font-medium hover:border-green-400 hover:text-green-600 transition-colors flex items-center justify-center gap-2">
             <Clock className="w-4 h-4" />
-            Đặt giao hàng sau
+            Schedule delivery for later
           </button>
         </div>
       </div>
@@ -1196,30 +1171,30 @@ export default function GroupOrderActivePage() {
                onClick={(e) => e.stopPropagation()}>
             <div className="px-6 py-5 bg-gradient-to-r from-green-600 to-emerald-500 flex items-center gap-3">
               <ShoppingCart className="w-5 h-5 text-white" />
-              <p className="text-white font-bold text-lg">{paymentOption === 'individual' ? 'Thanh toán phần tôi & Chốt đơn' : 'Chốt đơn hàng nhóm'}</p>
+              <p className="text-white font-bold text-lg">{paymentOption === 'individual' ? 'Pay my share & Place order' : 'Place group order'}</p>
             </div>
             <div className="p-6 space-y-4">
               <div className="bg-green-50 rounded-xl p-4 space-y-1.5 text-sm">
                 <div className="flex justify-between">
-                  <span className="text-gray-600">Tạm tính <span className="text-gray-400 font-normal">(cả nhóm)</span></span>
+                  <span className="text-gray-600">Subtotal <span className="text-gray-400 font-normal">(whole group)</span></span>
                   <span className="font-semibold">{fmtVND(subtotal)}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-gray-600">{paymentOption === 'individual' ? 'Phí ship (phần của bạn)' : 'Phí giao hàng'}</span>
+                  <span className="text-gray-600">{paymentOption === 'individual' ? 'Shipping (your share)' : 'Shipping fee'}</span>
                   <span className="font-semibold">{paymentOption === 'individual' ? fmtVND(ownerSharedShipping) : '25.000đ'}</span>
                 </div>
                 {activePct > 0 && (
                   <div className="flex justify-between text-green-600">
                     <span>
                       {paymentOption === 'individual'
-                        ? `Ưu đãi của bạn (${ownerDiscountPct.toFixed(1).replace(/\.0$/, '')}%)`
-                        : `Ưu đãi nhóm (${activePct}%)`}
+                        ? `Your discount (${ownerDiscountPct.toFixed(1).replace(/\.0$/, '')}%)`
+                        : `Group discount (${activePct}%)`}
                     </span>
                     <span className="font-semibold">−{fmtVND(paymentOption === 'individual' ? ownerDiscount : discount)}</span>
                   </div>
                 )}
                 <div className="border-t border-green-200 pt-1.5 flex justify-between">
-                  <span className="font-bold text-gray-900">Tổng cộng</span>
+                  <span className="font-bold text-gray-900">Total</span>
                   <span className="font-extrabold text-green-600">{fmtVND(total + 25000)}</span>
                 </div>
                 {paymentOption === 'owner_only' && totalHeld > 0 && (
@@ -1227,10 +1202,10 @@ export default function GroupOrderActivePage() {
                     <span className="flex flex-col gap-0">
                       <span className="flex items-center gap-1">
                         <Wallet className="w-3.5 h-3.5" />
-                        Tổng tiền đã cọc
+                        Total deposited
                       </span>
                       <span className="text-xs text-teal-500 font-normal">
-                        Đã thu cọc từ {members.filter((m) => m.walletPaid).length}/{members.filter((m) => m.role !== 'owner').length} thành viên
+                        Deposits from {members.filter((m) => m.walletPaid).length}/{members.filter((m) => m.role !== 'owner').length} members
                       </span>
                     </span>
                     <span className="font-semibold">−{fmtVND(totalHeld)}</span>
@@ -1243,33 +1218,33 @@ export default function GroupOrderActivePage() {
                   <span className={`font-bold ${
                     ownerRemaining === 0 ? "text-teal-700" : "text-orange-700"
                   }`}>
-                    {paymentOption === 'equal_split' ? 'Phần của bạn (Owner)' : paymentOption === 'individual' ? 'Phần của bạn' : 'Chủ nhóm cần trả nốt'}
+                    {paymentOption === 'equal_split' ? 'Your share (Owner)' : paymentOption === 'individual' ? 'Your share' : 'Owner still owes'}
                   </span>
                   <span className={`font-extrabold ${
                     ownerRemaining === 0 ? "text-teal-600" : "text-orange-600"
                   }`}>
-                    {ownerRemaining === 0 ? "Đã đủ 🎉" : fmtVND(ownerRemaining)}
+                    {ownerRemaining === 0 ? "Fully covered 🎉" : fmtVND(ownerRemaining)}
                   </span>
                 </div>
                 )}
               </div>
               <p className="text-xs text-gray-500 leading-relaxed">
                 {paymentOption === 'individual'
-                  ? '🧾 Mỗi thành viên trả phần tiền theo món của riêng mình sau khi đơn được chốt.'
+                  ? '🧾 Each member pays for their own items after the order is placed.'
                   : paymentOption === 'equal_split'
-                    ? `⚖️ Tổng hoá đơn được chia đều: mỗi người trả ${fmtVND(Math.round((total + 25000) / Math.max(members.length, 1)))} .`
+                    ? `⚖️ Total bill split equally: each person pays ${fmtVND(Math.round((total + 25000) / Math.max(members.length, 1)))} .`
                     : ownerRemaining > 0
-                      ? `💡 ${fmtVND(ownerRemaining)} sẽ bị trừ từ ví của bạn khi chốt đơn. Phần đã cọc của thành viên đã được tính.`
-                      : '✅ Tiền đặt cọc của thành viên đã đủ để thanh toán toàn bộ đơn hàng.'}
+                      ? `💡 ${fmtVND(ownerRemaining)} will be deducted from your wallet when placing the order. Member deposits have been counted.`
+                      : '✅ Member deposits are sufficient to cover the full order amount.'}
               </p>
               <div className="flex gap-3">
                 <button onClick={() => setShowPlaceConfirm(false)}
                   className="flex-1 py-2.5 rounded-xl border border-gray-200 text-sm font-medium text-gray-600 hover:bg-gray-50">
-                  Huỷ
+                  Cancel
                 </button>
                 <button onClick={handlePlaceOrder}
                   className="flex-1 py-2.5 rounded-xl bg-gradient-to-r from-green-600 to-emerald-500 text-white text-sm font-bold hover:from-green-700 hover:to-emerald-600 transition-all flex items-center justify-center gap-2">
-                  Xác nhận chốt đơn
+                  Confirm order
                 </button>
               </div>
             </div>
@@ -1295,13 +1270,13 @@ export default function GroupOrderActivePage() {
               >
                 <ArrowLeft className="w-5 h-5 text-gray-700" />
               </button>
-              <h3 className="text-lg font-bold text-gray-900">Chọn người thanh toán</h3>
+              <h3 className="text-lg font-bold text-gray-900">Choose payment method</h3>
             </div>
 
             {/* Description */}
             <div className="px-6 pt-4 pb-2">
               <p className="text-sm text-gray-500 leading-relaxed">
-                Nếu bạn muốn chia hoá đơn này, vui lòng xem qua cách chúng tôi áp dụng để chia số tiền giảm giá, phí giao hàng và tiền típ cho mỗi người trong nhóm.
+                If you'd like to split this bill, please review how we apply discounts, delivery fees and tips to each person in the group.
               </p>
             </div>
 
@@ -1311,20 +1286,20 @@ export default function GroupOrderActivePage() {
                 {
                   value: 'owner_only'   as const,
                   icon: '💳',
-                  label: 'Bạn thanh toán cho mọi người',
+                  label: 'You pay for everyone',
                   subtitle: null,
                 },
                 {
                   value: 'individual'   as const,
                   icon: '🧾',
-                  label: 'Mỗi người trả theo món của mình',
-                  subtitle: 'Tính tiền dựa trên giỏ hàng riêng của từng thành viên',
+                  label: 'Each person pays for their own items',
+                  subtitle: "Charged based on each member's own cart",
                 },
                 {
                   value: 'equal_split'  as const,
                   icon: '⚖️',
-                  label: 'Chia đều hoá đơn cho mọi người',
-                  subtitle: 'Tổng hoá đơn ÷ số thành viên trong nhóm',
+                  label: 'Split bill equally for everyone',
+                  subtitle: 'Total bill ÷ number of members in the group',
                 },
               ]).map((opt) => {
                 const selected = paymentOption === opt.value;
@@ -1367,14 +1342,14 @@ export default function GroupOrderActivePage() {
             {/* Footer hint */}
             <div className="px-6 pb-5 border-t border-gray-100 pt-3">
               <p className="text-xs text-gray-400 text-center">
-                Phương thức thanh toán khác
+                Other payment methods
               </p>
               <div className="flex gap-2 mt-2 justify-center">
                 <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-pink-50 border border-pink-100 text-xs font-semibold text-pink-600">
                   <span className="text-sm">💜</span> MoMo
                 </span>
                 <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-blue-50 border border-blue-100 text-xs font-semibold text-blue-600">
-                  <span className="text-sm">💳</span> Thẻ
+                  <span className="text-sm">💳</span> Card
                 </span>
               </div>
             </div>
@@ -1391,24 +1366,24 @@ export default function GroupOrderActivePage() {
             <div className="px-6 py-5 bg-gradient-to-r from-red-500 to-rose-500 flex items-center gap-3">
               <AlertTriangle className="w-5 h-5 text-white" />
               <p className="text-white font-bold text-lg">
-                {paymentOption === 'owner_only' ? 'Xóa đơn hàng nhóm' : 'Hủy đơn nhóm'}
+                {paymentOption === 'owner_only' ? 'Delete group order' : 'Cancel group order'}
               </p>
             </div>
             <div className="p-6 space-y-4">
               <p className="text-sm text-gray-600 leading-relaxed">
                 {paymentOption === 'owner_only'
-                  ? <>Đại bạn có chắc muốn <strong>xóa đơn hàng nhóm</strong>? Hành động này không thể hoàn tác và nhóm sẽ bị giải tán.</>
-                  : <>Bạn có chắc muốn <strong>hủy đơn hàng nhóm</strong>? Hành động này không thể hoàn tác. Tất cả thành viên đã đặt cọ sẽ được <strong>hoàn tiền ngay lập tức</strong>.</>
+                  ? <>Are you sure you want to <strong>delete this group order</strong>? This action cannot be undone and the group will be disbanded.</>
+                  : <>Are you sure you want to <strong>cancel this group order</strong>? This action cannot be undone. All members who have deposited will be <strong>refunded immediately</strong>.</>
                 }
               </p>
               <div className="flex gap-3">
                 <button onClick={() => setShowCancelConfirm(false)}
                   className="flex-1 py-2.5 rounded-xl border border-gray-200 text-sm font-medium text-gray-600 hover:bg-gray-50">
-                  Không
+                  No
                 </button>
                 <button onClick={handleCancelGroup}
                   className="flex-1 py-2.5 rounded-xl bg-gradient-to-r from-red-500 to-rose-500 text-white text-sm font-bold hover:from-red-600 hover:to-rose-600 transition-all">
-                  {paymentOption === 'owner_only' ? 'Xóa đơn' : 'Hủy đơn & hoàn tiền'}
+                  {paymentOption === 'owner_only' ? 'Delete order' : 'Cancel & refund'}
                 </button>
               </div>
             </div>
@@ -1427,7 +1402,7 @@ export default function GroupOrderActivePage() {
                 <QrCode className="w-5 h-5 text-white" />
               </div>
               <div className="flex-1">
-                <p className="text-xs text-green-100">Mời thành viên</p>
+                <p className="text-xs text-green-100">Invite members</p>
                 <p className="text-sm font-bold text-white truncate">{groupName}</p>
               </div>
               <button
@@ -1441,7 +1416,7 @@ export default function GroupOrderActivePage() {
             {/* QR code */}
             <div className="px-8 pt-7 pb-3 flex flex-col items-center">
               <p className="text-sm text-gray-500 text-center mb-5 leading-relaxed">
-                Chia sẻ mã QR hoặc đường link bên dưới để mời bạn bè tham gia nhóm
+                Share the QR code or the link below to invite friends to join your group
               </p>
               {inviteLink ? (
                 <div className="p-4 rounded-2xl border-2 border-green-100 bg-green-50 shadow-sm">
@@ -1455,7 +1430,7 @@ export default function GroupOrderActivePage() {
                 </div>
               ) : (
                 <div className="w-[180px] h-[180px] rounded-2xl bg-gray-100 flex items-center justify-center">
-                  <p className="text-xs text-gray-400">Không có QR</p>
+                  <p className="text-xs text-gray-400">No QR code</p>
                 </div>
               )}
             </div>
@@ -1464,7 +1439,7 @@ export default function GroupOrderActivePage() {
             <div className="px-6 pb-7 space-y-3">
               <div className="flex items-center gap-2">
                 <div className="flex-1 px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-mono text-gray-500 truncate">
-                  {inviteLink || "Chưa có link mời"}
+                  {inviteLink || "No invite link yet"}
                 </div>
                 <button
                   onClick={handleCopy}
@@ -1474,14 +1449,14 @@ export default function GroupOrderActivePage() {
                   } disabled:opacity-50`}
                 >
                   {copied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
-                  {copied ? "Copied!" : "Sao chép"}
+                  {copied ? "Copied!" : "Copy"}
                 </button>
               </div>
               <button
                 onClick={() => setShowQRModal(false)}
                 className="w-full py-3 rounded-2xl bg-green-600 text-white font-bold text-sm hover:bg-green-700 transition-colors"
               >
-                Xong
+                Done
               </button>
             </div>
           </div>

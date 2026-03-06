@@ -26,9 +26,9 @@ const TIERS = [
 type PaymentOption = 'owner_only' | 'individual' | 'equal_split';
 
 const PAYMENT_OPTIONS: { value: PaymentOption; label: string; subtitle: string | null; icon: string }[] = [
-  { value: 'owner_only',   label: 'Bạn thanh toán cho mọi người',   subtitle: null,                                                           icon: '💳' },
-  { value: 'individual',   label: 'Mỗi người trả theo món của mình', subtitle: 'Mỗi thành viên tự thanh toán phần của họ',                     icon: '🧾' },
-  { value: 'equal_split',  label: 'Chia đều hoá đơn cho mọi người', subtitle: 'Tổng bill chia đều cho tất cả thành viên trong nhóm',           icon: '⚖️' },
+  { value: 'owner_only',   label: 'You pay for everyone',        subtitle: null,                                                      icon: '💳' },
+  { value: 'individual',   label: 'Each person pays for their own items', subtitle: 'Each member pays their own share',                icon: '🧾' },
+  { value: 'equal_split',  label: 'Split bill equally for everyone', subtitle: 'Total bill divided equally among all group members',   icon: '⚖️' },
 ];
 
 const HOURS   = Array.from({ length: 24 }, (_, i) => String(i).padStart(2, "0"));
@@ -39,10 +39,10 @@ const MINUTES = ["00", "15", "30", "45"];
 function formatTimeLimit(h: string, m: string) {
   const hNum = parseInt(h, 10);
   const mNum = parseInt(m, 10);
-  if (hNum === 0 && mNum === 0) return "Không có";
-  if (hNum === 0) return `${mNum} phút`;
-  if (mNum === 0) return `${hNum} giờ`;
-  return `${hNum} giờ ${mNum} phút`;
+  if (hNum === 0 && mNum === 0) return "None";
+  if (hNum === 0) return `${mNum} min`;
+  if (mNum === 0) return `${hNum} h`;
+  return `${hNum} h ${mNum} min`;
 }
 
 // ─── DrumPicker ──────────────────────────────────────────────────────────────
@@ -122,10 +122,10 @@ export default function GroupOrderPage() {
   const passedCartItems = (location.state as any)?.cartItems ?? [];
   const { user } = useAuth();
 
-  const [groupName,    setGroupName]    = useState(`Đơn hàng của ${user?.username ?? user?.name ?? "tôi"}`);
+  const [groupName,    setGroupName]    = useState(`Order by ${user?.username ?? user?.name ?? "me"}`);
   const [editingName,  setEditingName]  = useState(false);
   const [paymentMode,  setPaymentMode]  = useState<PaymentOption>('owner_only');
-  const [timeLimit,    setTimeLimit]    = useState("Không có");
+  const [timeLimit,    setTimeLimit]    = useState("None");
 
   // Time limit sheet
   const [showTimeSheet, setShowTimeSheet] = useState(false);
@@ -143,13 +143,13 @@ export default function GroupOrderPage() {
         groupName,
         paymentMethod: paymentMode,
         paymentOption: paymentMode,
-        timeLimit: timeLimit !== "Đăng chờ" && timeLimit !== "Không có" ? null : null,
+        timeLimit: timeLimit !== "Pending" && timeLimit !== "None" ? null : null,
       });
       navigate("/group-order/active", {
         state: { groupName, cartItems: passedCartItems, groupId: group._id, paymentOption: paymentMode },
       });
     } catch (err: any) {
-      toast.error(err?.response?.data?.message ?? "Không tạo được nhóm. Vui lòng thử lại.");
+      toast.error(err?.response?.data?.message ?? "Failed to create group. Please try again.");
     } finally {
       setConfirming(false);
     }
@@ -167,11 +167,11 @@ export default function GroupOrderPage() {
             className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-green-600 transition-colors"
           >
             <ArrowLeft className="w-4 h-4" />
-            <span>Quay lại</span>
+            <span>Back</span>
           </button>
           <div className="h-5 w-px bg-gray-200" />
-          <h1 className="text-base font-bold text-gray-900">Đặt đơn nhóm</h1>
-          <span className="ml-auto text-xs text-gray-400">FreshMarket · {new Date().toLocaleDateString("vi-VN")}</span>
+          <h1 className="text-base font-bold text-gray-900">Group Order</h1>
+          <span className="ml-auto text-xs text-gray-400">FreshMarket · {new Date().toLocaleDateString("en-US")}</span>
         </div>
       </div>
 
@@ -190,11 +190,11 @@ export default function GroupOrderPage() {
               <div className="z-10">
                 <p className="text-green-100 text-sm font-medium mb-1">FreshMarket</p>
                 <h2 className="text-3xl font-extrabold text-white leading-tight mb-2">
-                  Đặt đơn nhóm<br />
-                  <span className="text-yellow-300">– tiết kiệm hơn!</span>
+                  Group Order<br />
+                  <span className="text-yellow-300">– save more!</span>
                 </h2>
                 <p className="text-green-100 text-sm max-w-xs leading-relaxed">
-                  Mời bạn bè cùng đặt, nhận ưu đãi lên đến <span className="font-bold text-white">10%</span> cho cả nhóm.
+                  Invite friends to order together, get up to <span className="font-bold text-white">10%</span> off for the whole group.
                 </p>
               </div>
               {/* decorative avatars */}
@@ -216,13 +216,13 @@ export default function GroupOrderPage() {
             <div className="px-6 pt-5 pb-4">
               <h3 className="text-base font-bold text-gray-900 flex items-center gap-2">
                 <Users className="w-5 h-5 text-green-600" />
-                Thiết lập nhóm
+                Group Setup
               </h3>
             </div>
 
             {/* Group name inline edit */}
             <div className="px-6 pb-4 border-t border-gray-100 pt-4">
-              <label className="text-xs text-gray-400 font-medium mb-1.5 block">Tên nhóm</label>
+              <label className="text-xs text-gray-400 font-medium mb-1.5 block">Group name</label>
               <div className="flex items-center gap-3">
                 {editingName ? (
                   <input
@@ -247,7 +247,7 @@ export default function GroupOrderPage() {
                   }`}
                 >
                   {editingName ? <Check className="w-3.5 h-3.5" /> : <Edit3 className="w-3.5 h-3.5" />}
-                  {editingName ? "Lưu" : "Chỉnh sửa"}
+                  {editingName ? "Save" : "Edit"}
                 </button>
               </div>
             </div>
@@ -255,17 +255,17 @@ export default function GroupOrderPage() {
             {/* Payment */}
             <SettingCard
               icon={<CreditCard className="w-5 h-5 text-green-600" />}
-              label="Thanh toán hoá đơn"
+              label="Bill payment"
               value={PAYMENT_OPTIONS.find(o => o.value === paymentMode)?.label ?? paymentMode}
               onEdit={() => setShowPaySheet(true)}
             />
             {/* Time limit */}
             <SettingCard
               icon={<Clock className="w-5 h-5 text-green-600" />}
-              label="Thời hạn thêm món"
+              label="Item ordering deadline"
               value={timeLimit}
               onEdit={() => setShowTimeSheet(true)}
-              valueClass={timeLimit === "Không có" ? "text-gray-400" : "text-gray-900"}
+              valueClass={timeLimit === "None" ? "text-gray-400" : "text-gray-900"}
             />
           </div>
 
@@ -279,10 +279,10 @@ export default function GroupOrderPage() {
           {/* ── Discount progress card ── */}
           <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
             <div className="flex items-start justify-between mb-1">
-              <p className="text-base font-extrabold text-gray-900">Nhận ưu đãi lên đến 10%!</p>
+              <p className="text-base font-extrabold text-gray-900">Get up to 10% off!</p>
             </div>
             <p className="text-xs text-gray-400 leading-relaxed mb-6">
-              Mời thêm thành viên và đảm bảo mọi người đều đặt ít nhất 1 món.
+              Invite more members and make sure everyone orders at least 1 item.
             </p>
 
             {/* Static roadmap bar */}
@@ -300,7 +300,7 @@ export default function GroupOrderPage() {
                       <div className="w-4 h-4 rounded-full border-2 bg-white border-gray-300 z-10" />
                       <div className="absolute top-5 flex flex-col items-center">
                         <span className="text-xs font-bold whitespace-nowrap text-gray-500">{tier.pct}%</span>
-                        <span className="text-[10px] whitespace-nowrap text-gray-400">{tier.members} người</span>
+                        <span className="text-[10px] whitespace-nowrap text-gray-400">{tier.members} members</span>
                       </div>
                     </div>
                   );
@@ -321,12 +321,12 @@ export default function GroupOrderPage() {
                   <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
                   <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
                 </svg>
-                Đang tạo nhóm...
+                Creating group...
               </>
-            ) : "Tạo Đơn hàng nhóm →"}
+            ) : "Create Group Order →"}
           </button>
           <p className="text-center text-xs text-gray-400">
-            Bạn có thể mời thành viên sau khi tạo nhóm
+            You can invite members after creating the group
           </p>
         </div>
       </div>
@@ -342,7 +342,7 @@ export default function GroupOrderPage() {
                 <ArrowLeft className="w-4 h-4" />
               </button>
               <div>
-                <p className="text-xs text-green-100">Đặt đơn nhóm</p>
+                <p className="text-xs text-green-100">Group Order</p>
                 <p className="text-sm font-bold text-white">{groupName}</p>
               </div>
             </div>
@@ -350,10 +350,10 @@ export default function GroupOrderPage() {
             {/* Content */}
             <div className="px-8 pt-8 pb-6">
               <h3 className="text-2xl font-extrabold text-gray-900 leading-snug mb-3">
-                Đặt thời hạn cho các thành viên thêm món
+                Set a deadline for members to add items
               </h3>
               <p className="text-sm text-gray-500 leading-relaxed mb-8">
-                Chúng tôi sẽ nhắc bạn đặt đơn khi gần đến thời hạn thêm món. Bạn có thể cập nhật thời hạn nếu các thành viên cần thêm thời gian.
+                We'll remind you to place the order before the deadline. You can update the deadline if members need more time.
               </p>
 
               {/* Drum pickers */}
@@ -363,7 +363,7 @@ export default function GroupOrderPage() {
                 <DrumPicker items={MINUTES} selected={tlMin}  onChange={setTlMin} />
               </div>
               <p className="text-center text-xs text-gray-400 mt-3">
-                {formatTimeLimit(tlHour, tlMin) === "Không có" ? "Không giới hạn thời gian" : `Thời hạn: ${formatTimeLimit(tlHour, tlMin)}`}
+                {formatTimeLimit(tlHour, tlMin) === "None" ? "No time limit" : `Deadline: ${formatTimeLimit(tlHour, tlMin)}`}
               </p>
             </div>
 
@@ -373,13 +373,13 @@ export default function GroupOrderPage() {
                 onClick={() => { setTimeLimit(formatTimeLimit(tlHour, tlMin)); setShowTimeSheet(false); }}
                 className="w-full py-3.5 rounded-2xl bg-green-600 text-white font-bold text-base hover:bg-green-700 active:scale-[0.98] transition-all shadow-md"
               >
-                Đặt thời hạn thêm món
+                Set deadline
               </button>
               <button
-                onClick={() => { setTimeLimit("Không có"); setShowTimeSheet(false); }}
+                onClick={() => { setTimeLimit("None"); setShowTimeSheet(false); }}
                 className="w-full py-3.5 rounded-2xl bg-gray-100 text-gray-700 font-semibold text-base hover:bg-gray-200 active:scale-[0.98] transition-all"
               >
-                Bỏ qua thời hạn và tiếp tục
+                No deadline, continue
               </button>
             </div>
           </div>
@@ -395,11 +395,11 @@ export default function GroupOrderPage() {
               <button onClick={() => setShowPaySheet(false)} className="w-8 h-8 rounded-full hover:bg-gray-100 flex items-center justify-center transition-colors">
                 <ArrowLeft className="w-5 h-5 text-gray-700" />
               </button>
-              <h3 className="text-lg font-bold text-gray-900">Chọn người thanh toán</h3>
+              <h3 className="text-lg font-bold text-gray-900">Choose payment method</h3>
             </div>
             <div className="px-6 py-5">
               <p className="text-sm text-gray-500 mb-6 leading-relaxed">
-                Chọn cách thanh toán cho nhóm của bạn. Bạn có thể thay đổi sau khi nhóm đã được tạo.
+                Choose how the group will pay. You can change this after the group is created.
               </p>
               <div className="space-y-2">
                 {PAYMENT_OPTIONS.map((opt) => {
@@ -467,7 +467,7 @@ function SettingCard({
       </div>
       <button className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-gray-100 text-gray-600 group-hover:bg-green-100 group-hover:text-green-700 transition-colors">
         <Edit3 className="w-3.5 h-3.5" />
-        Chỉnh sửa
+        Edit
       </button>
     </div>
   );
