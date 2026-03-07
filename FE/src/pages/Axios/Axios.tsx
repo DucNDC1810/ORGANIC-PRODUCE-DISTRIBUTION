@@ -80,6 +80,10 @@ export interface User {
   role: 'admin' | 'manager' | 'customer' | 'user' | 'shipper' | 'farmer';
   phone?: string;
   address?: string;
+  street?: string;
+  ward?: string;
+  district?: string;
+  province?: string;
   avatar?: string;
   dateOfBirth?: string;
   gender?: 'male' | 'female' | 'other';

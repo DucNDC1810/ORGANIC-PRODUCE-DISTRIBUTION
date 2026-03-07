@@ -124,7 +124,7 @@ export default function CheckoutPage() {
     fullName: user?.name || "",
     phone: user?.phone || "",
     email: user?.email || "",
-    address: "",
+    address: (user as any)?.street || "",
     paymentMethod: "COD",
     notes: "",
     promoCode: "",
@@ -183,6 +183,44 @@ export default function CheckoutPage() {
       .then((data: ProvinceItem[]) => setProvinces(data))
       .catch(() => setProvinces([]));
   }, []);
+
+  // Auto-fill province/district/ward from saved profile address once provinces are loaded
+  useEffect(() => {
+    if (provinces.length === 0) return;
+    const savedProvince = (user as any)?.province as string | undefined;
+    if (!savedProvince) return;
+    const matchedP = provinces.find((p) => p.name === savedProvince);
+    if (!matchedP) return;
+    setSelectedProvince({ code: matchedP.code, name: matchedP.name });
+    setLoadingDistricts(true);
+    fetch(`https://provinces.open-api.vn/api/p/${matchedP.code}?depth=2`)
+      .then((r) => r.json())
+      .then(async (pData) => {
+        const dList: DistrictItem[] = pData.districts ?? [];
+        setDistricts(dList);
+        const savedDistrict = (user as any)?.district as string | undefined;
+        if (!savedDistrict) return;
+        const matchedD = dList.find((d) => d.name === savedDistrict);
+        if (!matchedD) return;
+        setSelectedDistrict({ code: matchedD.code, name: matchedD.name });
+        setLoadingWards(true);
+        try {
+          const wRes = await fetch(`https://provinces.open-api.vn/api/d/${matchedD.code}?depth=2`);
+          const wData = await wRes.json();
+          const wList: WardItem[] = wData.wards ?? [];
+          setWards(wList);
+          const savedWard = (user as any)?.ward as string | undefined;
+          if (!savedWard) return;
+          const matchedW = wList.find((w) => w.name === savedWard);
+          if (matchedW) setSelectedWard({ code: matchedW.code, name: matchedW.name });
+        } finally {
+          setLoadingWards(false);
+        }
+      })
+      .catch(() => {})
+      .finally(() => setLoadingDistricts(false));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [provinces]);
 
   const handleProvinceChange = async (code: number, name: string) => {
     setSelectedProvince({ code, name });
