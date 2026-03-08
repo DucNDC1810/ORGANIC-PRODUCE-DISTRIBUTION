@@ -48,15 +48,20 @@ export default function Profile() {
   const [provinces, setProvinces] = useState<{ code: number; name: string }[]>([]);
   const [districts, setDistricts] = useState<{ code: number; name: string }[]>([]);
   const [wards, setWards] = useState<{ code: number; name: string }[]>([]);
-  const [selectedProvince, setSelectedProvince] = useState<{ code: number; name: string } | null>(null);
-  const [selectedDistrict, setSelectedDistrict] = useState<{ code: number; name: string } | null>(null);
-  const [selectedWard, setSelectedWard] = useState<{ code: number; name: string } | null>(null);
+  const [selectedProvince, setSelectedProvince] = useState<{ code: number; name: string } | null>(
+    user?.province ? { code: 0, name: user.province } : null
+  );
+  const [selectedDistrict, setSelectedDistrict] = useState<{ code: number; name: string } | null>(
+    user?.district ? { code: 0, name: user.district } : null
+  );
+  const [selectedWard, setSelectedWard] = useState<{ code: number; name: string } | null>(
+    user?.ward ? { code: 0, name: user.ward } : null
+  );
   const [loadingDistricts, setLoadingDistricts] = useState(false);
   const [loadingWards, setLoadingWards] = useState(false);
-  const [showLocationPanel, setShowLocationPanel] = useState(false);
+  const [showLocationModal, setShowLocationModal] = useState(false);
   const [locationTab, setLocationTab] = useState<'province' | 'district' | 'ward'>('province');
   const [locationSearch, setLocationSearch] = useState('');
-  const locationPanelRef = useRef<HTMLDivElement>(null);
   const locationSearchRef = useRef<HTMLInputElement>(null);
 
   const normalise = (str: string) =>
@@ -108,16 +113,7 @@ export default function Profile() {
       .catch(() => setProvinces([]));
   }, []);
 
-  // Close location panel on outside click
-  useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
-      if (locationPanelRef.current && !locationPanelRef.current.contains(e.target as Node)) {
-        setShowLocationPanel(false);
-      }
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
+
 
 
 
@@ -141,7 +137,7 @@ export default function Profile() {
       setSelectedProvince(user?.province ? { code: 0, name: user.province } : null);
       setSelectedDistrict(user?.district ? { code: 0, name: user.district } : null);
       setSelectedWard(user?.ward ? { code: 0, name: user.ward } : null);
-      setShowLocationPanel(false);
+      setShowLocationModal(false);
     }
     setIsEditing(!isEditing);
   };
@@ -185,7 +181,15 @@ export default function Profile() {
   const handleWardChange = (_code: number, name: string) => {
     setSelectedWard({ code: _code, name });
     setLocationSearch('');
-    setShowLocationPanel(false);
+    setShowLocationModal(false);
+  };
+
+  const openLocationModal = () => {
+    const tab = !selectedProvince ? 'province' : !selectedDistrict ? 'district' : 'ward';
+    setLocationTab(tab);
+    setLocationSearch('');
+    setShowLocationModal(true);
+    setTimeout(() => locationSearchRef.current?.focus(), 100);
   };
 
   const handleSave = async () => {
@@ -581,147 +585,18 @@ export default function Profile() {
 
                       {/* Province / District / Ward selector */}
                       {isEditing && (
-                        <div className="relative" ref={locationPanelRef}>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              const open = !showLocationPanel;
-                              setShowLocationPanel(open);
-                              if (open) {
-                                const tab = !selectedProvince ? 'province'
-                                  : !selectedDistrict ? 'district'
-                                  : 'ward';
-                                setLocationTab(tab);
-                                setLocationSearch('');
-                                setTimeout(() => locationSearchRef.current?.focus(), 50);
-                              }
-                            }}
-                            className="w-full px-4 py-3 border border-[#E5E7EB] rounded-lg text-sm text-left bg-white hover:border-[#00B207] focus:outline-none focus:border-[#00B207] transition-colors"
-                          >
-                            {selectedWard && selectedDistrict && selectedProvince ? (
-                              <span className="text-[#101828]">
-                                {selectedWard.name}, {selectedDistrict.name}, {selectedProvince.name}
-                              </span>
-                            ) : (
-                              <span className="text-gray-400">Province/City, District, Ward</span>
-                            )}
-                          </button>
-
-                          {showLocationPanel && (
-                            <div className="absolute left-0 right-0 top-full mt-1 bg-white border border-gray-200 rounded-lg shadow-xl z-50">
-                              {/* Tab headers */}
-                              <div className="flex border-b border-gray-200">
-                                {([
-                                  { key: 'province' as const, label: 'Province / City' },
-                                  { key: 'district' as const, label: 'District' },
-                                  { key: 'ward' as const, label: 'Ward' },
-                                ]).map(({ key, label }) => (
-                                  <button
-                                    key={key}
-                                    type="button"
-                                    disabled={
-                                      (key === 'district' && !selectedProvince) ||
-                                      (key === 'ward' && !selectedDistrict)
-                                    }
-                                    onClick={() => {
-                                      setLocationTab(key);
-                                      setLocationSearch('');
-                                      setTimeout(() => locationSearchRef.current?.focus(), 50);
-                                    }}
-                                    className={`flex-1 py-2.5 text-xs font-semibold border-b-2 transition-colors ${
-                                      locationTab === key
-                                        ? 'border-[#00B207] text-[#00B207]'
-                                        : 'border-transparent text-gray-500 hover:text-gray-700 disabled:text-gray-300 disabled:cursor-not-allowed'
-                                    }`}
-                                  >
-                                    {label}
-                                  </button>
-                                ))}
-                              </div>
-
-                              {/* Search */}
-                              <div className="px-3 pt-2.5 pb-1.5">
-                                <div className="flex items-center gap-2 border border-gray-200 rounded-lg px-3 py-2 bg-gray-50 focus-within:border-[#00B207] focus-within:bg-white transition-colors">
-                                  <Search className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
-                                  <input
-                                    ref={locationSearchRef}
-                                    type="text"
-                                    value={locationSearch}
-                                    onChange={(e) => setLocationSearch(e.target.value)}
-                                    placeholder={
-                                      locationTab === 'province' ? 'Tìm kiếm tỉnh/thành phố...'
-                                        : locationTab === 'district' ? 'Tìm kiếm quận/huyện...'
-                                        : 'Tìm kiếm phường/xã...'
-                                    }
-                                    className="flex-1 text-sm bg-transparent outline-none text-gray-700 placeholder-gray-400"
-                                  />
-                                  {locationSearch && (
-                                    <button
-                                      type="button"
-                                      onClick={() => { setLocationSearch(''); locationSearchRef.current?.focus(); }}
-                                      className="text-gray-400 hover:text-gray-600 transition-colors"
-                                    >
-                                      <X className="w-3.5 h-3.5" />
-                                    </button>
-                                  )}
-                                </div>
-                              </div>
-
-                              {/* List */}
-                              <div className="max-h-52 overflow-y-auto py-1">
-                                {locationTab === 'province' && (() => {
-                                  const filtered = locationSearch
-                                    ? provinces.filter((p) => normalise(p.name).includes(normalise(locationSearch)))
-                                    : provinces;
-                                  return filtered.length > 0
-                                    ? filtered.map((p) => (
-                                        <button key={p.code} type="button"
-                                          onClick={() => handleProvinceChange(p.code, p.name)}
-                                          className={`w-full text-left px-4 py-2 text-sm transition-colors hover:bg-gray-50 ${
-                                            selectedProvince?.name === p.name ? 'text-[#00B207] font-medium bg-green-50' : 'text-gray-700'
-                                          }`}
-                                        >{p.name}</button>
-                                      ))
-                                    : <p className="text-center py-6 text-sm text-gray-400">Không tìm thấy địa điểm phù hợp</p>;
-                                })()}
-
-                                {locationTab === 'district' && (() => {
-                                  if (loadingDistricts) return <p className="text-center py-6 text-sm text-gray-400">Loading...</p>;
-                                  const filtered = locationSearch
-                                    ? districts.filter((d) => normalise(d.name).includes(normalise(locationSearch)))
-                                    : districts;
-                                  return filtered.length > 0
-                                    ? filtered.map((d) => (
-                                        <button key={d.code} type="button"
-                                          onClick={() => handleDistrictChange(d.code, d.name)}
-                                          className={`w-full text-left px-4 py-2 text-sm transition-colors hover:bg-gray-50 ${
-                                            selectedDistrict?.name === d.name ? 'text-[#00B207] font-medium bg-green-50' : 'text-gray-700'
-                                          }`}
-                                        >{d.name}</button>
-                                      ))
-                                    : <p className="text-center py-6 text-sm text-gray-400">Không tìm thấy địa điểm phù hợp</p>;
-                                })()}
-
-                                {locationTab === 'ward' && (() => {
-                                  if (loadingWards) return <p className="text-center py-6 text-sm text-gray-400">Loading...</p>;
-                                  const filtered = locationSearch
-                                    ? wards.filter((w) => normalise(w.name).includes(normalise(locationSearch)))
-                                    : wards;
-                                  return filtered.length > 0
-                                    ? filtered.map((w) => (
-                                        <button key={w.code} type="button"
-                                          onClick={() => handleWardChange(w.code, w.name)}
-                                          className={`w-full text-left px-4 py-2 text-sm transition-colors hover:bg-gray-50 ${
-                                            selectedWard?.name === w.name ? 'text-[#00B207] font-medium bg-green-50' : 'text-gray-700'
-                                          }`}
-                                        >{w.name}</button>
-                                      ))
-                                    : <p className="text-center py-6 text-sm text-gray-400">Không tìm thấy địa điểm phù hợp</p>;
-                                })()}
-                              </div>
-                            </div>
-                          )}
-                        </div>
+                        <button
+                          type="button"
+                          onClick={openLocationModal}
+                          className="w-full px-4 py-3 border border-[#E5E7EB] rounded-lg text-sm text-left bg-white hover:border-[#00B207] focus:outline-none focus:border-[#00B207] transition-colors flex items-center justify-between group"
+                        >
+                          <span className={(selectedWard || selectedDistrict || selectedProvince) ? 'text-[#101828]' : 'text-gray-400'}>
+                            {(selectedWard || selectedDistrict || selectedProvince)
+                              ? [selectedWard?.name, selectedDistrict?.name, selectedProvince?.name].filter(Boolean).join(', ')
+                              : 'Chọn Tỉnh/Thành phố, Quận/Huyện, Phường/Xã'}
+                          </span>
+                          <Search className="w-4 h-4 text-gray-400 group-hover:text-[#00B207] transition-colors flex-shrink-0" />
+                        </button>
                       )}
                     </div>
                   </div>
@@ -748,6 +623,157 @@ export default function Profile() {
           </div>
         </div>
       </div>
+
+      {/* ── Location Modal ── */}
+      {showLocationModal && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4"
+          onClick={() => setShowLocationModal(false)}
+        >
+          <div
+            className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Modal header */}
+            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+              <h3 className="font-bold text-[#101828] text-base">Chọn địa chỉ</h3>
+              <button
+                type="button"
+                onClick={() => setShowLocationModal(false)}
+                className="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Tabs */}
+            <div className="flex border-b border-gray-100 px-5">
+              {([
+                { key: 'province' as const, label: 'Tỉnh / Thành phố' },
+                { key: 'district' as const, label: 'Quận / Huyện' },
+                { key: 'ward' as const, label: 'Phường / Xã' },
+              ]).map(({ key, label }) => (
+                <button
+                  key={key}
+                  type="button"
+                  disabled={
+                    (key === 'district' && !selectedProvince) ||
+                    (key === 'ward' && !selectedDistrict)
+                  }
+                  onClick={() => {
+                    setLocationTab(key);
+                    setLocationSearch('');
+                    setTimeout(() => locationSearchRef.current?.focus(), 50);
+                  }}
+                  className={`flex-1 py-3 text-xs font-semibold border-b-2 transition-colors ${
+                    locationTab === key
+                      ? 'border-[#00B207] text-[#00B207]'
+                      : 'border-transparent text-gray-400 hover:text-gray-600 disabled:text-gray-200 disabled:cursor-not-allowed'
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+
+            {/* Selected breadcrumb */}
+            {(selectedProvince || selectedDistrict || selectedWard) && (
+              <div className="px-5 py-2 bg-green-50 border-b border-green-100 text-xs text-green-700 font-medium truncate">
+                {[selectedProvince?.name, selectedDistrict?.name, selectedWard?.name].filter(Boolean).join(' › ')}
+              </div>
+            )}
+
+            {/* Search */}
+            <div className="px-5 pt-4 pb-2">
+              <div className="flex items-center gap-2 border border-gray-200 rounded-xl px-3 py-2.5 bg-gray-50 focus-within:border-[#00B207] focus-within:bg-white transition-colors">
+                <Search className="w-4 h-4 text-gray-400 flex-shrink-0" />
+                <input
+                  ref={locationSearchRef}
+                  type="text"
+                  value={locationSearch}
+                  onChange={(e) => setLocationSearch(e.target.value)}
+                  placeholder={
+                    locationTab === 'province' ? 'Tìm kiếm tỉnh/thành phố...'
+                      : locationTab === 'district' ? 'Tìm kiếm quận/huyện...'
+                      : 'Tìm kiếm phường/xã...'
+                  }
+                  className="flex-1 text-sm bg-transparent outline-none text-gray-700 placeholder-gray-400"
+                />
+                {locationSearch && (
+                  <button type="button" onClick={() => { setLocationSearch(''); locationSearchRef.current?.focus(); }}
+                    className="text-gray-400 hover:text-gray-600 transition-colors">
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* List */}
+            <div className="overflow-y-auto py-1" style={{ maxHeight: '320px' }}>
+              {locationTab === 'province' && (() => {
+                const filtered = locationSearch
+                  ? provinces.filter((p) => normalise(p.name).includes(normalise(locationSearch)))
+                  : provinces;
+                return filtered.length > 0
+                  ? filtered.map((p) => (
+                      <button key={p.code} type="button"
+                        onClick={() => handleProvinceChange(p.code, p.name)}
+                        className={`w-full text-left px-5 py-2.5 text-sm transition-colors hover:bg-gray-50 ${
+                          selectedProvince?.name === p.name ? 'text-[#00B207] font-semibold bg-green-50' : 'text-gray-700'
+                        }`}
+                      >{p.name}</button>
+                    ))
+                  : <p className="text-center py-8 text-sm text-gray-400">Không tìm thấy địa điểm phù hợp</p>;
+              })()}
+
+              {locationTab === 'district' && (() => {
+                if (loadingDistricts) return <p className="text-center py-8 text-sm text-gray-400">Đang tải...</p>;
+                const filtered = locationSearch
+                  ? districts.filter((d) => normalise(d.name).includes(normalise(locationSearch)))
+                  : districts;
+                return filtered.length > 0
+                  ? filtered.map((d) => (
+                      <button key={d.code} type="button"
+                        onClick={() => handleDistrictChange(d.code, d.name)}
+                        className={`w-full text-left px-5 py-2.5 text-sm transition-colors hover:bg-gray-50 ${
+                          selectedDistrict?.name === d.name ? 'text-[#00B207] font-semibold bg-green-50' : 'text-gray-700'
+                        }`}
+                      >{d.name}</button>
+                    ))
+                  : <p className="text-center py-8 text-sm text-gray-400">Không tìm thấy địa điểm phù hợp</p>;
+              })()}
+
+              {locationTab === 'ward' && (() => {
+                if (loadingWards) return <p className="text-center py-8 text-sm text-gray-400">Đang tải...</p>;
+                const filtered = locationSearch
+                  ? wards.filter((w) => normalise(w.name).includes(normalise(locationSearch)))
+                  : wards;
+                return filtered.length > 0
+                  ? filtered.map((w) => (
+                      <button key={w.code} type="button"
+                        onClick={() => handleWardChange(w.code, w.name)}
+                        className={`w-full text-left px-5 py-2.5 text-sm transition-colors hover:bg-gray-50 ${
+                          selectedWard?.name === w.name ? 'text-[#00B207] font-semibold bg-green-50' : 'text-gray-700'
+                        }`}
+                      >{w.name}</button>
+                    ))
+                  : <p className="text-center py-8 text-sm text-gray-400">Không tìm thấy địa điểm phù hợp</p>;
+              })()}
+            </div>
+
+            {/* Footer */}
+            <div className="px-5 py-3 border-t border-gray-100 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setShowLocationModal(false)}
+                className="px-5 py-2 rounded-xl bg-[#00B207] text-white text-sm font-semibold hover:bg-[#00B207]/90 transition-colors"
+              >
+                Xác nhận
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
     </div>
   );
