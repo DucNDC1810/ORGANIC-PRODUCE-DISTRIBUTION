@@ -73,7 +73,7 @@ export default function Profile() {
   }>({
     name: user?.name || '',
     phone: user?.phone || '',
-    street: (user as any)?.street || '',
+    street: user?.street || '',
     avatar: user?.avatar || '',
     gender: user?.gender || '',
     dateOfBirth: user?.dateOfBirth ? new Date(user.dateOfBirth).toISOString().split('T')[0] : ''
@@ -89,14 +89,14 @@ export default function Profile() {
       setFormData({
         name: user.name || '',
         phone: user.phone || '',
-        street: (user as any)?.street || '',
+        street: user.street || '',
         avatar: user.avatar || '',
         gender: user.gender || '',
         dateOfBirth: user.dateOfBirth ? new Date(user.dateOfBirth).toISOString().split('T')[0] : ''
       });
-      if ((user as any).province) setSelectedProvince({ code: 0, name: (user as any).province });
-      if ((user as any).district) setSelectedDistrict({ code: 0, name: (user as any).district });
-      if ((user as any).ward) setSelectedWard({ code: 0, name: (user as any).ward });
+      if (user.province) setSelectedProvince({ code: 0, name: user.province });
+      if (user.district) setSelectedDistrict({ code: 0, name: user.district });
+      if (user.ward) setSelectedWard({ code: 0, name: user.ward });
     }
   }, [user]);
 
@@ -133,14 +133,14 @@ export default function Profile() {
       setFormData({
         name: user?.name || '',
         phone: user?.phone || '',
-        street: (user as any)?.street || '',
+        street: user?.street || '',
         avatar: user?.avatar || '',
         gender: user?.gender || '',
         dateOfBirth: user?.dateOfBirth ? new Date(user.dateOfBirth).toISOString().split('T')[0] : ''
       });
-      setSelectedProvince((user as any)?.province ? { code: 0, name: (user as any).province } : null);
-      setSelectedDistrict((user as any)?.district ? { code: 0, name: (user as any).district } : null);
-      setSelectedWard((user as any)?.ward ? { code: 0, name: (user as any).ward } : null);
+      setSelectedProvince(user?.province ? { code: 0, name: user.province } : null);
+      setSelectedDistrict(user?.district ? { code: 0, name: user.district } : null);
+      setSelectedWard(user?.ward ? { code: 0, name: user.ward } : null);
       setShowLocationPanel(false);
     }
     setIsEditing(!isEditing);
@@ -229,15 +229,15 @@ export default function Profile() {
       setFormData({
         name: updatedUser.name || '',
         phone: updatedUser.phone || '',
-        street: (updatedUser as any).street || street,
+        street: updatedUser.street || street,
         avatar: updatedUser.avatar || '',
         gender: updatedUser.gender || '',
         dateOfBirth: updatedUser.dateOfBirth ? new Date(updatedUser.dateOfBirth).toISOString().split('T')[0] : '',
       });
       // Preserve the names we selected (API may not return ward/district/province if they were empty before)
-      const savedProvince = (updatedUser as any).province || province;
-      const savedDistrict = (updatedUser as any).district || district;
-      const savedWard = (updatedUser as any).ward || ward;
+      const savedProvince = updatedUser.province || province;
+      const savedDistrict = updatedUser.district || district;
+      const savedWard = updatedUser.ward || ward;
       if (savedProvince) setSelectedProvince(prev => ({ code: prev?.code ?? 0, name: savedProvince }));
       if (savedDistrict) setSelectedDistrict(prev => ({ code: prev?.code ?? 0, name: savedDistrict }));
       if (savedWard) setSelectedWard(prev => ({ code: prev?.code ?? 0, name: savedWard }));
@@ -570,10 +570,10 @@ export default function Profile() {
                           <Home className="w-5 h-5 text-[#00B207] mt-0.5" />
                           <span className="text-[#101828] font-medium">
                             {[
-                              formData.street || (user as any)?.street,
-                              selectedWard?.name || (user as any)?.ward,
-                              selectedDistrict?.name || (user as any)?.district,
-                              selectedProvince?.name || (user as any)?.province,
+                              formData.street || user?.street,
+                              selectedWard?.name || user?.ward,
+                              selectedDistrict?.name || user?.district,
+                              selectedProvince?.name || user?.province,
                             ].filter(Boolean).join(', ') || user?.address || 'Not set'}
                           </span>
                         </div>
