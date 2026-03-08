@@ -12,15 +12,15 @@ import { toast } from 'sonner';
 // ── Helpers ─────────────────────────────────────────────────────
 
 const FREQUENCY_LABEL: Record<string, string> = {
-  weekly:     'Mỗi tuần (7 ngày)',
-  'bi-weekly': 'Mỗi 2 tuần (14 ngày)',
-  monthly:    'Mỗi tháng (30 ngày)',
+  weekly:     'Weekly (7 days)',
+  'bi-weekly': 'Bi-weekly (14 days)',
+  monthly:    'Monthly (30 days)',
 };
 
 const PAYMENT_LABELS: Record<string, string> = {
   cod:     'COD',
   momo:    'MoMo',
-  cash:    'Tiền mặt',
+  cash:    'Cash',
 };
 
 const STATUS_CONFIG: Record<string, {
@@ -30,16 +30,16 @@ const STATUS_CONFIG: Record<string, {
   border: string;
   dot: string;
 }> = {
-  active:    { label: 'Đang hoạt động', bg: 'bg-green-50',  text: 'text-green-700',  border: 'border-green-200',  dot: 'bg-green-500' },
-  paused:    { label: 'Tạm dừng',       bg: 'bg-amber-50',  text: 'text-amber-700',  border: 'border-amber-200',  dot: 'bg-amber-400' },
-  cancelled: { label: 'Đã hủy',         bg: 'bg-red-50',    text: 'text-red-700',    border: 'border-red-200',    dot: 'bg-red-400' },
+  active:    { label: 'Active',     bg: 'bg-green-50',  text: 'text-green-700',  border: 'border-green-200',  dot: 'bg-green-500' },
+  paused:    { label: 'Paused',     bg: 'bg-amber-50',  text: 'text-amber-700',  border: 'border-amber-200',  dot: 'bg-amber-400' },
+  cancelled: { label: 'Cancelled',  bg: 'bg-red-50',    text: 'text-red-700',    border: 'border-red-200',    dot: 'bg-red-400' },
 };
 
 const TABS = [
-  { key: '',          label: 'Tất cả' },
-  { key: 'active',    label: 'Đang hoạt động' },
-  { key: 'paused',    label: 'Tạm dừng' },
-  { key: 'cancelled', label: 'Đã hủy' },
+  { key: '',          label: 'All' },
+  { key: 'active',    label: 'Active' },
+  { key: 'paused',    label: 'Paused' },
+  { key: 'cancelled', label: 'Cancelled' },
 ];
 
 function formatDate(d: string | Date) {
@@ -53,7 +53,7 @@ function formatCurrency(n: number) {
 }
 
 function getProductName(item: any): string {
-  return item?.name ?? item?.productId?.name ?? 'Sản phẩm';
+  return item?.name ?? item?.productId?.name ?? 'Product';
 }
 
 function getProductImage(item: any): string {
@@ -124,19 +124,19 @@ function EmptyState({ statusFilter }: { statusFilter: string }) {
         <div className="absolute bottom-3 left-1 w-3 h-3 rounded-full bg-violet-100" />
       </div>
       <h3 className="text-xl font-bold text-[#101828] mb-2">
-        {statusFilter ? 'Không tìm thấy gói nào' : 'Chưa có gói đặt hàng định kỳ'}
+        {statusFilter ? 'No subscriptions found' : 'No recurring orders yet'}
       </h3>
       <p className="text-sm text-[#6A7282] text-center max-w-xs mb-8 leading-relaxed">
         {statusFilter
-          ? `Bạn chưa có gói nào ở trạng thái "${STATUS_CONFIG[statusFilter]?.label ?? statusFilter}".`
-          : 'Bạn chưa đăng ký gói đặt hàng định kỳ nào. Tiết kiệm 5% mỗi đơn khi đặt hàng định kỳ!'}
+          ? `You have no subscriptions with "${STATUS_CONFIG[statusFilter]?.label ?? statusFilter}" status.`
+          : 'You have not set up any recurring orders yet. Save 5% per order with recurring delivery!'}
       </p>
       <button
         onClick={() => navigate('/products')}
         className="flex items-center gap-2 px-7 py-3 bg-violet-600 text-white rounded-xl font-semibold hover:bg-violet-700 transition-all shadow-sm hover:shadow-md active:scale-95"
       >
         <ShoppingBag className="w-5 h-5" />
-        Khám phá sản phẩm
+        Browse Products
       </button>
     </div>
   );
@@ -161,9 +161,9 @@ function CancelModal({
           <div className="w-14 h-14 rounded-full bg-red-50 flex items-center justify-center">
             <AlertTriangle className="w-7 h-7 text-red-500" />
           </div>
-          <h3 className="text-lg font-bold text-[#101828]">Hủy gói định kỳ?</h3>
+          <h3 className="text-lg font-bold text-[#101828]">Cancel Recurring Plan?</h3>
           <p className="text-sm text-[#6A7282] leading-relaxed">
-            Bạn sẽ không nhận được hàng định kỳ nữa. Các đơn hàng đã tạo trước đó vẫn sẽ được giao bình thường. Thao tác này không thể hoàn tác.
+            You will no longer receive recurring deliveries. Previously created orders will still be delivered as planned. This action cannot be undone.
           </p>
         </div>
         <div className="flex gap-3 mt-6">
@@ -172,7 +172,7 @@ function CancelModal({
             disabled={loading}
             className="flex-1 px-4 py-2.5 rounded-xl border border-[#E5E7EB] text-[#364153] font-semibold hover:bg-[#F3F4F6] transition-colors disabled:opacity-50"
           >
-            Không, giữ lại
+            No, Keep It
           </button>
           <button
             onClick={async () => { setLoading(true); await onCancel(subId); setLoading(false); onClose(); }}
@@ -180,7 +180,7 @@ function CancelModal({
             className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-red-500 text-white font-semibold hover:bg-red-600 transition-colors disabled:opacity-50"
           >
             {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <XCircle className="w-4 h-4" />}
-            Hủy gói
+            Cancel Plan
           </button>
         </div>
       </div>
@@ -231,11 +231,11 @@ function SubscriptionCard({
                 #{sub._id.slice(-10).toUpperCase()}
               </p>
               <span className="inline-flex items-center gap-0.5 text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-violet-50 text-violet-600 border border-violet-200">
-                <CalendarClock className="w-3 h-3" /> 🔁 Định kỳ
+                <CalendarClock className="w-3 h-3" /> 🔁 Recurring
               </span>
             </div>
             <p className="text-xs text-[#9CA3AF] mt-0.5">
-              Tạo ngày {formatDate(sub.createdAt)}
+              Created {formatDate(sub.createdAt)}
             </p>
           </div>
         </div>
@@ -248,7 +248,7 @@ function SubscriptionCard({
         <div className="flex items-start gap-2">
           <RefreshCw className="w-4 h-4 text-violet-500 mt-0.5 flex-shrink-0" />
           <div>
-            <p className="text-[10px] text-[#9CA3AF] font-medium uppercase tracking-wide">Tần suất</p>
+            <p className="text-[10px] text-[#9CA3AF] font-medium uppercase tracking-wide">Frequency</p>
             <p className="text-sm font-semibold text-[#101828]">{FREQUENCY_LABEL[sub.frequency] ?? sub.frequency}</p>
           </div>
         </div>
@@ -257,7 +257,7 @@ function SubscriptionCard({
         <div className="flex items-start gap-2">
           <CreditCard className="w-4 h-4 text-violet-500 mt-0.5 flex-shrink-0" />
           <div>
-            <p className="text-[10px] text-[#9CA3AF] font-medium uppercase tracking-wide">Thanh toán</p>
+            <p className="text-[10px] text-[#9CA3AF] font-medium uppercase tracking-wide">Payment</p>
             <p className="text-sm font-semibold text-[#101828]">
               {PAYMENT_LABELS[sub.paymentMethod?.toLowerCase()] ?? sub.paymentMethod ?? 'COD'}
             </p>
@@ -269,7 +269,7 @@ function SubscriptionCard({
           <div className="flex items-start gap-2 col-span-2">
             <Clock className="w-4 h-4 text-violet-500 mt-0.5 flex-shrink-0" />
             <div>
-              <p className="text-[10px] text-[#9CA3AF] font-medium uppercase tracking-wide">Lần giao tiếp theo</p>
+              <p className="text-[10px] text-[#9CA3AF] font-medium uppercase tracking-wide">Next Delivery</p>
               <div className="flex items-center gap-2">
                 <p className="text-sm font-semibold text-[#101828]">{formatDate(sub.nextDeliveryDate)}</p>
                 {days >= 0 && (
@@ -278,7 +278,7 @@ function SubscriptionCard({
                     days <= 2 ? 'bg-amber-50 text-amber-600' :
                     'bg-green-50 text-green-600'
                   }`}>
-                    {days === 0 ? 'Hôm nay!' : days < 0 ? 'Đang xử lý' : `Còn ${days} ngày`}
+                    {days === 0 ? 'Today!' : days < 0 ? 'Processing' : `${days} day(s) left`}
                   </span>
                 )}
               </div>
@@ -291,7 +291,7 @@ function SubscriptionCard({
           <div className="flex items-start gap-2">
             <Tag className="w-4 h-4 text-violet-500 mt-0.5 flex-shrink-0" />
             <div>
-              <p className="text-[10px] text-[#9CA3AF] font-medium uppercase tracking-wide">Ưu đãi định kỳ</p>
+              <p className="text-[10px] text-[#9CA3AF] font-medium uppercase tracking-wide">Recurring Discount</p>
               <p className="text-sm font-semibold text-green-600">-{Math.round(sub.discountRate * 100)}%</p>
             </div>
           </div>
@@ -307,7 +307,7 @@ function SubscriptionCard({
           <div className="flex items-center gap-2">
             <Package className="w-4 h-4 text-[#9CA3AF]" />
             <span className="text-sm font-medium text-[#364153]">
-              {items.length} sản phẩm
+              {items.length} item(s)
             </span>
           </div>
           <ChevronRight className={`w-4 h-4 text-[#9CA3AF] transition-transform duration-200 ${expanded ? 'rotate-90' : ''}`} />
@@ -330,7 +330,7 @@ function SubscriptionCard({
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium text-[#101828] truncate">{name}</p>
-                    <p className="text-xs text-[#9CA3AF]">SL: {qty}</p>
+                    <p className="text-xs text-[#9CA3AF]">Qty: {qty}</p>
                   </div>
                   {price > 0 && (
                     <p className="text-sm font-semibold text-[#101828] flex-shrink-0">
@@ -345,17 +345,17 @@ function SubscriptionCard({
             {totalPerCycle > 0 && (
               <div className="mt-3 pt-3 border-t border-[#F3F4F6] space-y-1">
                 <div className="flex justify-between text-xs text-[#6A7282]">
-                  <span>Tạm tính / chu kỳ</span>
+                  <span>Subtotal / cycle</span>
                   <span>{formatCurrency(totalPerCycle)}</span>
                 </div>
                 {discount > 0 && (
                   <div className="flex justify-between text-xs text-green-600">
-                    <span>Giảm giá định kỳ (-{Math.round(sub.discountRate * 100)}%)</span>
+                    <span>Recurring discount (-{Math.round(sub.discountRate * 100)}%)</span>
                     <span>-{formatCurrency(discount)}</span>
                   </div>
                 )}
                 <div className="flex justify-between text-sm font-bold text-[#101828]">
-                  <span>Dự kiến / chu kỳ</span>
+                  <span>Estimated / cycle</span>
                   <span className="text-[#00B207]">{formatCurrency(afterDiscount)}</span>
                 </div>
               </div>
@@ -366,12 +366,12 @@ function SubscriptionCard({
 
       {/* ── Row 4: Actions ── */}
       <div className="px-5 py-4 flex items-center justify-between gap-3 flex-wrap">
-        {/* "Xem đơn hàng" — navigate to order history */}
+        {/* "View Orders" — navigate to order history */}
         <button
           onClick={() => navigate('/profile?tab=orders')}
           className="flex items-center gap-1.5 text-sm text-violet-600 font-semibold hover:underline"
         >
-          Xem đơn hàng
+          View Orders
           <ChevronRight className="w-3.5 h-3.5" />
         </button>
 
@@ -385,7 +385,7 @@ function SubscriptionCard({
                 className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-amber-200 bg-amber-50 text-amber-700 text-sm font-semibold hover:bg-amber-100 transition-colors disabled:opacity-50"
               >
                 {isLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <PauseCircle className="w-3.5 h-3.5" />}
-                Tạm dừng
+                Pause
               </button>
             ) : sub.status === 'paused' ? (
               <button
@@ -394,7 +394,7 @@ function SubscriptionCard({
                 className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-green-200 bg-green-50 text-green-700 text-sm font-semibold hover:bg-green-100 transition-colors disabled:opacity-50"
               >
                 {isLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <PlayCircle className="w-3.5 h-3.5" />}
-                Tiếp tục
+                Resume
               </button>
             ) : null}
 
@@ -405,7 +405,7 @@ function SubscriptionCard({
               className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-red-200 bg-red-50 text-red-600 text-sm font-semibold hover:bg-red-100 transition-colors disabled:opacity-50"
             >
               <XCircle className="w-3.5 h-3.5" />
-              Hủy gói
+              Cancel Plan
             </button>
           </div>
         )}
@@ -446,7 +446,7 @@ export default function SubscriptionTab() {
       setTotalItems(pagination.totalItems ?? list.length);
     } catch (err: any) {
       setSubscriptions([]);
-      toast.error(err?.response?.data?.message ?? 'Không thể tải danh sách gói định kỳ');
+      toast.error(err?.response?.data?.message ?? 'Failed to load recurring plans');
     } finally {
       setLoading(false);
     }
@@ -465,10 +465,10 @@ export default function SubscriptionTab() {
     setActionLoading(id);
     try {
       await subscriptionService.pauseSubscription(id);
-      toast.success('Đã tạm dừng gói định kỳ');
+      toast.success('Recurring plan paused');
       fetchSubscriptions(activeTab, page);
     } catch {
-      toast.error('Không thể tạm dừng gói. Vui lòng thử lại.');
+      toast.error('Failed to pause plan. Please try again.');
     } finally {
       setActionLoading(null);
     }
@@ -478,10 +478,10 @@ export default function SubscriptionTab() {
     setActionLoading(id);
     try {
       await subscriptionService.resumeSubscription(id);
-      toast.success('Đã kích hoạt lại gói định kỳ');
+      toast.success('Recurring plan resumed');
       fetchSubscriptions(activeTab, page);
     } catch {
-      toast.error('Không thể kích hoạt lại gói. Vui lòng thử lại.');
+      toast.error('Failed to resume plan. Please try again.');
     } finally {
       setActionLoading(null);
     }
@@ -491,10 +491,10 @@ export default function SubscriptionTab() {
     setActionLoading(id);
     try {
       await subscriptionService.cancelSubscription(id);
-      toast.success('Đã hủy gói định kỳ');
+      toast.success('Recurring plan cancelled');
       fetchSubscriptions(activeTab, page);
     } catch {
-      toast.error('Không thể hủy gói. Vui lòng thử lại.');
+      toast.error('Failed to cancel plan. Please try again.');
     } finally {
       setActionLoading(null);
     }
@@ -505,7 +505,7 @@ export default function SubscriptionTab() {
     setDevLoading(subId);
     try {
       const res = await api.patch(`/subscriptions/dev/set-due/${subId}`) as any;
-      devLog$('ok', `[Set due] ${res?.message ?? 'nextDeliveryDate → hôm qua'}`);
+      devLog$('ok', `[Set due] ${res?.message ?? 'nextDeliveryDate → yesterday'}`);
       fetchSubscriptions(activeTab, page);
     } catch (err: any) {
       devLog$('err', `[Set due] ${err?.response?.data?.message ?? err.message}`);
@@ -516,15 +516,15 @@ export default function SubscriptionTab() {
 
   const handleDevTrigger = async () => {
     setDevLoading('trigger');
-    devLog$('ok', '[Trigger] Đang chạy processSubscriptionOrders()...');
+    devLog$('ok', '[Trigger] Running processSubscriptionOrders()...');
     try {
       const res = await api.post('/subscriptions/dev/trigger-now') as any;
       devLog$('ok', `[Trigger] ${res?.message ?? 'Done'}`);
-      toast.success('Cron job chạy xong! Kiểm tra Order History và email.');
+      toast.success('Cron job completed! Check Order History and email.');
       fetchSubscriptions(activeTab, page);
     } catch (err: any) {
       devLog$('err', `[Trigger] ${err?.response?.data?.message ?? err.message}`);
-      toast.error('Cron job lỗi — xem console backend');
+      toast.error('Cron job error — check backend console');
     } finally {
       setDevLoading(null);
     }
@@ -538,10 +538,10 @@ export default function SubscriptionTab() {
         <div>
           <h2 className="text-xl font-bold text-[#101828] flex items-center gap-2">
             <CalendarClock className="w-5 h-5 text-violet-600" />
-            Đặt hàng định kỳ
+            Recurring Orders
           </h2>
           <p className="text-sm text-[#6A7282] mt-0.5">
-            Quản lý các gói đặt hàng tự động của bạn
+            Manage your automatic recurring orders
           </p>
         </div>
         <button
@@ -550,7 +550,7 @@ export default function SubscriptionTab() {
           className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[#E5E7EB] text-sm text-[#364153] hover:bg-[#F3F4F6] transition-colors disabled:opacity-50"
         >
           <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
-          Làm mới
+          Refresh
         </button>
       </div>
 
@@ -559,8 +559,8 @@ export default function SubscriptionTab() {
         <div className="px-6 py-3 bg-violet-50 border-b border-violet-100 flex items-center gap-2">
           <CalendarClock className="w-4 h-4 text-violet-500" />
           <p className="text-sm text-violet-700 font-medium">
-            Bạn có <span className="font-bold">{totalItems}</span> gói đặt hàng định kỳ
-            {activeTab ? ` (${STATUS_CONFIG[activeTab]?.label ?? activeTab})` : ' (tất cả)'}
+            You have <span className="font-bold">{totalItems}</span> recurring plan(s)
+            {activeTab ? ` (${STATUS_CONFIG[activeTab]?.label ?? activeTab})` : ' (all)'}
           </p>
         </div>
       )}
@@ -602,21 +602,21 @@ export default function SubscriptionTab() {
             <div className="px-5 pb-4 space-y-3">
               {/* Instructions */}
               <ol className="text-xs text-orange-700 list-decimal list-inside space-y-0.5 leading-relaxed">
-                <li>Nhấn <strong>"Set về hôm qua"</strong> trên gói muốn test → nextDeliveryDate thành hôm qua</li>
-                <li>Nhấn <strong>"🚀 Chạy cron ngay"</strong> → backend xử lý, tạo Order mới, gửi email</li>
-                <li>Kiểm tra <strong>Order History</strong> và hòm thư email</li>
+                <li>Click <strong>"Set to Yesterday"</strong> on the plan to test → nextDeliveryDate becomes yesterday</li>
+                <li>Click <strong>"🚀 Run cron now"</strong> → backend processes, creates new Order, sends email</li>
+                <li>Check <strong>Order History</strong> and your email inbox</li>
               </ol>
 
               {/* Subscription list for quick set-due */}
               {subscriptions.length > 0 && (
                 <div className="space-y-2">
-                  <p className="text-xs font-semibold text-orange-600 uppercase tracking-wide">Gói hiện tại:</p>
+                  <p className="text-xs font-semibold text-orange-600 uppercase tracking-wide">Current plans:</p>
                   {subscriptions.map((sub: any) => (
                     <div key={sub._id} className="flex items-center justify-between bg-white rounded-lg border border-orange-200 px-3 py-2 text-xs">
                       <div>
                         <span className="font-mono font-bold text-[#101828]">#{sub._id.slice(-8).toUpperCase()}</span>
                         <span className="ml-2 text-[#6A7282]">
-                          {sub.frequency} · giao {new Date(sub.nextDeliveryDate).toLocaleDateString('vi-VN')}
+                          {sub.frequency} · delivery {new Date(sub.nextDeliveryDate).toLocaleDateString('en-US')}
                         </span>
                       </div>
                       <button
@@ -627,7 +627,7 @@ export default function SubscriptionTab() {
                         {devLoading === sub._id
                           ? <Loader2 className="w-3 h-3 animate-spin" />
                           : '📅'}
-                        Set về hôm qua
+                        Set to Yesterday
                       </button>
                     </div>
                   ))}
@@ -641,8 +641,8 @@ export default function SubscriptionTab() {
                 className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-orange-500 text-white font-bold hover:bg-orange-600 transition-colors disabled:opacity-50 text-sm"
               >
                 {devLoading === 'trigger'
-                  ? <><Loader2 className="w-4 h-4 animate-spin" /> Đang chạy cron...</>
-                  : <>🚀 Chạy cron ngay (processSubscriptionOrders)</>}
+                  ? <><Loader2 className="w-4 h-4 animate-spin" /> Running cron...</>
+                  : <>🚀 Run cron now (processSubscriptionOrders)</>}
               </button>
 
               {/* Log output */}
@@ -683,7 +683,7 @@ export default function SubscriptionTab() {
         {!loading && totalPages > 1 && (
           <div className="flex items-center justify-between pt-2">
             <p className="text-sm text-[#9CA3AF]">
-              Trang {page} / {totalPages}
+              Page {page} / {totalPages}
             </p>
             <div className="flex gap-2">
               <button
@@ -691,14 +691,14 @@ export default function SubscriptionTab() {
                 disabled={page === 1}
                 className="px-3 py-1.5 text-sm rounded-lg border border-[#E5E7EB] text-[#364153] hover:bg-[#F3F4F6] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
               >
-                Trước
+                Prev
               </button>
               <button
                 onClick={() => setPage(p => Math.min(totalPages, p + 1))}
                 disabled={page === totalPages}
                 className="px-3 py-1.5 text-sm rounded-lg border border-[#E5E7EB] text-[#364153] hover:bg-[#F3F4F6] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
               >
-                Tiếp
+                Next
               </button>
             </div>
           </div>

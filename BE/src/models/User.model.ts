@@ -9,6 +9,10 @@ export interface IUser extends Document {
   role: 'admin' | 'manager' | 'customer' | 'user' | 'shipper' | 'farmer';
   phone?: string;
   address?: string;
+  street?: string;
+  ward?: string;
+  district?: string;
+  province?: string;
   avatar?: string;
   dateOfBirth?: Date;
   gender?: 'male' | 'female' | 'other';
@@ -60,6 +64,10 @@ const userSchema = new Schema<IUser>(
     },
     phone: String,
     address: String,
+    street: String,
+    ward: String,
+    district: String,
+    province: String,
     avatar: {
       type: String,
       default: null
