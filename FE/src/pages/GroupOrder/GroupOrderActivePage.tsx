@@ -1155,11 +1155,6 @@ export default function GroupOrderActivePage() {
             {paymentOption === 'owner_only' ? 'Delete group order' : 'Cancel & refund'}
           </button>
 
-          {/* ── Delivery scheduling ── */}
-          <button className="w-full py-3 rounded-2xl border-2 border-dashed border-gray-300 text-gray-500 text-sm font-medium hover:border-green-400 hover:text-green-600 transition-colors flex items-center justify-center gap-2">
-            <Clock className="w-4 h-4" />
-            Schedule delivery for later
-          </button>
         </div>
       </div>
 
