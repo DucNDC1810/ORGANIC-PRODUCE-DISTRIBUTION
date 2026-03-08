@@ -33,34 +33,34 @@ const STATUS_CONFIG: Record<
   string,
   { label: string; bgColor: string; textColor: string; borderColor: string; dotColor: string }
 > = {
-  pending:    { label: 'Chờ thanh toán', bgColor: 'bg-amber-50',   textColor: 'text-amber-700',   borderColor: 'border-amber-200',  dotColor: 'bg-amber-400'   },
-  confirmed:  { label: 'Đã xác nhận',   bgColor: 'bg-blue-50',    textColor: 'text-blue-700',    borderColor: 'border-blue-200',   dotColor: 'bg-blue-400'    },
-  processing: { label: 'Đang xử lý',    bgColor: 'bg-violet-50',  textColor: 'text-violet-700',  borderColor: 'border-violet-200', dotColor: 'bg-violet-400'  },
-  shipped:    { label: 'Đang giao',     bgColor: 'bg-indigo-50',  textColor: 'text-indigo-700',  borderColor: 'border-indigo-200', dotColor: 'bg-indigo-400'  },
-  delivered:  { label: 'Đã giao',       bgColor: 'bg-green-50',   textColor: 'text-green-700',   borderColor: 'border-green-200',  dotColor: 'bg-green-500'   },
-  cancelled:  { label: 'Đã hủy',        bgColor: 'bg-red-50',     textColor: 'text-red-700',     borderColor: 'border-red-200',    dotColor: 'bg-red-400'     },
-  refunded:   { label: 'Đã hoàn tiền',  bgColor: 'bg-gray-50',    textColor: 'text-gray-700',    borderColor: 'border-gray-200',   dotColor: 'bg-gray-400'    },
+  pending:    { label: 'Awaiting Payment', bgColor: 'bg-amber-50',   textColor: 'text-amber-700',   borderColor: 'border-amber-200',  dotColor: 'bg-amber-400'   },
+  confirmed:  { label: 'Confirmed',        bgColor: 'bg-blue-50',    textColor: 'text-blue-700',    borderColor: 'border-blue-200',   dotColor: 'bg-blue-400'    },
+  processing: { label: 'Processing',       bgColor: 'bg-violet-50',  textColor: 'text-violet-700',  borderColor: 'border-violet-200', dotColor: 'bg-violet-400'  },
+  shipped:    { label: 'Shipped',          bgColor: 'bg-indigo-50',  textColor: 'text-indigo-700',  borderColor: 'border-indigo-200', dotColor: 'bg-indigo-400'  },
+  delivered:  { label: 'Delivered',        bgColor: 'bg-green-50',   textColor: 'text-green-700',   borderColor: 'border-green-200',  dotColor: 'bg-green-500'   },
+  cancelled:  { label: 'Cancelled',        bgColor: 'bg-red-50',     textColor: 'text-red-700',     borderColor: 'border-red-200',    dotColor: 'bg-red-400'     },
+  refunded:   { label: 'Refunded',         bgColor: 'bg-gray-50',    textColor: 'text-gray-700',    borderColor: 'border-gray-200',   dotColor: 'bg-gray-400'    },
 };
 
 const TABS = [
-  { key: '',           label: 'Tất cả' },
-  { key: 'pending',    label: 'Chờ thanh toán' },
-  { key: 'processing', label: 'Đang xử lý' },
-  { key: 'shipped',    label: 'Đang giao' },
-  { key: 'delivered',  label: 'Đã giao' },
-  { key: 'cancelled',  label: 'Đã hủy' },
+  { key: '',           label: 'All' },
+  { key: 'pending',    label: 'Awaiting Payment' },
+  { key: 'processing', label: 'Processing' },
+  { key: 'shipped',    label: 'Shipped' },
+  { key: 'delivered',  label: 'Delivered' },
+  { key: 'cancelled',  label: 'Cancelled' },
 ];
 
 const PAYMENT_LABELS: Record<string, string> = {
   cod:     'COD',
   momo:    'MoMo',
   vnpay:   'VNPay',
-  stripe:  'Thẻ tín dụng',
-  cash:    'Tiền mặt',
+  stripe:  'Credit Card',
+  cash:    'Cash',
 };
 
 // ─── Utility helpers ────────────────────────────────────────────
-const getItemName  = (item: any) => item?.name    || item?.productId?.name            || 'Sản phẩm';
+const getItemName  = (item: any) => item?.name    || item?.productId?.name            || 'Product';
 const getItemImage = (item: any) => item?.image || item?.productId?.thumbnail || item?.productId?.imageUrls?.[0] || item?.productId?.image || '';
 const getProductId = (item: any) =>
   !item ? null : typeof item.productId === 'object' ? item.productId?._id : item.productId;
@@ -118,19 +118,19 @@ function EmptyState({ status }: { status: string }) {
         <div className="absolute top-0 left-4 w-4 h-4 rounded-full bg-amber-100" />
       </div>
       <h3 className="text-xl font-bold text-[#101828] mb-2">
-        {status ? 'Không tìm thấy đơn hàng' : 'Giỏ hàng trống'}
+        {status ? 'No orders found' : 'No orders yet'}
       </h3>
       <p className="text-sm text-[#6A7282] text-center max-w-xs mb-8 leading-relaxed">
         {status && config
-          ? `Bạn chưa có đơn hàng nào ở trạng thái "${config.label}".`
-          : 'Bạn chưa đặt đơn hàng nào. Hãy khám phá các sản phẩm tươi ngon ngay hôm nay!'}
+          ? `You have no orders with "${config.label}" status.`
+          : 'You have not placed any orders yet. Explore our fresh products today!'}
       </p>
       <button
         onClick={() => navigate('/products')}
         className="flex items-center gap-2 px-7 py-3 bg-[#00B207] text-white rounded-xl font-semibold hover:bg-[#009906] transition-all shadow-sm hover:shadow-md active:scale-95"
       >
         <ShoppingBag className="w-5 h-5" />
-        Tiếp tục mua sắm
+        Continue Shopping
       </button>
     </div>
   );
@@ -211,10 +211,10 @@ function OrderCard({
               {order.subscriptionId && (
                 <span
                   className="inline-flex items-center gap-0.5 text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-violet-50 text-violet-600 border border-violet-200 select-none"
-                  title="Đơn thuộc gói định kỳ"
+                  title="Belongs to a recurring subscription"
                 >
                   <CalendarClock className="w-3 h-3" />
-                  🔁 Định kỳ
+                  🔁 Recurring
                 </span>
               )}
             </div>
@@ -247,11 +247,11 @@ function OrderCard({
             <>
               <p className="text-sm font-semibold text-[#101828] truncate">{firstName}</p>
               <p className="text-xs text-[#6A7282] mt-1">
-                Số lượng:&nbsp;
+                Qty:&nbsp;
                 <span className="font-semibold text-[#364153]">{firstItem?.quantity}</span>
                 {extraCount > 0 && (
                   <span className="ml-1.5 text-[#00B207] font-semibold">
-                    ...và {extraCount} sản phẩm khác
+                    ...and {extraCount} more item(s)
                   </span>
                 )}
               </p>
@@ -259,7 +259,7 @@ function OrderCard({
           ) : (
             <p className="text-sm text-[#9CA3AF] flex items-center gap-1.5">
               <Package className="w-3.5 h-3.5" />
-              Sản phẩm
+              Product
             </p>
           )}
           {order.notes && (
@@ -275,7 +275,7 @@ function OrderCard({
       <div className="flex items-end justify-between px-5 py-4">
         {/* Left: Financials */}
         <div>
-          <p className="text-xs text-[#9CA3AF] mb-0.5 uppercase tracking-wide">Tổng thanh toán</p>
+          <p className="text-xs text-[#9CA3AF] mb-0.5 uppercase tracking-wide">Total</p>
           <p className="text-2xl font-extrabold text-[#00B207] leading-none">
             {formatCurrency(order.totalAmount)}
           </p>
@@ -286,14 +286,14 @@ function OrderCard({
           {(order as any).deliveryInfo?.type === 'pickup' && (
             <span className="inline-flex items-center gap-1 mt-2 text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
               <Store className="w-3 h-3" />
-              Nhận tại cửa hàng
+              Store Pickup
             </span>
           )}
           {((order as any).deliveryInfo?.type === 'delivery' ||
             ((order as any).deliveryInfo && (order as any).deliveryInfo.type !== 'pickup')) && (
             <span className="inline-flex items-center gap-1 mt-2 text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200">
               <MapPin className="w-3 h-3" />
-              Giao tận nơi
+              Home Delivery
             </span>
           )}
         </div>
@@ -305,7 +305,7 @@ function OrderCard({
             className="flex items-center gap-1.5 px-4 py-2 text-sm font-semibold text-[#00B207] border-2 border-[#00B207] rounded-xl hover:bg-[#EDF2EE] active:scale-95 transition-all"
           >
             <Eye className="w-4 h-4" />
-            Xem chi tiết
+            View Details
           </button>
           <div className="flex gap-2">
             <button
@@ -318,7 +318,7 @@ function OrderCard({
               ) : (
                 <RotateCcw className="w-3.5 h-3.5" />
               )}
-              Mua lại
+              Reorder
             </button>
             {order.status === 'pending' && (
               <button
@@ -326,7 +326,7 @@ function OrderCard({
                 className="flex items-center gap-1 px-3.5 py-2 text-xs font-bold text-red-600 border-2 border-red-200 rounded-xl hover:bg-red-50 active:scale-95 transition-all"
               >
                 <Ban className="w-3.5 h-3.5" />
-                Hủy đơn
+                Cancel
               </button>
             )}
           </div>
@@ -386,7 +386,7 @@ function OrderDetailModal({
         {/* Header */}
         <div className="flex items-start justify-between px-6 py-4 border-b border-[#E5E7EB]">
           <div>
-            <h3 className="text-lg font-bold text-[#101828]">Chi tiết đơn hàng</h3>
+            <h3 className="text-lg font-bold text-[#101828]">Order Details</h3>
             <div className="flex items-center gap-1.5 mt-0.5">
               <p className="text-xs text-[#9CA3AF] font-mono">
                 #{order._id.toUpperCase()}
@@ -394,10 +394,10 @@ function OrderDetailModal({
               {order.subscriptionId && (
                 <span
                   className="inline-flex items-center gap-0.5 text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-violet-50 text-violet-600 border border-violet-200 select-none"
-                  title="Đơn thuộc gói định kỳ"
+                  title="Belongs to a recurring subscription"
                 >
                   <CalendarClock className="w-3 h-3" />
-                  🔁 Định kỳ
+                  🔁 Recurring
                 </span>
               )}
             </div>
@@ -434,7 +434,7 @@ function OrderDetailModal({
                     ? <Store className="w-3.5 h-3.5 text-emerald-600" />
                     : <MapPin className="w-3.5 h-3.5 text-[#00B207]" />}
                 </div>
-                {isPickup ? 'Thông tin nhận tại cửa hàng' : 'Thông tin giao hàng'}
+                {isPickup ? 'Store Pickup Info' : 'Delivery Info'}
               </h4>
 
               {isPickup ? (
@@ -443,20 +443,20 @@ function OrderDetailModal({
                   {/* Recipient */}
                   {(delivery.fullName || delivery.phone || delivery.email) && (
                     <div className="bg-[#F9FAFB] rounded-xl border border-[#E5E7EB] px-4 py-3 space-y-2.5">
-                      <p className="text-xs font-semibold text-[#6A7282] uppercase tracking-wide mb-1">Người nhận</p>
-                      {delivery.fullName && <InfoRow label="Họ tên" value={delivery.fullName} bold />}
-                      {delivery.phone && <InfoRow label="Điện thoại" value={delivery.phone} />}
+                      <p className="text-xs font-semibold text-[#6A7282] uppercase tracking-wide mb-1">Recipient</p>
+                      {delivery.fullName && <InfoRow label="Full Name" value={delivery.fullName} bold />}
+                      {delivery.phone && <InfoRow label="Phone" value={delivery.phone} />}
                       {delivery.email && <InfoRow label="Email" value={delivery.email} />}
                     </div>
                   )}
 
                   {/* Store details */}
                   <div className="bg-emerald-50 border border-emerald-200 rounded-xl px-4 py-3 space-y-2.5">
-                    <p className="text-xs font-semibold text-emerald-700 uppercase tracking-wide mb-1">Cửa hàng</p>
-                    {pickup?.name && <InfoRow label="Tên" value={pickup.name} bold />}
+                    <p className="text-xs font-semibold text-emerald-700 uppercase tracking-wide mb-1">Store</p>
+                    {pickup?.name && <InfoRow label="Name" value={pickup.name} bold />}
                     {pickup?.address && (
                       <div className="flex items-start gap-2 text-sm">
-                        <span className="text-[#9CA3AF] w-24 flex-shrink-0">Địa chỉ</span>
+                        <span className="text-[#9CA3AF] w-24 flex-shrink-0">Address</span>
                         <div>
                           <span className="font-medium text-[#101828] leading-relaxed">{pickup.address}</span>
                           <a
@@ -466,7 +466,7 @@ function OrderDetailModal({
                             className="flex items-center gap-1 mt-1.5 text-xs font-semibold text-[#00B207] hover:underline w-fit"
                           >
                             <Navigation2 className="w-3.5 h-3.5" />
-                            Xem đường đi
+                            Get Directions
                           </a>
                         </div>
                       </div>
@@ -477,11 +477,11 @@ function OrderDetailModal({
                   <div className="flex items-start gap-3 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3">
                     <span className="text-xl leading-none">🏪</span>
                     <div>
-                      <p className="text-xs font-bold text-amber-800 mb-0.5">Lưu ý</p>
+                      <p className="text-xs font-bold text-amber-800 mb-0.5">Note</p>
                       <p className="text-xs text-amber-700 leading-relaxed">
-                        Vui lòng đưa mã đơn hàng{' '}
+                        Please show your order ID{' '}
                         <span className="font-bold text-amber-900 font-mono">#{order._id.slice(-10).toUpperCase()}</span>{' '}
-                        cho nhân viên tại quầy để nhận hàng.
+                        to the staff at the counter to collect your order.
                       </p>
                     </div>
                   </div>
@@ -492,9 +492,9 @@ function OrderDetailModal({
                   {/* Recipient card */}
                   {(delivery.fullName || delivery.phone || delivery.email) && (
                     <div className="bg-[#F9FAFB] rounded-xl border border-[#E5E7EB] px-4 py-3 space-y-2.5">
-                      <p className="text-xs font-semibold text-[#6A7282] uppercase tracking-wide mb-1">Người nhận</p>
-                      {delivery.fullName && <InfoRow label="Họ tên" value={delivery.fullName} bold />}
-                      {delivery.phone && <InfoRow label="Điện thoại" value={delivery.phone} />}
+                      <p className="text-xs font-semibold text-[#6A7282] uppercase tracking-wide mb-1">Recipient</p>
+                      {delivery.fullName && <InfoRow label="Full Name" value={delivery.fullName} bold />}
+                      {delivery.phone && <InfoRow label="Phone" value={delivery.phone} />}
                       {delivery.email && <InfoRow label="Email" value={delivery.email} />}
                     </div>
                   )}
@@ -502,7 +502,7 @@ function OrderDetailModal({
                   {/* Address card */}
                   {delivery.address && (
                     <div className="bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 space-y-2.5">
-                      <p className="text-xs font-semibold text-blue-700 uppercase tracking-wide mb-1">Địa chỉ giao hàng</p>
+                      <p className="text-xs font-semibold text-blue-700 uppercase tracking-wide mb-1">Delivery Address</p>
                       <div className="flex items-start gap-2 text-sm">
                         <MapPin className="w-4 h-4 text-blue-500 flex-shrink-0 mt-0.5" />
                         <div>
@@ -514,7 +514,7 @@ function OrderDetailModal({
                             className="flex items-center gap-1 mt-1.5 text-xs font-semibold text-blue-600 hover:underline w-fit"
                           >
                             <Navigation2 className="w-3.5 h-3.5" />
-                            Xem trên bản đồ
+                            View on Map
                           </a>
                         </div>
                       </div>
@@ -532,7 +532,7 @@ function OrderDetailModal({
                 <div className="w-6 h-6 rounded-lg bg-amber-50 flex items-center justify-center">
                   <FileText className="w-3.5 h-3.5 text-amber-600" />
                 </div>
-                Ghi chú
+                Notes
               </h4>
               <div className="bg-amber-50 border border-amber-100 rounded-xl px-4 py-3">
                 <p className="text-sm text-amber-800 leading-relaxed">{fullOrder.notes}</p>
@@ -547,7 +547,7 @@ function OrderDetailModal({
               <div className="w-6 h-6 rounded-lg bg-[#EDF2EE] flex items-center justify-center">
                 <Package className="w-3.5 h-3.5 text-[#00B207]" />
               </div>
-              Sản phẩm
+              Products
               <span className="ml-1 px-1.5 py-0.5 bg-[#F3F4F6] text-[#6A7282] text-xs rounded-md font-medium">
                 {fullOrder.items.length}
               </span>
@@ -601,29 +601,29 @@ function OrderDetailModal({
               <div className="w-6 h-6 rounded-lg bg-[#EDF2EE] flex items-center justify-center">
                 <CreditCard className="w-3.5 h-3.5 text-[#00B207]" />
               </div>
-              Tóm tắt thanh toán
+              Payment Summary
             </h4>
             <div className="bg-[#F9FAFB] rounded-xl border border-[#E5E7EB] overflow-hidden">
               <div className="px-4 py-3 space-y-2.5">
                 {(fullOrder.shippingCost ?? 0) > 0 && (
-                  <SummaryRow label="Phí vận chuyển" value={formatCurrency(fullOrder.shippingCost!)} />
+                  <SummaryRow label="Shipping Fee" value={formatCurrency(fullOrder.shippingCost!)} />
                 )}
                 {(fullOrder.discountAmount ?? 0) > 0 && (
                   <SummaryRow
-                    label={<span className="flex items-center gap-1"><Tag className="w-3 h-3" />Giảm giá</span>}
+                    label={<span className="flex items-center gap-1"><Tag className="w-3 h-3" />Discount</span>}
                     value={`-${formatCurrency(fullOrder.discountAmount!)}`}
                     valueClass="text-[#00B207]"
                   />
                 )}
                 {(fullOrder.taxAmount ?? 0) > 0 && (
-                  <SummaryRow label="Thuế" value={formatCurrency(fullOrder.taxAmount!)} />
+                  <SummaryRow label="Tax" value={formatCurrency(fullOrder.taxAmount!)} />
                 )}
-                <SummaryRow label="Phương thức TT" value={getPaymentLabel(fullOrder.paymentMethod)} />
+                <SummaryRow label="Payment Method" value={getPaymentLabel(fullOrder.paymentMethod)} />
                 <SummaryRow
-                  label="Trạng thái TT"
+                  label="Payment Status"
                   value={
-                    fullOrder.paymentStatus === 'paid' ? 'Đã thanh toán' :
-                    fullOrder.paymentStatus === 'failed' ? 'Thất bại' : 'Chờ thanh toán'
+                    fullOrder.paymentStatus === 'paid' ? 'Paid' :
+                    fullOrder.paymentStatus === 'failed' ? 'Failed' : 'Awaiting Payment'
                   }
                   valueClass={
                     fullOrder.paymentStatus === 'paid' ? 'text-green-600' :
@@ -633,7 +633,7 @@ function OrderDetailModal({
               </div>
               {/* Total */}
               <div className="flex items-center justify-between px-4 py-3 bg-[#EDF2EE] border-t border-[#E5E7EB]">
-                <span className="font-bold text-[#101828]">Tổng cộng</span>
+                <span className="font-bold text-[#101828]">Total</span>
                 <span className="text-xl font-extrabold text-[#00B207]">
                   {formatCurrency(fullOrder.totalAmount)}
                 </span>
@@ -648,7 +648,7 @@ function OrderDetailModal({
               <div className="flex items-start gap-3 bg-red-50 border border-red-100 rounded-xl px-4 py-3">
                 <Ban className="w-4 h-4 text-red-500 flex-shrink-0 mt-0.5" />
                 <div>
-                  <p className="text-xs font-semibold text-red-700 mb-0.5">Lý do hủy</p>
+                  <p className="text-xs font-semibold text-red-700 mb-0.5">Cancellation Reason</p>
                   <p className="text-sm text-red-600">{(fullOrder as any).cancelReason}</p>
                 </div>
               </div>
@@ -723,12 +723,12 @@ function CancelModal({
           <div className="w-14 h-14 rounded-full bg-red-100 flex items-center justify-center mb-4">
             <AlertTriangle className="w-7 h-7 text-red-500" />
           </div>
-          <h3 className="text-lg font-bold text-[#101828] mb-2">Hủy đơn hàng</h3>
+          <h3 className="text-lg font-bold text-[#101828] mb-2">Cancel Order</h3>
           <p className="text-sm text-[#6A7282] mb-1">
-            Bạn có chắc muốn hủy đơn hàng này không?
+            Are you sure you want to cancel this order?
           </p>
           <p className="text-xs text-[#9CA3AF] mb-6">
-            Hành động này không thể hoàn tác sau khi xác nhận.
+            This action cannot be undone once confirmed.
           </p>
           <div className="flex gap-3 w-full">
             <button
@@ -736,7 +736,7 @@ function CancelModal({
               onClick={onClose}
               className="flex-1 py-2.5 text-sm font-semibold text-[#364153] bg-[#F3F4F6] rounded-xl hover:bg-[#E5E7EB] transition-colors disabled:opacity-50"
             >
-              Giữ đơn
+              Keep Order
             </button>
             <button
               disabled={loading}
@@ -746,10 +746,10 @@ function CancelModal({
               {loading ? (
                 <>
                   <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                  Đang hủy...
+                  Cancelling...
                 </>
               ) : (
-                'Xác nhận hủy'
+                'Confirm Cancel'
               )}
             </button>
           </div>
@@ -779,7 +779,7 @@ function SubscriptionPaymentModal({
       const res = await momoService.createPayment({
         orderId: order._id,
         amount: order.totalAmount,
-        description: `Thanh toán đơn định kỳ #${order._id.slice(-8).toUpperCase()}`,
+        description: `Pay recurring order #${order._id.slice(-8).toUpperCase()}`,
       }) as any;
       const data = res?.data?.data ?? res?.data;
       if (data?.payUrl) {
@@ -794,10 +794,10 @@ function SubscriptionPaymentModal({
         }));
         window.location.href = data.payUrl;
       } else {
-        setError('Không lấy được link thanh toán MoMo.');
+        setError('Failed to get MoMo payment link.');
       }
     } catch (err: any) {
-      setError(err?.response?.data?.message ?? 'Lỗi khởi tạo thanh toán MoMo.');
+      setError(err?.response?.data?.message ?? 'Failed to initiate MoMo payment.');
     } finally {
       setPaying(false);
     }
@@ -818,7 +818,7 @@ function SubscriptionPaymentModal({
               <div className="w-7 h-7 rounded-lg bg-violet-100 flex items-center justify-center">
                 <CalendarClock className="w-4 h-4 text-violet-600" />
               </div>
-              <h3 className="text-base font-bold text-[#101828]">Thanh toán đơn định kỳ</h3>
+              <h3 className="text-base font-bold text-[#101828]">Pay Recurring Order</h3>
             </div>
             <p className="text-xs text-violet-500 font-mono mt-1 ml-9">
               #{order._id.slice(-10).toUpperCase()}
@@ -837,7 +837,7 @@ function SubscriptionPaymentModal({
           {/* Items */}
           <div>
             <p className="text-xs font-semibold text-[#9CA3AF] uppercase tracking-wide mb-2">
-              Sản phẩm ({items.length})
+              Items ({items.length})
             </p>
             <div className="space-y-2">
               {items.map((item: any, i: number) => (
@@ -865,7 +865,7 @@ function SubscriptionPaymentModal({
 
           {/* Total */}
           <div className="flex items-center justify-between bg-violet-50 border border-violet-100 rounded-xl px-4 py-3">
-            <span className="font-bold text-[#101828]">Tổng thanh toán</span>
+            <span className="font-bold text-[#101828]">Total</span>
             <span className="text-xl font-extrabold text-violet-600">{formatCurrency(order.totalAmount)}</span>
           </div>
 
@@ -889,13 +889,13 @@ function SubscriptionPaymentModal({
                 ? <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                 : <img src="https://upload.wikimedia.org/wikipedia/vi/f/fe/MoMo_Logo.png" className="w-5 h-5 rounded-full object-cover" alt="MoMo" />
               }
-              {paying ? 'Đang xử lý...' : 'Thanh toán qua MoMo'}
+              {paying ? 'Processing...' : 'Pay with MoMo'}
             </button>
           )}
           {method !== 'momo' && (
             <div className="bg-green-50 border border-green-100 rounded-xl px-4 py-3 text-center">
-              <p className="text-sm font-semibold text-green-700">✅ Đơn này thanh toán khi nhận hàng (COD)</p>
-              <p className="text-xs text-green-600 mt-0.5">Không cần thanh toán trước.</p>
+              <p className="text-sm font-semibold text-green-700">✅ This order is paid on delivery (COD)</p>
+              <p className="text-xs text-green-600 mt-0.5">No prepayment required.</p>
             </div>
           )}
           <button
@@ -903,7 +903,7 @@ function SubscriptionPaymentModal({
             disabled={paying}
             className="w-full py-2.5 text-sm font-semibold text-[#6A7282] bg-[#F3F4F6] rounded-xl hover:bg-[#E5E7EB] transition-colors disabled:opacity-50"
           >
-            Đóng
+            Close
           </button>
         </div>
       </div>
@@ -928,7 +928,7 @@ function SubscriptionOrderCard({
   const firstItem = (order.items ?? [])[0] as any;
   const extraCount = Math.max(0, (order.items ?? []).length - 1);
   const thumbnail = firstItem ? getItemImage(firstItem) : '';
-  const firstName = firstItem ? getItemName(firstItem) : 'Sản phẩm';
+  const firstName = firstItem ? getItemName(firstItem) : 'Product';
   const isUnpaid = order.paymentStatus === 'unpaid';
 
   return (
@@ -944,11 +944,11 @@ function SubscriptionOrderCard({
       <div className="px-5 py-2 bg-gradient-to-r from-violet-600 to-purple-500 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Repeat2 className="w-4 h-4 text-white" />
-          <span className="text-xs font-bold text-white tracking-wide">Đơn hàng định kỳ</span>
+          <span className="text-xs font-bold text-white tracking-wide">Recurring Order</span>
         </div>
         {isUnpaid && (
           <span className="text-[10px] font-bold text-amber-900 bg-amber-300 px-2 py-0.5 rounded-full">
-            ⚠️ Chưa thanh toán
+            ⚠️ Unpaid
           </span>
         )}
       </div>
@@ -974,7 +974,7 @@ function SubscriptionOrderCard({
         <div className="flex items-center gap-2 px-5 py-2.5 bg-amber-50 border-b border-amber-100">
           <AlertTriangle className="w-4 h-4 text-amber-500 flex-shrink-0" />
           <p className="text-xs font-semibold text-amber-700">
-            Vui lòng thanh toán trước ngày giao để đảm bảo đơn được xử lý.
+            Please pay before the delivery date to ensure the order is processed.
           </p>
         </div>
       )}
@@ -998,10 +998,10 @@ function SubscriptionOrderCard({
         <div className="flex-1 min-w-0">
           <p className="text-sm font-semibold text-[#101828] truncate">{firstName}</p>
           <p className="text-xs text-[#6A7282] mt-1">
-            Số lượng:&nbsp;
+            Qty:&nbsp;
             <span className="font-semibold text-[#364153]">{firstItem?.quantity}</span>
             {extraCount > 0 && (
-              <span className="ml-1.5 text-violet-600 font-semibold">...và {extraCount} sản phẩm khác</span>
+              <span className="ml-1.5 text-violet-600 font-semibold">...and {extraCount} more item(s)</span>
             )}
           </p>
           <p className="text-xs text-[#9CA3AF] mt-1 flex items-center gap-1">
@@ -1014,7 +1014,7 @@ function SubscriptionOrderCard({
       {/* ── Row 3: Total + Actions ── */}
       <div className="flex items-end justify-between px-5 py-4 bg-white">
         <div>
-          <p className="text-xs text-[#9CA3AF] mb-0.5 uppercase tracking-wide">Tổng thanh toán</p>
+          <p className="text-xs text-[#9CA3AF] mb-0.5 uppercase tracking-wide">Total</p>
           <p className="text-2xl font-extrabold text-violet-600 leading-none">
             {formatCurrency(order.totalAmount)}
           </p>
@@ -1026,7 +1026,7 @@ function SubscriptionOrderCard({
               className="flex items-center gap-1.5 px-5 py-2.5 text-sm font-bold text-white bg-violet-600 rounded-xl hover:bg-violet-700 active:scale-95 transition-all shadow-sm shadow-violet-200"
             >
               <CreditCard className="w-4 h-4" />
-              Thanh toán ngay
+              Pay Now
             </button>
           )}
           <button
@@ -1034,7 +1034,7 @@ function SubscriptionOrderCard({
             className="flex items-center gap-1.5 px-4 py-2 text-sm font-semibold text-violet-600 border-2 border-violet-200 rounded-xl hover:bg-violet-50 active:scale-95 transition-all"
           >
             <Eye className="w-4 h-4" />
-            Xem chi tiết
+            View Details
           </button>
         </div>
       </div>
@@ -1069,7 +1069,7 @@ export default function OrderHistoryTab({ highlightOrderId }: { highlightOrderId
       setOrders(res.data ?? []);
       setTotalPages(res.pagination?.totalPages ?? 1);
     } catch (err: any) {
-      toast.error(err.response?.data?.message || 'Không thể tải đơn hàng');
+      toast.error(err.response?.data?.message || 'Failed to load orders');
     } finally {
       setLoading(false);
     }
@@ -1120,9 +1120,9 @@ export default function OrderHistoryTab({ highlightOrderId }: { highlightOrderId
       }
       await refreshCart();
       openCart();
-      toast.success(`Đã thêm ${order.items.length} sản phẩm vào giỏ hàng!`);
+      toast.success(`Added ${order.items.length} item(s) to cart!`);
     } catch {
-      toast.error('Không thể thêm vào giỏ hàng. Một số sản phẩm có thể không còn khả dụng.');
+      toast.error('Could not add to cart. Some products may be unavailable.');
     } finally {
       setReordering(false);
     }
@@ -1133,11 +1133,11 @@ export default function OrderHistoryTab({ highlightOrderId }: { highlightOrderId
     setCancelState(prev => ({ ...prev, cancelling: true }));
     try {
       await orderService.cancelOrder(cancelState.order._id, 'Cancelled by customer');
-      toast.success('Đã hủy đơn hàng thành công');
+      toast.success('Order cancelled successfully');
       setCancelState({ order: null, cancelling: false });
       fetchOrders();
     } catch (err: any) {
-      toast.error(err.response?.data?.message || 'Không thể hủy đơn hàng');
+      toast.error(err.response?.data?.message || 'Failed to cancel order');
       setCancelState(prev => ({ ...prev, cancelling: false }));
     }
   };
@@ -1148,13 +1148,13 @@ export default function OrderHistoryTab({ highlightOrderId }: { highlightOrderId
       {/* ── Page Header ── */}
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-bold text-[#101828]">Lịch sử đơn hàng</h2>
-          <p className="text-sm text-[#6A7282] mt-0.5">Theo dõi và quản lý các đơn hàng của bạn</p>
+          <h2 className="text-2xl font-bold text-[#101828]">Order History</h2>
+          <p className="text-sm text-[#6A7282] mt-0.5">Track and manage your orders</p>
         </div>
         <button
           onClick={fetchOrders}
           disabled={loading}
-          title="Làm mới"
+          title="Refresh"
           className="w-9 h-9 flex items-center justify-center rounded-xl bg-white border border-[#E5E7EB] text-[#6A7282] hover:bg-[#EDF2EE] hover:text-[#00B207] hover:border-[#00B207] transition-all disabled:opacity-50"
         >
           <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
