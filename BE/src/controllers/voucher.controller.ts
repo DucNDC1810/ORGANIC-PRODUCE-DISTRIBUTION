@@ -175,8 +175,9 @@ export class VoucherController {
   getVoucherByCode = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
     try {
       const { code } = req.params;
+      const escapedCode = code.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
-      const voucher = await Voucher.findOne({ code: code.toUpperCase() }).populate(
+      const voucher = await Voucher.findOne({ code: { $regex: new RegExp(`^${escapedCode}$`, 'i') } }).populate(
         'applicableProducts',
         'name price'
       );
@@ -225,8 +226,9 @@ export class VoucherController {
     try {
       const { code } = req.params;
       const { purchaseAmount, userId, productIds, categoryId } = req.body;
+      const escapedCode = code.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
-      const voucher = await Voucher.findOne({ code: code.toUpperCase() });
+      const voucher = await Voucher.findOne({ code: { $regex: new RegExp(`^${escapedCode}$`, 'i') } });
 
       if (!voucher) {
         throw new AppError('Voucher not found', 404);
@@ -316,8 +318,9 @@ export class VoucherController {
       if (!userId) {
         throw new AppError('User not authenticated', 401);
       }
+      const escapedCode = code.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
-      const voucher = await Voucher.findOne({ code: code.toUpperCase() });
+      const voucher = await Voucher.findOne({ code: { $regex: new RegExp(`^${escapedCode}$`, 'i') } });
 
       if (!voucher) {
         throw new AppError('Voucher not found', 404);
