@@ -3,6 +3,7 @@ import mongoose from 'mongoose';
 import { Payment } from '../models/Payment.model';
 import { Order } from '../models/Order.model';
 import { User } from '../models/User.model';
+import { Product } from '../models/Product.model';
 import { Transaction } from '../models/Transaction.model';
 import momoService from '../services/momo.service';
 import { AuthRequest } from '../middlewares/auth.middleware';
@@ -43,12 +44,35 @@ export class MoMoController {
           throw new AppError('Delivery info is required for new orders', 400);
         }
 
+        // Validate and deduct stock
+        const orderItems = Array.isArray(items) ? items : [];
+        if (orderItems.length > 0) {
+          const productIds = orderItems.map((item: any) => item.productId);
+          const products = await Product.find({ _id: { $in: productIds } });
+          for (const item of orderItems) {
+            const product = products.find(p => p._id.toString() === item.productId?.toString());
+            if (!product) {
+              throw new AppError(`Sản phẩm không tồn tại: ${item.productId}`, 404);
+            }
+            if (product.stock < item.quantity) {
+              throw new AppError(`Sản phẩm "${product.name}" không đủ hàng. Tồn kho: ${product.stock}, Yêu cầu: ${item.quantity}`, 400);
+            }
+          }
+          const stockDeductOps = orderItems.map((item: any) => ({
+            updateOne: {
+              filter: { _id: item.productId, stock: { $gte: item.quantity } },
+              update: { $inc: { stock: -item.quantity } }
+            }
+          }));
+          await Product.bulkWrite(stockDeductOps);
+        }
+
         const newOrder = await Order.create({
           userId,
           deliveryInfo,
           ...(pickupLocation ? { pickupLocation } : {}),
           paymentMethod: 'momo',
-          items: Array.isArray(items) ? items : [],
+          items: orderItems,
           totalAmount: amount,
           status: 'pending',
           ...(notes ? { notes } : {}),
@@ -308,11 +332,23 @@ export class MoMoController {
             { new: true }
           );
 
-          await Order.findByIdAndUpdate(
+          const failedOrder = await Order.findByIdAndUpdate(
             payment.orderId,
             { status: 'failed', paymentStatus: 'failed' },
             { new: true }
           );
+
+          // Restore stock when MoMo payment fails
+          if (failedOrder && failedOrder.items.length > 0) {
+            const restoreOps = failedOrder.items.map((item: any) => ({
+              updateOne: {
+                filter: { _id: item.productId },
+                update: { $inc: { stock: item.quantity } }
+              }
+            }));
+            await Product.bulkWrite(restoreOps);
+            console.log('✅ Stock restored for failed order:', failedOrder._id);
+          }
 
           console.log('✅ PAYMENT AND ORDER UPDATED TO FAILED');
           console.log('  PaymentId:', payment._id);

@@ -2,6 +2,7 @@ import { Response, NextFunction } from 'express';
 import mongoose from 'mongoose';
 import { User } from '../models/User.model';
 import { Order } from '../models/Order.model';
+import { Product } from '../models/Product.model';
 import { Transaction } from '../models/Transaction.model';
 import momoService from '../services/momo.service';
 import { AuthRequest } from '../middlewares/auth.middleware';
@@ -158,6 +159,26 @@ export class WalletController {
       if (!totalAmount || totalAmount <= 0) {
         throw new AppError('Total amount must be a positive number', 400);
       }
+
+      // 0. Validate and deduct product stock
+      const productIds = items.map((item: any) => item.productId);
+      const products = await Product.find({ _id: { $in: productIds } }).session(session);
+      for (const item of items) {
+        const product = products.find((p: any) => p._id.toString() === item.productId?.toString());
+        if (!product) {
+          throw new AppError(`Sản phẩm không tồn tại: ${item.productId}`, 404);
+        }
+        if (product.stock < item.quantity) {
+          throw new AppError(`Sản phẩm "${product.name}" không đủ hàng. Tồn kho: ${product.stock}, Yêu cầu: ${item.quantity}`, 400);
+        }
+      }
+      const stockDeductOps = items.map((item: any) => ({
+        updateOne: {
+          filter: { _id: item.productId, stock: { $gte: item.quantity } },
+          update: { $inc: { stock: -item.quantity } }
+        }
+      }));
+      await Product.bulkWrite(stockDeductOps, { session });
 
       // 1. Kiểm tra và trừ số dư ví (atomic với $inc)
       const updatedUser = await User.findOneAndUpdate(
