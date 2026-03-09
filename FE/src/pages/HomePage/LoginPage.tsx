@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { Leaf, Eye, EyeOff, Lock, Send } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
@@ -18,6 +18,30 @@ export default function LoginPage() {
     email: '',
     password: '',
   });
+
+  const emailRef = useRef<HTMLInputElement>(null);
+  const passwordRef = useRef<HTMLInputElement>(null);
+  const submitRef = useRef<HTMLButtonElement>(null);
+
+  // Auto-focus username on mount
+  useEffect(() => {
+    emailRef.current?.focus();
+  }, []);
+
+  // Tab focus trap: cycle only between email → password → submit
+  const handleTabTrap = useCallback((e: React.KeyboardEvent, current: 'email' | 'password' | 'submit') => {
+    if (e.key !== 'Tab') return;
+    e.preventDefault();
+    if (!e.shiftKey) {
+      if (current === 'email') passwordRef.current?.focus();
+      else if (current === 'password') submitRef.current?.focus();
+      else emailRef.current?.focus();
+    } else {
+      if (current === 'submit') passwordRef.current?.focus();
+      else if (current === 'password') emailRef.current?.focus();
+      else submitRef.current?.focus();
+    }
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -88,6 +112,9 @@ export default function LoginPage() {
         });
       } else {
         toast.error(message || 'Login failed. Please check your credentials.');
+        // Select all text in password field so user can retype immediately
+        passwordRef.current?.focus();
+        passwordRef.current?.select();
       }
     } finally {
       setLoading(false);
@@ -196,8 +223,11 @@ export default function LoginPage() {
                 type="text"
                 autoComplete="off"
                 required
+                tabIndex={1}
+                ref={emailRef}
                 value={formData.email}
                 onChange={handleInputChange}
+                onKeyDown={(e) => handleTabTrap(e, 'email')}
                 className="block w-full px-4 py-3.5 bg-white border-2 border-primary/30 rounded-xl text-foreground placeholder:text-muted-foreground focus:border-primary focus:ring-0 transition-all outline-none hover:border-primary/50"
                 placeholder="you@example.com or username"
               />
@@ -215,13 +245,17 @@ export default function LoginPage() {
                   type={showPassword ? 'text' : 'password'}
                   autoComplete="off"
                   required
+                  tabIndex={2}
+                  ref={passwordRef}
                   value={formData.password}
                   onChange={handleInputChange}
+                  onKeyDown={(e) => handleTabTrap(e, 'password')}
                   className="block w-full px-4 py-3.5 pr-12 bg-white border-2 border-primary/30 rounded-xl text-foreground placeholder:text-muted-foreground focus:border-primary focus:ring-0 transition-all outline-none hover:border-primary/50"
                   placeholder="Enter your password"
                 />
                 <button
                   type="button"
+                  tabIndex={-1}
                   onClick={() => setShowPassword(!showPassword)}
                   className="absolute inset-y-0 right-0 pr-4 flex items-center text-muted-foreground hover:text-primary transition-colors"
                 >
@@ -239,13 +273,14 @@ export default function LoginPage() {
               <label className="flex items-center gap-2 cursor-pointer">
                 <input
                   type="checkbox"
+                  tabIndex={-1}
                   checked={rememberMe}
                   onChange={(e) => setRememberMe(e.target.checked)}
                   className="w-4 h-4 rounded border-primary/30 text-primary focus:ring-primary focus:ring-offset-0"
                 />
                 <span className="text-sm text-foreground">Remember me</span>
               </label>
-              <Link to="/forgot-password" className="text-sm text-primary hover:text-primary-dark font-medium transition-colors">
+              <Link to="/forgot-password" tabIndex={-1} className="text-sm text-primary hover:text-primary-dark font-medium transition-colors">
                 Forgot password?
               </Link>
             </div>
@@ -253,7 +288,10 @@ export default function LoginPage() {
             {/* Sign In Button */}
             <button
               type="submit"
+              tabIndex={3}
+              ref={submitRef}
               disabled={loading}
+              onKeyDown={(e) => handleTabTrap(e, 'submit')}
               className="w-full py-4 bg-gradient-to-r from-[#6ee7b7] via-primary to-primary-dark text-white rounded-xl font-semibold text-lg shadow-lg hover:shadow-xl hover:-translate-y-0.5 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0"
             >
               {loading ? 'Signing in...' : 'Sign In'}
@@ -297,6 +335,7 @@ export default function LoginPage() {
               <button
                 type="button"
                 onClick={() => window.location.href = 'http://localhost:5000/api/auth/google'}
+                tabIndex={-1}
                 className="w-16 h-16 bg-white border-2 border-border rounded-full hover:border-primary hover:shadow-lg transition-all flex items-center justify-center group"
                 title="Sign in with Google"
               >
