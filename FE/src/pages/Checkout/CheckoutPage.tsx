@@ -31,16 +31,16 @@ import RecurringDeliveryModal, {
 } from "../../components/RecurringDeliveryModal";
 
 export default function CheckoutPage() {
-  const { cart, removeFromCart, updateQuantity, clearCart } = useCart();
+  const { cart, getTotalPrice, removeFromCart, updateQuantity, clearCart } = useCart();
   const { user } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const { groupSession } = useGroup();
 
-  // Filter to only the items the user selected on the Cart page
-  const selectedItemIds: string[] = (location.state as any)?.selectedItemIds ?? [];
-  const checkoutItems = selectedItemIds.length > 0
-    ? cart.filter((item) => selectedItemIds.includes(item.id))
+  // Items selected in CartPage (undefined = all items)
+  const selectedItemIds = (location.state as any)?.selectedItemIds as string[] | undefined;
+  const checkoutItems = selectedItemIds
+    ? cart.filter((i) => selectedItemIds.includes(i.id))
     : cart;
 
   // ── Group checkout detection ─────────────────────────────────────────────
@@ -57,77 +57,19 @@ export default function CheckoutPage() {
 
   // isGroupOrder = true if we arrived from the group page OR there is an
   // active group session saved in localStorage
-  //
-  // groupOrderDismissed is set to true when the user switches to Store pickup,
-  // which resets all group order data to prevent stale payload on submit.
-  const [groupOrderDismissed, setGroupOrderDismissed] = useState(false);
-  const isGroupOrder = !groupOrderDismissed && (navGroupData != null || groupSession != null);
-  const activeGroupId = isGroupOrder ? (navGroupData?.groupId ?? groupSession?.groupId ?? null) : null;
-  const groupDiscountPct = isGroupOrder ? (navGroupData?.activePct ?? 0) : 0;
+  const isGroupOrder = navGroupData != null || groupSession != null;
+  const activeGroupId = navGroupData?.groupId ?? groupSession?.groupId ?? null;
+  const groupDiscountPct = navGroupData?.activePct ?? 0;
   // ─────────────────────────────────────────────────────────────────────────
 
   const [deliveryType, setDeliveryType] = useState<"delivery" | "pickup">(
     "delivery",
   );
-
-  // Auto-reset group order state when switching to Store pickup
-  useEffect(() => {
-    if (deliveryType === "pickup") {
-      setGroupOrderDismissed(true);
-    }
-  }, [deliveryType]);
   const [showRecurringModal, setShowRecurringModal] = useState(false);
   const [recurringData, setRecurringData] = useState<RecurringData | null>(null);
   const isRecurringOrder = recurringData !== null;
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-
-  // ── Click-to-edit quantity ─────────────────────────────────────────────
-  const QTY_MAX = 99;
-  const [editingQtyId, setEditingQtyId] = useState<string | null>(null);
-  const [editingQtyValue, setEditingQtyValue] = useState<string>("");
-
-  const commitQtyEdit = async (itemId: string) => {
-    const parsed = parseInt(editingQtyValue, 10);
-    // Empty / 0 / negative → clamp to 1; above max → clamp to QTY_MAX
-    const newQty = isNaN(parsed) || parsed < 1 ? 1 : Math.min(parsed, QTY_MAX);
-    setEditingQtyId(null);
-    setEditingQtyValue("");
-    await handleUpdateQuantity(itemId, newQty);
-  };
-
-  const handleQtyKeyDown = (e: React.KeyboardEvent<HTMLInputElement>, _itemId: string) => {
-    // Hard-block non-integer characters
-    if (["e", "E", "+", "-", "."].includes(e.key)) {
-      e.preventDefault();
-      return;
-    }
-    if (e.key === "Enter") {
-      (e.target as HTMLInputElement).blur();
-      return;
-    }
-    if (e.key === "Escape") {
-      setEditingQtyId(null);
-      setEditingQtyValue("");
-      return;
-    }
-  };
-
-  const handleQtyPaste = (e: React.ClipboardEvent<HTMLInputElement>) => {
-    const pasted = e.clipboardData.getData("text");
-    // Only allow strings that are purely digits (no letters, decimals, signs)
-    if (!/^\d+$/.test(pasted)) {
-      e.preventDefault();
-    }
-  };
-
-  const handleQtyChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const raw = e.target.value;
-    // Strip any non-digit characters that might slip through
-    const digitsOnly = raw.replace(/\D/g, "");
-    setEditingQtyValue(digitsOnly);
-  };
-  // ──────────────────────────────────────────────────────────────────────
 
   // Auto-dismiss toast after 4 seconds
   useEffect(() => {
@@ -329,7 +271,7 @@ export default function CheckoutPage() {
   };
   // ----------------------------------------------------------------
 
-  const baseSubtotal = checkoutItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
+  const baseSubtotal = checkoutItems.reduce((sum, i) => sum + i.price * i.quantity, 0);
   // For group orders, honour the subtotal/shipping/discount from the Active Group page
   const subtotal = isGroupOrder && navGroupData ? navGroupData.subtotal : baseSubtotal;
   const shipping = isGroupOrder
@@ -408,7 +350,7 @@ export default function CheckoutPage() {
       const response = await voucherService.validateVoucher(code, {
         purchaseAmount: subtotal,
       });
-      setVoucherDiscount((response as any).data.discountValue);
+      setVoucherDiscount(response.data.discountValue);
       setAppliedVoucher(code);
       setVoucherError("");
     } catch (err: any) {
@@ -446,7 +388,7 @@ export default function CheckoutPage() {
       frequency: frequencyMap[recurringData.recurringFrequency],
       deliveryDay,
       nextDeliveryDate: nextDelivery.toISOString(),
-      items: checkoutItems.map((item) => ({
+      items: cart.map((item) => ({
         productId: item.id,
         quantity: item.quantity,
         priceAtSubscription: item.price,
@@ -483,7 +425,7 @@ export default function CheckoutPage() {
           ...(deliveryType === 'pickup' && selectedStore
             ? { pickupLocation: { name: selectedStore.name, address: selectedStore.address } }
             : {}),
-          items: checkoutItems.map((item) => ({
+          items: cart.map((item) => ({
             productId: item.id,
             quantity: item.quantity,
             price: item.price,
@@ -509,7 +451,7 @@ export default function CheckoutPage() {
             address: momoBuiltAddress,
             type: deliveryType,
           },
-          items: checkoutItems.map((item) => ({
+          items: cart.map((item) => ({
             productId: item.id,
             quantity: item.quantity,
             price: item.price,
@@ -581,7 +523,7 @@ export default function CheckoutPage() {
           ...(deliveryType === 'pickup' && selectedStore
             ? { pickupLocation: { name: selectedStore.name, address: selectedStore.address } }
             : {}),
-          items: checkoutItems.map((item) => ({
+          items: cart.map((item) => ({
             productId: item.id,
             quantity: item.quantity,
             price: item.price,
@@ -616,14 +558,6 @@ export default function CheckoutPage() {
               console.warn("Subscription creation failed:", subErr);
             }
           }
-          // Snapshot cart items before clearing (for display on success page)
-          const cartItemsSnapshot = checkoutItems.map((item) => ({
-            productId: { _id: item.id, name: item.name, thumbnail: item.image },
-            quantity: item.quantity,
-            price: item.price,
-            subtotal: item.price * item.quantity,
-          }));
-
           // Xoá giỏ hàng sau khi đặt hàng thành công
           await clearCart(true);
 
@@ -632,9 +566,11 @@ export default function CheckoutPage() {
               orderId: result?._id || result?.data?._id,
               paymentMethod: "COD",
               totalAmount: total,
+              notes: formData.notes || null,
               isRecurring: isRecurringOrder,
               subscriptionConfig: isRecurringOrder ? buildSubscriptionPayload() : null,
               deliveryType,
+              cartItems: cartItemsSnapshot,
               pickupLocation:
                 deliveryType === "pickup" && selectedStore
                   ? { name: selectedStore.name, address: selectedStore.address }
@@ -693,7 +629,7 @@ export default function CheckoutPage() {
           ...(deliveryType === "pickup" && selectedStore
             ? { pickupLocation: { name: selectedStore.name, address: selectedStore.address } }
             : {}),
-          items: checkoutItems.map((item) => ({
+          items: cart.map((item) => ({
             productId: item.id,
             quantity: item.quantity,
             price: item.price,
@@ -709,14 +645,6 @@ export default function CheckoutPage() {
         const newBalance = result?.walletBalance ?? walletBalance - total;
         setWalletBalance(newBalance);
 
-        // Snapshot cart items before clearing (for display on success page)
-        const cartItemsSnapshot = checkoutItems.map((item) => ({
-          productId: { _id: item.id, name: item.name, thumbnail: item.image },
-          quantity: item.quantity,
-          price: item.price,
-          subtotal: item.price * item.quantity,
-        }));
-
         // Xoá giỏ hàng sau khi thanh toán thành công
         await clearCart(true);
 
@@ -726,7 +654,9 @@ export default function CheckoutPage() {
             paymentMethod: "Wallet",
             walletBalance: newBalance,
             totalAmount: total,
+            notes: formData.notes || null,
             deliveryType,
+            cartItems: cartItemsSnapshot,
             pickupLocation:
               deliveryType === "pickup" && selectedStore
                 ? { name: selectedStore.name, address: selectedStore.address }
@@ -1119,14 +1049,7 @@ export default function CheckoutPage() {
               </div>
             </div>
 
-            {/* Đặt theo nhóm — Clickable card (hidden with fade when Store pickup is selected) */}
-            <div
-              className={`transition-all duration-300 ease-in-out overflow-hidden ${
-                deliveryType === "pickup"
-                  ? "opacity-0 max-h-0 pointer-events-none"
-                  : "opacity-100 max-h-[500px]"
-              }`}
-            >
+            {/* Đặt theo nhóm — Clickable card */}
             <button
               type="button"
               onClick={() =>
@@ -1189,7 +1112,6 @@ export default function CheckoutPage() {
                 </span>
               </div>
             </button>
-            </div>
 
             {/* Scheduled Recurring Delivery — Clickable card */}
             <button
@@ -1396,7 +1318,7 @@ export default function CheckoutPage() {
                 </h3>
 
                 <div className="space-y-4">
-                  {checkoutItems.map((item) => (
+                  {cart.map((item) => (
                     <div key={item.id} className="flex gap-3">
                       <div className="w-14 h-14 bg-gray-100 rounded-lg overflow-hidden flex-shrink-0">
                         <img
@@ -1433,33 +1355,9 @@ export default function CheckoutPage() {
                             >
                               <Minus className="w-3 h-3" />
                             </button>
-                            {editingQtyId === item.id ? (
-                              <input
-                                type="text"
-                                inputMode="numeric"
-                                pattern="[0-9]*"
-                                maxLength={2}
-                                value={editingQtyValue}
-                                autoFocus
-                                onFocus={(e) => e.target.select()}
-                                onChange={handleQtyChange}
-                                onBlur={() => commitQtyEdit(item.id)}
-                                onKeyDown={(e) => handleQtyKeyDown(e, item.id)}
-                                onPaste={handleQtyPaste}
-                                className="w-8 text-xs font-medium text-center bg-transparent outline-none border-none"
-                              />
-                            ) : (
-                              <span
-                                className="text-xs font-medium px-2 hover:bg-gray-100 cursor-text rounded"
-                                onClick={() => {
-                                  setEditingQtyId(item.id);
-                                  setEditingQtyValue(String(item.quantity));
-                                }}
-                                title="Click to edit quantity"
-                              >
-                                {item.quantity}
-                              </span>
-                            )}
+                            <span className="text-xs font-medium px-2">
+                              {item.quantity}
+                            </span>
                             <button 
                               onClick={() => handleUpdateQuantity(item.id, item.quantity + 1)}
                               className="w-6 h-6 flex items-center justify-center hover:bg-gray-50 transition-colors"
@@ -1717,11 +1615,11 @@ export default function CheckoutPage() {
               <div className="rounded-xl border border-gray-100 overflow-hidden">
                 <div className="px-3 py-1.5 bg-gray-50 border-b border-gray-100">
                   <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
-                    Products ({checkoutItems.length})
+                    Products ({cart.length})
                   </p>
                 </div>
                 <div className="divide-y divide-gray-50">
-                  {checkoutItems.map((item) => (
+                  {cart.map((item) => (
                     <div key={item.id} className="flex items-center gap-2.5 px-3 py-2">
                       <div className="w-8 h-8 bg-gray-100 rounded-lg overflow-hidden flex-shrink-0">
                         <img src={item.image} alt={item.name} className="w-full h-full object-cover" />

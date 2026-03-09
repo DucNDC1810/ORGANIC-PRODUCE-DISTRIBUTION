@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react';
-import { useCart } from '../../context/CartContext';
 import { Link, useLocation } from 'react-router-dom';
 import { 
   CheckCircle, 
@@ -15,7 +14,7 @@ import {
   User,
   Navigation2,
   Store,
-  Repeat
+  Repeat,
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import Header from '../../components/Header';
@@ -43,7 +42,6 @@ function getDeliveryScheduleLabel(config: any): string {
 
 export default function OrderSuccessPage() {
   const location = useLocation();
-  const { clearCart } = useCart();
   const [orderData, setOrderData] = useState<any>(null);
   const [subscriptionConfig, setSubscriptionConfig] = useState<any>(null);
   const [verificationStatus, setVerificationStatus] = useState<"idle" | "verifying" | "verified">("idle");
@@ -85,6 +83,8 @@ export default function OrderSuccessPage() {
           const walletOrderId = location.state.orderId;
           const stateDeliveryInfo = location.state.deliveryInfo || null;
           const statePickupLocation = location.state.pickupLocation || null;
+          const stateNotes = location.state.notes || null;
+          const stateCartItems = location.state.cartItems || [];
           setOrderData({
             orderId: walletOrderId,
             amount: location.state.totalAmount,
@@ -92,6 +92,8 @@ export default function OrderSuccessPage() {
             deliveryInfo: stateDeliveryInfo,
             pickupLocation: statePickupLocation,
             walletBalance: location.state.walletBalance,
+            items: stateCartItems,
+            notes: stateNotes,
           });
           if (walletOrderId) {
             try {
@@ -105,6 +107,8 @@ export default function OrderSuccessPage() {
                   deliveryInfo: (order as any).deliveryInfo || stateDeliveryInfo,
                   pickupLocation: (order as any).pickupLocation || statePickupLocation,
                   walletBalance: location.state.walletBalance,
+                  items: (order.items && order.items.length > 0) ? order.items : stateCartItems,
+                  notes: order.notes || stateNotes,
                 });
               }
             } catch {
@@ -129,12 +133,16 @@ export default function OrderSuccessPage() {
           // Seed immediately from navigate state so the page renders right away
           const stateDeliveryInfo = location.state.deliveryInfo || null;
           const statePickupLocation = location.state.pickupLocation || null;
+          const stateNotes = location.state.notes || null;
+          const stateCartItems = location.state.cartItems || [];
           setOrderData({
             orderId: codOrderId,
             amount: location.state.totalAmount,
             paymentMethod: "COD",
             deliveryInfo: stateDeliveryInfo,
             pickupLocation: statePickupLocation,
+            items: stateCartItems,
+            notes: stateNotes,
           });
 
           // Also fetch full order from DB to confirm and fill any missing fields
@@ -151,6 +159,8 @@ export default function OrderSuccessPage() {
                   paymentMethod: "COD",
                   deliveryInfo: dbDeliveryInfo,
                   pickupLocation: (order as any).pickupLocation || statePickupLocation,
+                  items: (order.items && order.items.length > 0) ? order.items : stateCartItems,
+                  notes: order.notes || stateNotes,
                 });
               }
             } catch {
@@ -193,13 +203,12 @@ export default function OrderSuccessPage() {
                       ...mergedData,
                       deliveryInfo: (orderRes.data.data as any).deliveryInfo || data.deliveryInfo,
                       pickupLocation: (orderRes.data.data as any).pickupLocation || data.pickupLocation,
+                      items: (orderRes.data.data as any).items || mergedData.items,
                     };
                   }
                 } catch { /* non-fatal — fall back to cached data */ }
               }
               setOrderData(mergedData);
-              // Clear cart after successful MoMo payment
-              clearCart(true).catch(() => {});
               // Capture subscription config for UI display
               if (subscriptionConfig) {
                 setSubscriptionConfig(subscriptionConfig);
@@ -245,7 +254,10 @@ export default function OrderSuccessPage() {
                 setOrderData({
                   orderId: order._id,
                   amount: order.totalAmount,
-                  deliveryInfo: (order as any).deliveryInfo || null,                  pickupLocation: (order as any).pickupLocation || null,                  notes: order.notes,
+                  deliveryInfo: (order as any).deliveryInfo || null,
+                  pickupLocation: (order as any).pickupLocation || null,
+                  items: order.items || [],
+                  notes: order.notes,
                 });
                 console.log('✅ Fetched order from backend');
               }
@@ -446,7 +458,7 @@ export default function OrderSuccessPage() {
                 Order Date
               </div>
               <div className="text-lg font-semibold text-foreground">
-                {new Date().toLocaleDateString('en-US')}
+                {new Date().toLocaleDateString('vi-VN')}
               </div>
             </div>
 
@@ -584,6 +596,58 @@ export default function OrderSuccessPage() {
                     </div>
                   )}
 
+                  {/* Product List */}
+                  {orderData?.items && orderData.items.length > 0 && (
+                    <div className="border-t border-gray-100 pt-4 pb-4 border-b border-gray-100 space-y-2">
+                      <h3 className="text-sm font-semibold text-foreground mb-3">Items Ordered</h3>
+                      {orderData.items.map((item: any, idx: number) => {
+                        const product = typeof item.productId === 'object' ? item.productId : null;
+                        return (
+                          <div key={product?._id || idx} className="flex items-center gap-3">
+                            {product?.thumbnail ? (
+                              <img
+                                src={product.thumbnail}
+                                alt={product.name}
+                                className="w-10 h-10 rounded-lg object-cover flex-shrink-0 border border-gray-100"
+                              />
+                            ) : (
+                              <div className="w-10 h-10 rounded-lg bg-gray-100 flex-shrink-0" />
+                            )}
+                            <div className="flex-1 min-w-0">
+                              <div className="text-xs font-medium text-foreground truncate">
+                                {product?.name || 'Product'}
+                              </div>
+                              <div className="text-xs text-muted-foreground">
+                                {item.price?.toLocaleString('vi-VN')} ₫
+                              </div>
+                            </div>
+                            <div className="text-xs font-semibold text-foreground flex-shrink-0">x{item.quantity}</div>
+                          </div>
+                        );
+                      })}
+                      {orderData?.notes && (
+                        <div className="pt-2 flex items-start gap-2">
+                          <span className="text-base leading-none">📝</span>
+                          <div>
+                            <div className="text-xs text-muted-foreground">Order Notes</div>
+                            <div className="text-xs font-medium text-foreground">{orderData.notes}</div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Notes fallback (when no items to show) */}
+                  {(!orderData?.items || orderData.items.length === 0) && orderData?.notes && (
+                    <div className="border-t border-gray-100 pt-4 pb-4 border-b border-gray-100 flex items-start gap-2">
+                      <span className="text-base leading-none">📝</span>
+                      <div>
+                        <div className="text-xs text-muted-foreground">Order Notes</div>
+                        <div className="text-xs font-medium text-foreground">{orderData.notes}</div>
+                      </div>
+                    </div>
+                  )}
+
                   {/* Payment Method */}
                   <div className="space-y-3">
                     <h3 className="font-semibold text-foreground">Payment Method</h3>
@@ -609,15 +673,7 @@ export default function OrderSuccessPage() {
                     </div>
                   </div>
 
-                  {/* Notes */}
-                  {orderData?.notes && (
-                    <div className="pt-4 border-t border-border">
-                      <h3 className="font-semibold text-foreground mb-2">Notes</h3>
-                      <p className="text-muted-foreground text-sm italic">
-                        {orderData.notes}
-                      </p>
-                    </div>
-                  )}
+
                 </div>
               </div>
             </motion.div>
