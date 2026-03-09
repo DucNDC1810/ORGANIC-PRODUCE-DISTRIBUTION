@@ -37,10 +37,10 @@ export default function CheckoutPage() {
   const location = useLocation();
   const { groupSession } = useGroup();
 
-  // Items selected in CartPage (undefined = all items)
-  const selectedItemIds = (location.state as any)?.selectedItemIds as string[] | undefined;
-  const checkoutItems = selectedItemIds
-    ? cart.filter((i) => selectedItemIds.includes(i.id))
+  // Filter to only the items the user selected on the Cart page
+  const selectedItemIds: string[] = (location.state as any)?.selectedItemIds ?? [];
+  const checkoutItems = selectedItemIds.length > 0
+    ? cart.filter((item) => selectedItemIds.includes(item.id))
     : cart;
 
   // ── Group checkout detection ─────────────────────────────────────────────
@@ -329,7 +329,7 @@ export default function CheckoutPage() {
   };
   // ----------------------------------------------------------------
 
-  const baseSubtotal = checkoutItems.reduce((sum, i) => sum + i.price * i.quantity, 0);
+  const baseSubtotal = checkoutItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
   // For group orders, honour the subtotal/shipping/discount from the Active Group page
   const subtotal = isGroupOrder && navGroupData ? navGroupData.subtotal : baseSubtotal;
   const shipping = isGroupOrder
@@ -616,6 +616,14 @@ export default function CheckoutPage() {
               console.warn("Subscription creation failed:", subErr);
             }
           }
+          // Snapshot cart items before clearing (for display on success page)
+          const cartItemsSnapshot = checkoutItems.map((item) => ({
+            productId: { _id: item.id, name: item.name, thumbnail: item.image },
+            quantity: item.quantity,
+            price: item.price,
+            subtotal: item.price * item.quantity,
+          }));
+
           // Xoá giỏ hàng sau khi đặt hàng thành công
           await clearCart(true);
 
@@ -700,6 +708,14 @@ export default function CheckoutPage() {
         const result = (response as any)?.data || response;
         const newBalance = result?.walletBalance ?? walletBalance - total;
         setWalletBalance(newBalance);
+
+        // Snapshot cart items before clearing (for display on success page)
+        const cartItemsSnapshot = checkoutItems.map((item) => ({
+          productId: { _id: item.id, name: item.name, thumbnail: item.image },
+          quantity: item.quantity,
+          price: item.price,
+          subtotal: item.price * item.quantity,
+        }));
 
         // Xoá giỏ hàng sau khi thanh toán thành công
         await clearCart(true);
@@ -788,7 +804,7 @@ export default function CheckoutPage() {
     );
   }
 
-  if (cart.length === 0) {
+  if (checkoutItems.length === 0) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
