@@ -31,11 +31,17 @@ import RecurringDeliveryModal, {
 } from "../../components/RecurringDeliveryModal";
 
 export default function CheckoutPage() {
-  const { cart, getTotalPrice, removeFromCart, updateQuantity, clearCart } = useCart();
+  const { cart, removeFromCart, updateQuantity, clearCart } = useCart();
   const { user } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const { groupSession } = useGroup();
+
+  // Filter to only the items the user selected on the Cart page
+  const selectedItemIds: string[] = (location.state as any)?.selectedItemIds ?? [];
+  const checkoutItems = selectedItemIds.length > 0
+    ? cart.filter((item) => selectedItemIds.includes(item.id))
+    : cart;
 
   // ── Group checkout detection ─────────────────────────────────────────────
   // Populated when navigating from the Active Group page
@@ -265,7 +271,7 @@ export default function CheckoutPage() {
   };
   // ----------------------------------------------------------------
 
-  const baseSubtotal = getTotalPrice();
+  const baseSubtotal = checkoutItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
   // For group orders, honour the subtotal/shipping/discount from the Active Group page
   const subtotal = isGroupOrder && navGroupData ? navGroupData.subtotal : baseSubtotal;
   const shipping = isGroupOrder
@@ -382,7 +388,7 @@ export default function CheckoutPage() {
       frequency: frequencyMap[recurringData.recurringFrequency],
       deliveryDay,
       nextDeliveryDate: nextDelivery.toISOString(),
-      items: cart.map((item) => ({
+      items: checkoutItems.map((item) => ({
         productId: item.id,
         quantity: item.quantity,
         priceAtSubscription: item.price,
@@ -419,7 +425,7 @@ export default function CheckoutPage() {
           ...(deliveryType === 'pickup' && selectedStore
             ? { pickupLocation: { name: selectedStore.name, address: selectedStore.address } }
             : {}),
-          items: cart.map((item) => ({
+          items: checkoutItems.map((item) => ({
             productId: item.id,
             quantity: item.quantity,
             price: item.price,
@@ -445,7 +451,7 @@ export default function CheckoutPage() {
             address: momoBuiltAddress,
             type: deliveryType,
           },
-          items: cart.map((item) => ({
+          items: checkoutItems.map((item) => ({
             productId: item.id,
             quantity: item.quantity,
             price: item.price,
@@ -517,7 +523,7 @@ export default function CheckoutPage() {
           ...(deliveryType === 'pickup' && selectedStore
             ? { pickupLocation: { name: selectedStore.name, address: selectedStore.address } }
             : {}),
-          items: cart.map((item) => ({
+          items: checkoutItems.map((item) => ({
             productId: item.id,
             quantity: item.quantity,
             price: item.price,
@@ -553,7 +559,7 @@ export default function CheckoutPage() {
             }
           }
           // Snapshot cart items before clearing (for display on success page)
-          const cartItemsSnapshot = cart.map((item) => ({
+          const cartItemsSnapshot = checkoutItems.map((item) => ({
             productId: { _id: item.id, name: item.name, thumbnail: item.image },
             quantity: item.quantity,
             price: item.price,
@@ -631,7 +637,7 @@ export default function CheckoutPage() {
           ...(deliveryType === "pickup" && selectedStore
             ? { pickupLocation: { name: selectedStore.name, address: selectedStore.address } }
             : {}),
-          items: cart.map((item) => ({
+          items: checkoutItems.map((item) => ({
             productId: item.id,
             quantity: item.quantity,
             price: item.price,
@@ -648,7 +654,7 @@ export default function CheckoutPage() {
         setWalletBalance(newBalance);
 
         // Snapshot cart items before clearing (for display on success page)
-        const cartItemsSnapshot = cart.map((item) => ({
+        const cartItemsSnapshot = checkoutItems.map((item) => ({
           productId: { _id: item.id, name: item.name, thumbnail: item.image },
           quantity: item.quantity,
           price: item.price,
@@ -744,7 +750,7 @@ export default function CheckoutPage() {
     );
   }
 
-  if (cart.length === 0) {
+  if (checkoutItems.length === 0) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
@@ -1328,7 +1334,7 @@ export default function CheckoutPage() {
                 </h3>
 
                 <div className="space-y-4">
-                  {cart.map((item) => (
+                  {checkoutItems.map((item) => (
                     <div key={item.id} className="flex gap-3">
                       <div className="w-14 h-14 bg-gray-100 rounded-lg overflow-hidden flex-shrink-0">
                         <img
@@ -1625,11 +1631,11 @@ export default function CheckoutPage() {
               <div className="rounded-xl border border-gray-100 overflow-hidden">
                 <div className="px-3 py-1.5 bg-gray-50 border-b border-gray-100">
                   <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
-                    Products ({cart.length})
+                    Products ({checkoutItems.length})
                   </p>
                 </div>
                 <div className="divide-y divide-gray-50">
-                  {cart.map((item) => (
+                  {checkoutItems.map((item) => (
                     <div key={item.id} className="flex items-center gap-2.5 px-3 py-2">
                       <div className="w-8 h-8 bg-gray-100 rounded-lg overflow-hidden flex-shrink-0">
                         <img src={item.image} alt={item.name} className="w-full h-full object-cover" />
