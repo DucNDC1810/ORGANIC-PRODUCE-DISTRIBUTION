@@ -86,6 +86,8 @@ export default function AdminProductManagement() {
     origin: '',
     isOrganic: true,
     isFeatured: false,
+    expiryDate: '',
+    harvestDate: '',
   });
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -140,6 +142,8 @@ export default function AdminProductManagement() {
       origin: '',
       isOrganic: true,
       isFeatured: false,
+      expiryDate: '',
+      harvestDate: '',
     });
     setFormErrors({});
   };
@@ -267,6 +271,8 @@ export default function AdminProductManagement() {
       origin: product.origin || '',
       isOrganic: product.isOrganic !== false,
       isFeatured: product.isFeatured || false,
+      expiryDate: product.expiryDate ? new Date(product.expiryDate).toISOString().split('T')[0] : '',
+      harvestDate: product.harvestDate ? new Date(product.harvestDate).toISOString().split('T')[0] : '',
     });
     setIsEditDialogOpen(true);
   };
@@ -464,6 +470,27 @@ export default function AdminProductManagement() {
                       {formErrors.origin}
                     </p>
                   )}
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="harvestDate" className="text-sm font-semibold">Harvest Date</Label>
+                    <Input
+                      id="harvestDate"
+                      type="date"
+                      value={formData.harvestDate}
+                      onChange={(e) => handleInputChange('harvestDate', e.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="expiryDate" className="text-sm font-semibold">Expiry Date (Hạn sử dụng)</Label>
+                    <Input
+                      id="expiryDate"
+                      type="date"
+                      min={new Date().toISOString().split('T')[0]}
+                      value={formData.expiryDate}
+                      onChange={(e) => handleInputChange('expiryDate', e.target.value)}
+                    />
+                  </div>
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="description" className="text-sm font-semibold">Description</Label>
@@ -748,7 +775,7 @@ export default function AdminProductManagement() {
                           </TableCell>
                           <TableCell>
                             <Badge variant="outline" className="bg-purple-50 text-purple-700 text-[10px]">
-                              {categories.find(c => c._id === product.category)?.name || 'Unknown'}
+                              {categories.find(c => c.slug === product.category || c._id === product.category)?.name || product.category || 'Unknown'}
                             </Badge>
                           </TableCell>
                           <TableCell>
@@ -971,6 +998,27 @@ export default function AdminProductManagement() {
                 className={formErrors.origin ? 'border-red-500' : ''}
               />
             </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="edit-harvestDate" className="text-sm font-semibold">Harvest Date</Label>
+                <Input
+                  id="edit-harvestDate"
+                  type="date"
+                  value={formData.harvestDate}
+                  onChange={(e) => handleInputChange('harvestDate', e.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-expiryDate" className="text-sm font-semibold">Expiry Date (Hạn sử dụng)</Label>
+                <Input
+                  id="edit-expiryDate"
+                  type="date"
+                  min={new Date().toISOString().split('T')[0]}
+                  value={formData.expiryDate}
+                  onChange={(e) => handleInputChange('expiryDate', e.target.value)}
+                />
+              </div>
+            </div>
             <div className="space-y-2">
               <Label htmlFor="edit-description">Description</Label>
               <Textarea
@@ -1099,12 +1147,27 @@ export default function AdminProductManagement() {
                 <div>
                   <p className="text-sm text-gray-500">Category</p>
                   <p className="text-lg font-medium text-gray-900">
-                    {categories.find(c => c._id === selectedProduct.category)?.name || 'Unknown'}
+                    {categories.find(c => c.slug === selectedProduct.category || c._id === selectedProduct.category)?.name || selectedProduct.category || 'Unknown'}
                   </p>
                 </div>
                 <div>
                   <p className="text-sm text-gray-500">Origin</p>
                   <p className="text-lg font-medium text-gray-900">{selectedProduct.origin || 'N/A'}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-500">Harvest Date</p>
+                  <p className="text-lg font-medium text-gray-900">
+                    {selectedProduct.harvestDate ? new Date(selectedProduct.harvestDate).toLocaleDateString('vi-VN') : 'N/A'}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-500">Expiry Date (Hạn sử dụng)</p>
+                  <p className={`text-lg font-medium ${selectedProduct.expiryDate && new Date(selectedProduct.expiryDate) < new Date() ? 'text-red-600' : 'text-gray-900'}`}>
+                    {selectedProduct.expiryDate ? new Date(selectedProduct.expiryDate).toLocaleDateString('vi-VN') : 'N/A'}
+                    {selectedProduct.expiryDate && new Date(selectedProduct.expiryDate) < new Date() && (
+                      <span className="ml-2 text-xs bg-red-100 text-red-700 px-1.5 py-0.5 rounded">Đã hết hạn</span>
+                    )}
+                  </p>
                 </div>
                 {selectedProduct.rating !== undefined && (
                   <>
