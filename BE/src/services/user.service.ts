@@ -4,6 +4,8 @@ import jwt, { SignOptions } from 'jsonwebtoken';
 import crypto from 'crypto';
 import { EmailService } from './email.service';
 import { UserRole } from '../constants/roles';
+import { getSecurityConfig } from '../config/securityConfig';
+import { createNotification } from '../models/Notification.model';
 
 interface AuthResponse {
   user: Partial<IUser>;
@@ -132,6 +134,17 @@ export class UserService {
   }
 
   async updateUser(id: string, userData: Partial<IUser>): Promise<IUser> {
+    // Check if email is being updated and if it already exists
+    if (userData.email) {
+      const existingUser = await User.findOne({ 
+        email: userData.email,
+        _id: { $ne: id } // Exclude current user from check
+      });
+      if (existingUser) {
+        throw new AppError('Email already exists', 400);
+      }
+    }
+
     const user = await User.findByIdAndUpdate(
       id,
       { $set: userData },
@@ -235,6 +248,50 @@ export class UserService {
     );
 
     return { modifiedCount: result.modifiedCount };
+  }
+
+  /**
+   * Request unlock — user submits request, emails sent to admin + confirmation to user
+   */
+  async requestUnlock(email: string): Promise<void> {
+    const user = await User.findOne({ email: email.toLowerCase() });
+    if (!user) {
+      // Don't reveal whether email exists
+      return;
+    }
+    if (user.isActive) {
+      throw new AppError('This account is not locked.', 400);
+    }
+    // Send emails (fire-and-forget for user, awaited for admin)
+    this.emailService.sendUnlockRequestConfirmation(user.email, user.name).catch(() => {});
+    await this.emailService.sendUnlockRequestToAdmin(user.name, user.email);
+    // Create admin notification
+    createNotification(
+      'unlock_request',
+      'Yêu cầu mở khóa tài khoản',
+      `${user.name} (${user.email}) đang yêu cầu được mở khóa tài khoản.`,
+      { link: '?tab=settings', metadata: { userId: user._id, email: user.email } }
+    );
+  }
+
+  /**
+   * Unlock a locked-out user account (admin only)
+   */
+  async unlockUser(id: string): Promise<IUser> {
+    const user = await User.findByIdAndUpdate(
+      id,
+      { failedLoginAttempts: 0, lockedUntil: null, isActive: true },
+      { new: true }
+    ).select('-password');
+    if (!user) throw new AppError('User not found', 404);
+    return user;
+  }
+
+  /**
+   * Get all locked users (admin only)
+   */
+  async getLockedUsers(): Promise<IUser[]> {
+    return User.find({ isActive: false }).select('-password');
   }
 
   /**
@@ -424,6 +481,8 @@ export class UserService {
   }
 
   async login(emailOrUsername: string, password: string): Promise<AuthResponse> {
+    const { maxLoginAttempts: MAX_ATTEMPTS } = getSecurityConfig();
+
     // Find user with password by email or username
     const user = await User.findOne({ 
       $or: [{ email: emailOrUsername.toLowerCase() }, { username: emailOrUsername.toLowerCase() }] 
@@ -438,10 +497,39 @@ export class UserService {
       throw new AppError('Please login with Google', 401);
     }
 
+    // Check if account is locked/deactivated (must be checked before password attempt)
+    if (!user.isActive) {
+      throw new AppError(
+        'Your account has been locked. Please contact admin to unlock your account.',
+        423
+      );
+    }
+
     // Check password
     const isPasswordValid = await user.comparePassword(password);
     if (!isPasswordValid) {
-      throw new AppError('Invalid email or password', 401);
+      const newAttempts = (user.failedLoginAttempts || 0) + 1;
+      if (newAttempts >= MAX_ATTEMPTS) {
+        await User.findByIdAndUpdate(user._id, {
+          failedLoginAttempts: newAttempts,
+          isActive: false
+        });
+        // Notify user and admin (fire-and-forget)
+        this.emailService.sendAccountLockedToUser(user.email, user.name, newAttempts).catch(() => {});
+        this.emailService.sendAccountLockedToAdmin(user.name, user.email, newAttempts).catch(() => {});
+        createNotification(
+          'account_locked',
+          'Tài khoản bị khóa',
+          `Tài khoản của ${user.name} (${user.email}) đã bị khóa sau ${newAttempts} lần nhập sai mật khẩu.`,
+          { link: '?tab=customers', metadata: { userId: user._id, email: user.email } }
+        );
+        throw new AppError(
+          `Your account has been locked after ${MAX_ATTEMPTS} failed login attempts. Please contact admin to unlock your account.`,
+          423
+        );
+      }
+      await User.findByIdAndUpdate(user._id, { failedLoginAttempts: newAttempts });
+      throw new AppError(`Invalid email or password. ${MAX_ATTEMPTS - newAttempts} attempt(s) remaining before account lock.`, 401);
     }
 
     // Check if email is verified
@@ -449,10 +537,8 @@ export class UserService {
       throw new AppError('Please verify your email before logging in. Check your inbox for the verification link.', 403);
     }
 
-    // Check if account is active
-    if (!user.isActive) {
-      throw new AppError('Your account has been deactivated. Please contact support.', 403);
-    }
+    // Reset failed attempts on successful login
+    await User.findByIdAndUpdate(user._id, { failedLoginAttempts: 0, lockedUntil: null });
 
     // Generate token
     const token = this.generateToken(user._id.toString());

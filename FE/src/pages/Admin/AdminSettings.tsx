@@ -1,14 +1,111 @@
 import { useState, useEffect, useRef } from 'react';
-import { User, Phone, Mail, Home, Edit2, Save, X, Camera, Shield } from 'lucide-react';
+import { User, Phone, Mail, Home, Edit2, Save, X, Camera, Shield, Lock, Unlock, Clock, AlertTriangle } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { userAPI } from '../Axios/Axios';
 import { toast } from 'sonner';
+import api from '../../services/api';
+
+// ─── Session timeout stored in localStorage ───────────────────────────────────
+const SESSION_TIMEOUT_KEY = 'admin_session_timeout_minutes';
+const DEFAULT_TIMEOUT = 30;
+
+interface LockedUser {
+  _id: string;
+  name: string;
+  email: string;
+  failedLoginAttempts: number;
+  lockedUntil?: string;
+}
 
 export default function AdminSettings() {
   const { user, setUser } = useAuth();
   const [isEditing, setIsEditing] = useState(false);
   const [loading, setLoading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // ── Security Settings state ────────────────────────────────────────────────
+  const [sessionTimeout, setSessionTimeout] = useState<number>(
+    parseInt(localStorage.getItem(SESSION_TIMEOUT_KEY) || String(DEFAULT_TIMEOUT))
+  );
+  const [timeoutDraft, setTimeoutDraft] = useState<number>(
+    parseInt(localStorage.getItem(SESSION_TIMEOUT_KEY) || String(DEFAULT_TIMEOUT))
+  );
+  const [maxAttempts, setMaxAttempts] = useState<number>(5);
+  const [maxAttemptsDraft, setMaxAttemptsDraft] = useState<number>(5);
+  const [savingSecConfig, setSavingSecConfig] = useState(false);
+  const [lockedUsers, setLockedUsers] = useState<LockedUser[]>([]);
+  const [loadingLocked, setLoadingLocked] = useState(false);
+  const [unlockingId, setUnlockingId] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetchLockedUsers();
+    fetchSecurityConfig();
+  }, []);
+
+  const fetchSecurityConfig = async () => {
+    try {
+      const res = await api.get('/users/security-config') as any;
+      const cfg = res.data;
+      setMaxAttempts(cfg.maxLoginAttempts);
+      setMaxAttemptsDraft(cfg.maxLoginAttempts);
+    } catch {
+      // silently ignore
+    }
+  };
+
+  const handleSaveSecurityConfig = async () => {
+    if (maxAttemptsDraft < 1 || maxAttemptsDraft > 20) {
+      toast.error('Max login attempts must be between 1 and 20');
+      return;
+    }
+    setSavingSecConfig(true);
+    try {
+      await api.patch('/users/security-config', {
+        maxLoginAttempts: maxAttemptsDraft,
+      });
+      setMaxAttempts(maxAttemptsDraft);
+      toast.success('Security configuration saved');
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || 'Failed to save security config');
+    } finally {
+      setSavingSecConfig(false);
+    }
+  };
+
+  const fetchLockedUsers = async () => {
+    setLoadingLocked(true);
+    try {
+      const res = await api.get('/users/locked') as any;
+      setLockedUsers(res.data ?? []);
+    } catch {
+      // silently ignore
+    } finally {
+      setLoadingLocked(false);
+    }
+  };
+
+  const handleSaveTimeout = () => {
+    if (timeoutDraft < 1 || timeoutDraft > 1440) {
+      toast.error('Session timeout must be between 1 and 1440 minutes');
+      return;
+    }
+    localStorage.setItem(SESSION_TIMEOUT_KEY, String(timeoutDraft));
+    setSessionTimeout(timeoutDraft);
+    toast.success(`Session timeout set to ${timeoutDraft} minutes`);
+  };
+
+  const handleUnlockUser = async (userId: string) => {
+    setUnlockingId(userId);
+    try {
+      await api.patch(`/users/${userId}/unlock`);
+      toast.success('User account unlocked successfully');
+      setLockedUsers(prev => prev.filter(u => u._id !== userId));
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || 'Failed to unlock user');
+    } finally {
+      setUnlockingId(null);
+    }
+  };
 
   const [formData, setFormData] = useState({
     name: user?.name || '',
@@ -301,6 +398,181 @@ export default function AdminSettings() {
                 )}
               </div>
             </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Security Settings */}
+      {/* Login Attempt Limits */}
+      <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+        <div className="flex items-center gap-3 px-6 py-4 border-b border-gray-100">
+          <div className="w-8 h-8 bg-red-100 rounded-lg flex items-center justify-center">
+            <Shield className="w-4 h-4 text-red-600" />
+          </div>
+          <div>
+            <h3 className="text-base font-semibold text-gray-900">Login Attempt Limits</h3>
+            <p className="text-xs text-gray-500">Configure failed-login lockout policy</p>
+          </div>
+          <span className="ml-auto text-xs text-gray-400">
+            Current: <span className="font-semibold text-red-500">{maxAttempts}</span> attempts before lockout
+          </span>
+        </div>
+        <div className="p-6 space-y-4">
+          <p className="text-sm text-gray-600">
+            Account will be <span className="font-semibold text-red-600">permanently locked</span> after reaching the limit and must be <span className="font-semibold">manually unlocked by admin</span>.
+          </p>
+          <div className="space-y-3">
+            <label className="block text-sm font-medium text-gray-700">Max failed attempts before lockout</label>
+            <div className="flex items-center gap-3">
+              <input
+                type="number"
+                min={1}
+                max={20}
+                value={maxAttemptsDraft}
+                onChange={(e) => setMaxAttemptsDraft(Number(e.target.value))}
+                className="w-24 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-red-400 focus:ring-1 focus:ring-red-400"
+              />
+              <span className="text-sm text-gray-500">attempts</span>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {[3, 5, 10].map(val => (
+                <button
+                  key={val}
+                  onClick={() => setMaxAttemptsDraft(val)}
+                  className={`px-3 py-1 rounded-full text-xs font-medium transition-colors border ${
+                    maxAttemptsDraft === val
+                      ? 'bg-red-500 text-white border-red-500'
+                      : 'bg-gray-50 text-gray-600 border-gray-200 hover:border-red-300'
+                  }`}
+                >
+                  {val}x
+                </button>
+              ))}
+            </div>
+            <p className="text-xs text-gray-400">Range: 1–20. Locked accounts appear in "Locked Accounts" below.</p>
+          </div>
+        </div>
+        <div className="px-6 pb-6 flex justify-end">
+          <button
+            onClick={handleSaveSecurityConfig}
+            disabled={savingSecConfig}
+            className="flex items-center gap-2 px-5 py-2 bg-red-500 text-white rounded-lg text-sm font-medium hover:bg-red-600 transition-colors disabled:opacity-50"
+          >
+            <Save className="w-4 h-4" />
+            {savingSecConfig ? 'Saving...' : 'Save Security Config'}
+          </button>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Session Timeout */}
+        <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+          <div className="flex items-center gap-3 px-6 py-4 border-b border-gray-100">
+            <div className="w-8 h-8 bg-orange-100 rounded-lg flex items-center justify-center">
+              <Clock className="w-4 h-4 text-orange-600" />
+            </div>
+            <div>
+              <h3 className="text-base font-semibold text-gray-900">Session Timeout</h3>
+              <p className="text-xs text-gray-500">Auto-logout after inactivity</p>
+            </div>
+          </div>
+          <div className="p-6 space-y-4">
+            <p className="text-sm text-gray-600">
+              Current timeout: <span className="font-semibold text-orange-600">{sessionTimeout} minutes</span>
+            </p>
+            <div className="flex items-center gap-3">
+              <input
+                type="number"
+                min={1}
+                max={1440}
+                value={timeoutDraft}
+                onChange={(e) => setTimeoutDraft(Number(e.target.value))}
+                className="w-28 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-orange-400 focus:ring-1 focus:ring-orange-400"
+              />
+              <span className="text-sm text-gray-500">minutes</span>
+              <button
+                onClick={handleSaveTimeout}
+                className="ml-auto flex items-center gap-2 px-4 py-2 bg-orange-500 text-white rounded-lg text-sm font-medium hover:bg-orange-600 transition-colors"
+              >
+                <Save className="w-4 h-4" />
+                Save
+              </button>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {[15, 30, 60, 120].map(val => (
+                <button
+                  key={val}
+                  onClick={() => setTimeoutDraft(val)}
+                  className={`px-3 py-1 rounded-full text-xs font-medium transition-colors border ${
+                    timeoutDraft === val
+                      ? 'bg-orange-500 text-white border-orange-500'
+                      : 'bg-gray-50 text-gray-600 border-gray-200 hover:border-orange-300'
+                  }`}
+                >
+                  {val}m
+                </button>
+              ))}
+            </div>
+            <p className="text-xs text-gray-400">Range: 1–1440 minutes (24 hours). This setting is stored locally and applies on next login.</p>
+          </div>
+        </div>
+
+        {/* Locked Users */}
+        <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+          <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 bg-red-100 rounded-lg flex items-center justify-center">
+                <Lock className="w-4 h-4 text-red-600" />
+              </div>
+              <div>
+                <h3 className="text-base font-semibold text-gray-900">Locked Accounts</h3>
+                <p className="text-xs text-gray-500">Users locked after failed logins</p>
+              </div>
+            </div>
+            <button
+              onClick={fetchLockedUsers}
+              className="text-xs text-emerald-600 hover:text-emerald-700 font-medium underline underline-offset-2"
+            >
+              Refresh
+            </button>
+          </div>
+          <div className="p-4">
+            {loadingLocked ? (
+              <div className="py-8 text-center text-sm text-gray-400">Loading...</div>
+            ) : lockedUsers.length === 0 ? (
+              <div className="py-8 text-center">
+                <Shield className="w-10 h-10 text-green-400 mx-auto mb-2" />
+                <p className="text-sm text-gray-500">No locked accounts</p>
+              </div>
+            ) : (
+              <div className="space-y-2 max-h-72 overflow-y-auto">
+                {lockedUsers.map(u => (
+                  <div key={u._id} className="flex items-center gap-3 p-3 bg-red-50 border border-red-100 rounded-xl">
+                    <div className="w-9 h-9 rounded-full bg-red-200 flex items-center justify-center flex-shrink-0">
+                      <AlertTriangle className="w-4 h-4 text-red-600" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold text-gray-800 truncate">{u.name}</p>
+                      <p className="text-xs text-gray-500 truncate">{u.email}</p>
+                      <p className="text-xs text-red-500 mt-0.5">
+                        {u.failedLoginAttempts} failed attempt(s)
+                        {u.lockedUntil && (
+                          <> · locked until {new Date(u.lockedUntil).toLocaleString('vi-VN')}</>
+                        )}
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => handleUnlockUser(u._id)}
+                      disabled={unlockingId === u._id}
+                      className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-500 text-white rounded-lg text-xs font-medium hover:bg-emerald-600 transition-colors disabled:opacity-50 flex-shrink-0"
+                    >
+                      <Unlock className="w-3.5 h-3.5" />
+                      {unlockingId === u._id ? '...' : 'Unlock'}
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       </div>
