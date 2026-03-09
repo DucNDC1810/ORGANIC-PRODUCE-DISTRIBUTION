@@ -71,7 +71,7 @@ export class WalletController {
         amount: Math.floor(amount),
         type: 'topup',
         status: 'pending',
-        description: `Nạp tiền vào ví FreshMarket`,
+        description: `Top-up to FreshMarket Wallet`,
         metadata: safeGroupId ? { groupId: safeGroupId } : {}
       });
 
@@ -213,7 +213,7 @@ export class WalletController {
             type: 'payment',
             status: 'success',
             orderId: order._id,
-            description: `Thanh toán đơn hàng #${order._id}`
+            description: `Payment for order #${order._id}`
           }
         ],
         { session }
@@ -296,7 +296,7 @@ export class WalletController {
 
       // 5. Ghi transaction cho người nhận (refund/receive)
       await Transaction.create(
-        [{ userId: toUserId, amount, type: 'refund', status: 'success', description: `Nhận tiền từ ${updatedSender.name}` }],
+        [{ userId: toUserId, amount, type: 'refund', status: 'success', description: `Received from ${updatedSender.name}` }],
         { session }
       );
 
@@ -422,7 +422,7 @@ export class WalletController {
                 amount: FIRST_TOPUP_BONUS,
                 type: 'bonus',
                 status: 'success',
-                description: 'Thưởng nạp tiền lần đầu +10.000₫'
+                description: 'First top-up bonus (+10,000₫)'
               }],
               { session }
             );

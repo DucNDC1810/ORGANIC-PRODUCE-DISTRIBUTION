@@ -36,18 +36,43 @@ function txColor(type: Transaction['type']) {
   return type === 'payment' ? 'text-red-600' : 'text-emerald-600';
 }
 
+function resolveOrderId(orderId: any, description?: string): string | null {
+  if (!orderId) {
+    if (description) {
+      const match = description.match(/#([a-f0-9]{24})/i);
+      if (match) return match[1].slice(-8);
+    }
+    return null;
+  }
+  if (typeof orderId === 'string') return orderId.slice(-8);
+  if (typeof orderId === 'object' && orderId._id) return String(orderId._id).slice(-8);
+  return String(orderId).slice(-8);
+}
+
 function txLabel(tx: Transaction) {
-  if (tx.description) return tx.description;
-  if (tx.type === 'topup')   return 'Top-up to wallet';
-  if (tx.type === 'payment') return `Payment for order${tx.orderId ? ` #${String(tx.orderId).slice(-6)}` : ''}`;
-  if (tx.type === 'bonus')   return 'First top-up bonus';
+  if (tx.type === 'topup')   return 'Top-up to FreshMarket Wallet';
+  if (tx.type === 'bonus')   return 'First top-up bonus (+10,000₫)';
+  if (tx.type === 'payment') {
+    const desc = tx.description ?? '';
+    const isGroup = /nh.m/i.test(desc);
+    const oid = resolveOrderId(tx.orderId, desc);
+    if (isGroup) return `Group order payment${oid ? ` #${oid}` : ''}`;
+    return `Payment for order${oid ? ` #${oid}` : ''}`;
+  }
+  if (tx.type === 'refund') {
+    const desc = tx.description ?? '';
+    if (/h.y/i.test(desc)) return 'Group order deposit refund (leader cancelled)';
+    if (/r.i/i.test(desc)) return 'Group order deposit refund (left group)';
+    if (/nh.m/i.test(desc)) return 'Group order deposit refund';
+    return 'Refund';
+  }
   return 'Refund';
 }
 
 function fmtDate(iso: string) {
   const d = new Date(iso);
-  return d.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' })
-    + ' ' + d.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
+  return d.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' })
+    + ' ' + d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', hour12: false });
 }
 
 // Aggregate spending (type=payment) by week or month
@@ -57,12 +82,13 @@ function aggregateSpending(txs: Transaction[], mode: 'week' | 'month') {
     const d = new Date(t.createdAt);
     let key: string;
     if (mode === 'month') {
-      key = `T${d.getMonth() + 1}/${d.getFullYear()}`;
+      const monthNames = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+      key = `${monthNames[d.getMonth()]} ${d.getFullYear()}`;
     } else {
       // ISO week
       const jan1 = new Date(d.getFullYear(), 0, 1);
       const week = Math.ceil(((d.getTime() - jan1.getTime()) / 86400000 + jan1.getDay() + 1) / 7);
-      key = `T${week}`;
+      key = `W${week}`;
     }
     map[key] = (map[key] ?? 0) + t.amount;
   });

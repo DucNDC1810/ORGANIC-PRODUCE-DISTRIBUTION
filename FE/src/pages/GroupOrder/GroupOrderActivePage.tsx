@@ -8,7 +8,6 @@ import {
   Check,
   Share2,
   ShoppingCart,
-  Clock,
   ChevronRight,
   Trash2,
   Plus,
@@ -1101,25 +1100,7 @@ export default function GroupOrderActivePage() {
             </button>
           ) : (
             <button
-              onClick={() => {
-                if (paymentOption === 'owner_only') {
-                  navigate("/checkout", {
-                    state: {
-                      groupCheckout: {
-                        groupId,
-                        groupName,
-                        activePct,
-                        discount,
-                        subtotal,
-                        shipping: 25000,
-                        total: total + 25000,
-                      },
-                    },
-                  });
-                } else {
-                  setShowPlaceConfirm(true);
-                }
-              }}
+              onClick={() => setShowPlaceConfirm(true)}
               disabled={placeOrderLoading || cart.length === 0 || (paymentOption === 'equal_split' && !allNonOwnerPaid)}
               className="w-full py-4 rounded-2xl bg-gradient-to-r from-green-600 to-emerald-500 text-white text-base font-extrabold shadow-lg hover:from-green-700 hover:to-emerald-600 active:scale-[0.98] transition-all duration-150 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
             >

@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Users, TrendingUp, Eye, Search, Edit, Trash2, UserCheck, UserX, RefreshCw, ChevronLeft, ChevronRight, Shield, AlertTriangle, Lock } from 'lucide-react';
+import { Users, TrendingUp, Eye, Search, Edit, Trash2, UserCheck, UserX, RefreshCw, ChevronLeft, ChevronRight, Shield, AlertTriangle, Lock, UserPlus, EyeOff, Mail, User as UserIcon, Phone, MapPin, KeyRound, Briefcase } from 'lucide-react';
 import { Button } from '../../components/ui/button';
 import { Badge } from '../../components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
@@ -36,6 +36,7 @@ export default function CustomerManagement() {
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [viewDialogOpen, setViewDialogOpen] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [roleDialogOpen, setRoleDialogOpen] = useState(false);
   const [statusDialogOpen, setStatusDialogOpen] = useState(false);
@@ -49,10 +50,32 @@ export default function CustomerManagement() {
     phone: '', 
     address: '' 
   });
+  
+  // Create form state
+  const [createForm, setCreateForm] = useState<{
+    name: string;
+    email: string;
+    username: string;
+    password: string;
+    role: 'admin' | 'manager' | 'customer' | 'user' | 'shipper' | 'farmer';
+    phone: string;
+    address: string;
+  }>({ 
+    name: '', 
+    email: '', 
+    username: '',
+    password: '',
+    role: 'customer',
+    phone: '', 
+    address: '' 
+  });
+  
   const [newRole, setNewRole] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [passwordError, setPasswordError] = useState('');
+  const [showCreatePassword, setShowCreatePassword] = useState(false);
+  const [passwordStrength, setPasswordStrength] = useState({ score: 0, text: '', color: '' });
 
   // Fetch users
   const fetchUsers = useCallback(async () => {
@@ -141,9 +164,69 @@ export default function CustomerManagement() {
       setEditDialogOpen(false);
       setSelectedUser(null);
       fetchUsers();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to update user:', error);
-      toast.error('Failed to update user information');
+      const errorMessage = error?.response?.data?.message || 'Failed to update user information';
+      toast.error(errorMessage);
+    }
+  };
+
+  // Calculate password strength
+  const calculatePasswordStrength = (password: string) => {
+    let score = 0;
+    if (!password) return { score: 0, text: '', color: '' };
+    
+    // Length
+    if (password.length >= 6) score++;
+    if (password.length >= 10) score++;
+    
+    // Character variety
+    if (/[a-z]/.test(password)) score++;
+    if (/[A-Z]/.test(password)) score++;
+    if (/[0-9]/.test(password)) score++;
+    if (/[^a-zA-Z0-9]/.test(password)) score++;
+    
+    // Return strength assessment
+    if (score <= 2) return { score, text: 'Weak', color: 'bg-red-500' };
+    if (score <= 4) return { score, text: 'Medium', color: 'bg-yellow-500' };
+    return { score, text: 'Strong', color: 'bg-green-500' };
+  };
+
+  // Handle create user
+  const handleCreateUser = async () => {
+    // Validate fields
+    if (!createForm.name || !createForm.email || !createForm.username || !createForm.password) {
+      toast.error('Please fill in all required fields');
+      return;
+    }
+
+    // Validate password
+    const passwordValidationError = validatePassword(createForm.password);
+    if (passwordValidationError) {
+      toast.error(passwordValidationError);
+      return;
+    }
+
+    try {
+      await userAPI.createUser(createForm);
+      toast.success('User created successfully!');
+      setCreateDialogOpen(false);
+      setCreateForm({ 
+        name: '', 
+        email: '', 
+        username: '',
+        password: '',
+        role: 'customer',
+        phone: '', 
+        address: '' 
+      });
+      setPasswordStrength({ score: 0, text: '', color: '' });
+      fetchUsers();
+      fetchStats();
+    } catch (error: any) {
+      console.error('Failed to create user:', error);
+      const errorMessage = error?.response?.data?.message || 'Failed to create user';
+      toast.error(errorMessage);
     }
   };
 
@@ -269,10 +352,16 @@ export default function CustomerManagement() {
           <h2 className="text-3xl font-bold text-foreground mb-2">Account Management</h2>
           <p className="text-muted-foreground">Manage and monitor system users</p>
         </div>
-        <Button onClick={() => { fetchUsers(); fetchStats(); }} variant="outline">
-          <RefreshCw className="w-4 h-4 mr-2" />
-          Refresh
-        </Button>
+        <div className="flex gap-3">
+          <Button onClick={() => setCreateDialogOpen(true)} className="bg-primary hover:bg-primary-dark">
+            <UserPlus className="w-4 h-4 mr-2" />
+            Add User
+          </Button>
+          <Button onClick={() => { fetchUsers(); fetchStats(); }} variant="outline">
+            <RefreshCw className="w-4 h-4 mr-2" />
+            Refresh
+          </Button>
+        </div>
       </div>
 
       {/* Stats Cards */}
@@ -602,6 +691,243 @@ export default function CustomerManagement() {
               <Edit className="w-4 h-4 mr-2" />
               Save Changes
             </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Create User Dialog - Modern Design */}
+      <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
+        <DialogContent className="sm:max-w-3xl max-h-[90vh] overflow-hidden">
+          {/* Header with Gradient */}
+          <div className="relative overflow-hidden">
+            <div className="absolute inset-0 bg-gradient-to-br from-green-500 via-emerald-500 to-teal-600 opacity-10"></div>
+            <div className="relative flex items-center gap-4 py-6">
+              <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-green-500 to-emerald-600 flex items-center justify-center shadow-lg">
+                <UserPlus className="w-8 h-8 text-white" />
+              </div>
+              <div className="flex-1">
+                <DialogTitle className="text-2xl font-bold text-gray-900">Create New User</DialogTitle>
+                <DialogDescription className="text-gray-600 mt-1">Add a new user account to the system</DialogDescription>
+              </div>
+            </div>
+          </div>
+
+          {/* Form Content with 2-column layout */}
+          <div className="overflow-y-auto max-h-[calc(90vh-200px)] px-1">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-5 py-2">
+              {/* Left Column */}
+              <div className="space-y-4">
+                {/* Full Name */}
+                <div>
+                  <Label className="text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
+                    <UserIcon className="w-4 h-4 text-green-600" />
+                    Full Name <span className="text-red-500">*</span>
+                  </Label>
+                  <div className="relative">
+                    <Input 
+                      value={createForm.name} 
+                      onChange={(e) => setCreateForm({ ...createForm, name: e.target.value })} 
+                      className="pl-10 border-gray-300 focus:border-green-500 focus:ring-green-500 transition-all"
+                      placeholder="John Doe"
+                      required
+                    />
+                    <UserIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                  </div>
+                </div>
+
+                {/* Username */}
+                <div>
+                  <Label className="text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
+                    <UserIcon className="w-4 h-4 text-green-600" />
+                    Username <span className="text-red-500">*</span>
+                  </Label>
+                  <div className="relative">
+                    <Input 
+                      value={createForm.username} 
+                      onChange={(e) => setCreateForm({ ...createForm, username: e.target.value })} 
+                      className="pl-10 border-gray-300 focus:border-green-500 focus:ring-green-500 transition-all"
+                      placeholder="johndoe"
+                      required
+                    />
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 font-medium">@</span>
+                  </div>
+                </div>
+
+                {/* Email */}
+                <div>
+                  <Label className="text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
+                    <Mail className="w-4 h-4 text-green-600" />
+                    Email Address <span className="text-red-500">*</span>
+                  </Label>
+                  <div className="relative">
+                    <Input 
+                      value={createForm.email} 
+                      onChange={(e) => setCreateForm({ ...createForm, email: e.target.value })} 
+                      className="pl-10 border-gray-300 focus:border-green-500 focus:ring-green-500 transition-all"
+                      placeholder="john@example.com"
+                      type="email"
+                      required
+                    />
+                    <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                  </div>
+                </div>
+
+                {/* Phone */}
+                <div>
+                  <Label className="text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
+                    <Phone className="w-4 h-4 text-gray-500" />
+                    Phone Number
+                  </Label>
+                  <div className="relative">
+                    <Input 
+                      value={createForm.phone} 
+                      onChange={(e) => setCreateForm({ ...createForm, phone: e.target.value })} 
+                      className="pl-10 border-gray-300 focus:border-green-500 focus:ring-green-500 transition-all"
+                      placeholder="+84 123 456 789"
+                    />
+                    <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                  </div>
+                </div>
+              </div>
+
+              {/* Right Column */}
+              <div className="space-y-4">
+                {/* Password */}
+                <div>
+                  <Label className="text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
+                    <KeyRound className="w-4 h-4 text-green-600" />
+                    Password <span className="text-red-500">*</span>
+                  </Label>
+                  <div className="relative">
+                    <Input 
+                      value={createForm.password} 
+                      onChange={(e) => {
+                        setCreateForm({ ...createForm, password: e.target.value });
+                        setPasswordStrength(calculatePasswordStrength(e.target.value));
+                      }} 
+                      className="pl-10 pr-10 border-gray-300 focus:border-green-500 focus:ring-green-500 transition-all"
+                      placeholder="Min 6 chars, 1 uppercase, 1 number"
+                      type={showCreatePassword ? 'text' : 'password'}
+                      required
+                    />
+                    <KeyRound className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                    <button
+                      type="button"
+                      onClick={() => setShowCreatePassword(!showCreatePassword)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                    >
+                      {showCreatePassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
+                  {/* Password Strength Indicator */}
+                  {createForm.password && (
+                    <div className="mt-2">
+                      <div className="flex items-center gap-2 mb-1">
+                        <div className="flex-1 h-2 bg-gray-200 rounded-full overflow-hidden">
+                          <div 
+                            className={`h-full transition-all duration-300 ${passwordStrength.color}`}
+                            style={{ width: `${(passwordStrength.score / 6) * 100}%` }}
+                          ></div>
+                        </div>
+                        <span className={`text-xs font-medium ${
+                          passwordStrength.score <= 2 ? 'text-red-600' : 
+                          passwordStrength.score <= 4 ? 'text-yellow-600' : 'text-green-600'
+                        }`}>
+                          {passwordStrength.text}
+                        </span>
+                      </div>
+                      <p className="text-xs text-gray-500">Use uppercase, lowercase, numbers & symbols</p>
+                    </div>
+                  )}
+                </div>
+
+                {/* Role */}
+                <div>
+                  <Label className="text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
+                    <Briefcase className="w-4 h-4 text-green-600" />
+                    Role <span className="text-red-500">*</span>
+                  </Label>
+                  <Select value={createForm.role} onValueChange={(value) => setCreateForm({ ...createForm, role: value as 'admin' | 'manager' | 'customer' | 'user' | 'shipper' | 'farmer' })}>
+                    <SelectTrigger className="border-gray-300 focus:border-green-500 focus:ring-green-500">
+                      <SelectValue placeholder="Select role" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="customer">
+                        <div className="flex items-center gap-2">
+                          <div className="w-2 h-2 rounded-full bg-blue-500"></div>
+                          Customer
+                        </div>
+                      </SelectItem>
+                      <SelectItem value="farmer">
+                        <div className="flex items-center gap-2">
+                          <div className="w-2 h-2 rounded-full bg-green-500"></div>
+                          Farmer
+                        </div>
+                      </SelectItem>
+                      <SelectItem value="shipper">
+                        <div className="flex items-center gap-2">
+                          <div className="w-2 h-2 rounded-full bg-orange-500"></div>
+                          Shipper
+                        </div>
+                      </SelectItem>
+                      <SelectItem value="manager">
+                        <div className="flex items-center gap-2">
+                          <div className="w-2 h-2 rounded-full bg-purple-500"></div>
+                          Manager
+                        </div>
+                      </SelectItem>
+                      <SelectItem value="admin">
+                        <div className="flex items-center gap-2">
+                          <div className="w-2 h-2 rounded-full bg-red-500"></div>
+                          Admin
+                        </div>
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Address */}
+                <div>
+                  <Label className="text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
+                    <MapPin className="w-4 h-4 text-gray-500" />
+                    Address
+                  </Label>
+                  <div className="relative">
+                    <Input 
+                      value={createForm.address} 
+                      onChange={(e) => setCreateForm({ ...createForm, address: e.target.value })} 
+                      className="pl-10 border-gray-300 focus:border-green-500 focus:ring-green-500 transition-all"
+                      placeholder="City, Country"
+                    />
+                    <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Footer with Actions */}
+          <DialogFooter className="border-t pt-4 mt-4">
+            <div className="flex gap-3 w-full sm:w-auto">
+              <Button 
+                variant="outline" 
+                onClick={() => {
+                  setCreateDialogOpen(false);
+                  setCreateForm({ name: '', email: '', username: '', password: '', role: 'customer', phone: '', address: '' });
+                  setPasswordStrength({ score: 0, text: '', color: '' });
+                }} 
+                className="flex-1 sm:flex-none border-gray-300 hover:bg-gray-50"
+              >
+                Cancel
+              </Button>
+              <Button 
+                onClick={handleCreateUser} 
+                className="flex-1 sm:flex-none bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white shadow-lg hover:shadow-xl transition-all"
+              >
+                <UserPlus className="w-4 h-4 mr-2" />
+                Create User
+              </Button>
+            </div>
           </DialogFooter>
         </DialogContent>
       </Dialog>

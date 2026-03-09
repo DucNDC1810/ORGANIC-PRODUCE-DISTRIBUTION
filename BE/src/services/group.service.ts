@@ -91,7 +91,7 @@ export class GroupService {
         amount: member.walletHoldAmount,
         type: 'refund',
         status: 'success',
-        description: `Hoàn tiền đặt cọc đơn nhóm (rời nhóm)`,
+        description: `Group order deposit refund (left group)`,
         metadata: { groupId, memberId },
       });
     }
@@ -156,7 +156,7 @@ export class GroupService {
       amount: subtotal,
       type: 'payment',
       status: 'success',
-      description: `Đặt cọc đơn nhóm "${group.groupName}"`,
+      description: `Group order deposit for "${group.groupName}"`,
       metadata: { groupId, memberId },
     });
 
@@ -201,7 +201,7 @@ export class GroupService {
           amount: m.walletHoldAmount,
           type: 'refund',
           status: 'success',
-          description: `Hoàn tiền đặt cọc đơn nhóm "${group.groupName}" (chủ nhóm hủy)`,
+          description: `Group order deposit refund for "${group.groupName}" (leader cancelled)`,
           metadata: { groupId },
         });
       }
@@ -309,7 +309,7 @@ export class GroupService {
         type: 'payment',
         status: 'success',
         orderId: order._id,
-        description: `Thanh toán phần chủ nhóm cho đơn nhóm "${group.groupName}"`,
+        description: `Group order leader payment for "${group.groupName}"`,
         metadata: { groupId },
       });
     }

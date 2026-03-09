@@ -1,14 +1,12 @@
-import { useState, useRef, useEffect } from "react";
+import { useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { toast } from "sonner";
 import { groupService } from "../../services/groupService";
 import { useAuth } from "../../context/AuthContext";
 import {
   ArrowLeft,
-  Clock,
   Users,
   CreditCard,
-  ChevronRight,
   Check,
   Edit3,
 } from "lucide-react";
@@ -31,88 +29,7 @@ const PAYMENT_OPTIONS: { value: PaymentOption; label: string; subtitle: string |
   { value: 'equal_split',  label: 'Split bill equally for everyone', subtitle: 'Total bill divided equally among all group members',   icon: '⚖️' },
 ];
 
-const HOURS   = Array.from({ length: 24 }, (_, i) => String(i).padStart(2, "0"));
-const MINUTES = ["00", "15", "30", "45"];
-
 // ─── Helpers ─────────────────────────────────────────────────────────────────
-
-function formatTimeLimit(h: string, m: string) {
-  const hNum = parseInt(h, 10);
-  const mNum = parseInt(m, 10);
-  if (hNum === 0 && mNum === 0) return "None";
-  if (hNum === 0) return `${mNum} min`;
-  if (mNum === 0) return `${hNum} h`;
-  return `${hNum} h ${mNum} min`;
-}
-
-// ─── DrumPicker ──────────────────────────────────────────────────────────────
-
-const DRUM_H = 52;
-
-function DrumPicker({
-  items,
-  selected,
-  onChange,
-}: {
-  items: string[];
-  selected: string;
-  onChange: (v: string) => void;
-}) {
-  const ref = useRef<HTMLDivElement>(null);
-  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  useEffect(() => {
-    const idx = items.indexOf(selected);
-    if (ref.current && idx >= 0) ref.current.scrollTop = idx * DRUM_H;
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  const onScroll = () => {
-    if (timer.current) clearTimeout(timer.current);
-    timer.current = setTimeout(() => {
-      if (!ref.current) return;
-      const idx = Math.max(0, Math.min(Math.round(ref.current.scrollTop / DRUM_H), items.length - 1));
-      ref.current.scrollTop = idx * DRUM_H;
-      if (items[idx] !== selected) onChange(items[idx]);
-    }, 80);
-  };
-
-  return (
-    <div className="relative" style={{ width: 100, height: DRUM_H * 5 }}>
-      <div className="absolute inset-x-0 top-0 z-10 pointer-events-none" style={{ height: DRUM_H * 2, background: "linear-gradient(to bottom, white 20%, transparent)" }} />
-      <div className="absolute inset-x-0 bottom-0 z-10 pointer-events-none" style={{ height: DRUM_H * 2, background: "linear-gradient(to top, white 20%, transparent)" }} />
-      <div className="absolute inset-x-0 rounded-xl bg-gray-100 z-0" style={{ top: DRUM_H * 2, height: DRUM_H }} />
-      <div
-        ref={ref}
-        onScroll={onScroll}
-        className="absolute inset-0 overflow-y-scroll"
-        style={{ scrollSnapType: "y mandatory", scrollbarWidth: "none" } as React.CSSProperties}
-      >
-        <div style={{ height: DRUM_H * 2 }} />
-        {items.map((item) => {
-          const active = item === selected;
-          return (
-            <div
-              key={item}
-              style={{ scrollSnapAlign: "center", height: DRUM_H }}
-              className="flex items-center justify-center cursor-pointer select-none"
-              onClick={() => {
-                const idx = items.indexOf(item);
-                if (ref.current) ref.current.scrollTop = idx * DRUM_H;
-                onChange(item);
-              }}
-            >
-              <span className="font-semibold transition-all duration-150" style={{ fontSize: active ? 30 : 22, color: active ? "#111827" : "#9ca3af" }}>
-                {item}
-              </span>
-            </div>
-          );
-        })}
-        <div style={{ height: DRUM_H * 2 }} />
-      </div>
-    </div>
-  );
-}
 
 // ─── Main Page ───────────────────────────────────────────────────────────────
 
@@ -125,13 +42,6 @@ export default function GroupOrderPage() {
   const [groupName,    setGroupName]    = useState(`Order by ${user?.username ?? user?.name ?? "me"}`);
   const [editingName,  setEditingName]  = useState(false);
   const [paymentMode,  setPaymentMode]  = useState<PaymentOption>('owner_only');
-  const [timeLimit,    setTimeLimit]    = useState("None");
-
-  // Time limit sheet
-  const [showTimeSheet, setShowTimeSheet] = useState(false);
-  const [tlHour,  setTlHour]  = useState("01");
-  const [tlMin,   setTlMin]   = useState("15");
-
   // Payment sheet
   const [showPaySheet,  setShowPaySheet]  = useState(false);
   const [confirming,    setConfirming]    = useState(false);
@@ -143,7 +53,7 @@ export default function GroupOrderPage() {
         groupName,
         paymentMethod: paymentMode,
         paymentOption: paymentMode,
-        timeLimit: timeLimit !== "Pending" && timeLimit !== "None" ? null : null,
+        timeLimit: null,
       });
       navigate("/group-order/active", {
         state: { groupName, cartItems: passedCartItems, groupId: group._id, paymentOption: paymentMode },
@@ -259,14 +169,7 @@ export default function GroupOrderPage() {
               value={PAYMENT_OPTIONS.find(o => o.value === paymentMode)?.label ?? paymentMode}
               onEdit={() => setShowPaySheet(true)}
             />
-            {/* Time limit */}
-            <SettingCard
-              icon={<Clock className="w-5 h-5 text-green-600" />}
-              label="Item ordering deadline"
-              value={timeLimit}
-              onEdit={() => setShowTimeSheet(true)}
-              valueClass={timeLimit === "None" ? "text-gray-400" : "text-gray-900"}
-            />
+
           </div>
 
         </div>
@@ -330,61 +233,6 @@ export default function GroupOrderPage() {
           </p>
         </div>
       </div>
-
-      {/* ════════════ TIME LIMIT SHEET ════════════ */}
-      {showTimeSheet && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center">
-          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setShowTimeSheet(false)} />
-          <div className="relative bg-white rounded-3xl shadow-2xl w-full max-w-md mx-4 overflow-hidden">
-            {/* Green header */}
-            <div className="bg-gradient-to-br from-green-600 to-emerald-500 px-6 py-5 flex items-center gap-3">
-              <button onClick={() => setShowTimeSheet(false)} className="w-8 h-8 rounded-full bg-white/20 text-white hover:bg-white/30 flex items-center justify-center transition-colors">
-                <ArrowLeft className="w-4 h-4" />
-              </button>
-              <div>
-                <p className="text-xs text-green-100">Group Order</p>
-                <p className="text-sm font-bold text-white">{groupName}</p>
-              </div>
-            </div>
-
-            {/* Content */}
-            <div className="px-8 pt-8 pb-6">
-              <h3 className="text-2xl font-extrabold text-gray-900 leading-snug mb-3">
-                Set a deadline for members to add items
-              </h3>
-              <p className="text-sm text-gray-500 leading-relaxed mb-8">
-                We'll remind you to place the order before the deadline. You can update the deadline if members need more time.
-              </p>
-
-              {/* Drum pickers */}
-              <div className="flex items-center justify-center gap-6">
-                <DrumPicker items={HOURS}   selected={tlHour} onChange={setTlHour} />
-                <span className="text-3xl font-bold text-gray-300 select-none mb-1">:</span>
-                <DrumPicker items={MINUTES} selected={tlMin}  onChange={setTlMin} />
-              </div>
-              <p className="text-center text-xs text-gray-400 mt-3">
-                {formatTimeLimit(tlHour, tlMin) === "None" ? "No time limit" : `Deadline: ${formatTimeLimit(tlHour, tlMin)}`}
-              </p>
-            </div>
-
-            {/* Footer */}
-            <div className="px-6 pb-7 space-y-3">
-              <button
-                onClick={() => { setTimeLimit(formatTimeLimit(tlHour, tlMin)); setShowTimeSheet(false); }}
-                className="w-full py-3.5 rounded-2xl bg-green-600 text-white font-bold text-base hover:bg-green-700 active:scale-[0.98] transition-all shadow-md"
-              >
-                Set deadline
-              </button>
-              <button
-                onClick={() => { setTimeLimit("None"); setShowTimeSheet(false); }}
-                className="w-full py-3.5 rounded-2xl bg-gray-100 text-gray-700 font-semibold text-base hover:bg-gray-200 active:scale-[0.98] transition-all"
-              >
-                No deadline, continue
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* ════════════ PAYMENT SHEET ════════════ */}
       {showPaySheet && (

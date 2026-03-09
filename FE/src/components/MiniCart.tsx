@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { X, Minus, Plus, ShoppingBag } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Link } from 'react-router-dom';
@@ -6,6 +7,37 @@ import { ImageWithFallback } from '../components/figma/ImageWithFallback';
 
 export default function MiniCart() {
   const { cart, isCartOpen, closeCart, updateQuantity, removeFromCart, getTotalPrice, getTotalItems } = useCart();
+
+  // ── Click-to-edit quantity ─────────────────────────────────────────────
+  const QTY_MAX = 99;
+  const [editingQtyId, setEditingQtyId] = useState<string | null>(null);
+  const [editingQtyValue, setEditingQtyValue] = useState<string>('');
+
+  const commitQtyEdit = async (itemId: string) => {
+    const parsed = parseInt(editingQtyValue, 10);
+    const newQty = isNaN(parsed) || parsed < 1 ? 1 : Math.min(parsed, QTY_MAX);
+    setEditingQtyId(null);
+    setEditingQtyValue('');
+    await updateQuantity(itemId, newQty);
+  };
+
+  const handleQtyKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (['e', 'E', '+', '-', '.'].includes(e.key)) {
+      e.preventDefault();
+      return;
+    }
+    if (e.key === 'Enter') { (e.target as HTMLInputElement).blur(); return; }
+    if (e.key === 'Escape') { setEditingQtyId(null); setEditingQtyValue(''); }
+  };
+
+  const handleQtyPaste = (e: React.ClipboardEvent<HTMLInputElement>) => {
+    if (!/^\d+$/.test(e.clipboardData.getData('text'))) e.preventDefault();
+  };
+
+  const handleQtyChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setEditingQtyValue(e.target.value.replace(/\D/g, ''));
+  };
+  // ──────────────────────────────────────────────────────────────────────
 
   return (
     <AnimatePresence>
@@ -113,16 +145,39 @@ export default function MiniCart() {
                           <div className="flex items-center gap-2 bg-white rounded-lg p-1">
                             <button
                               onClick={() => updateQuantity(item.id, item.quantity - 1)}
-                              className="p-1 hover:bg-muted rounded transition-colors"
+                              disabled={item.quantity <= 1}
+                              className="p-1 hover:bg-muted rounded transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                             >
                               <Minus className="w-4 h-4 text-muted-foreground" />
                             </button>
-                            <span className="w-8 text-center font-medium text-foreground">
-                              {item.quantity}
-                            </span>
+                            {editingQtyId === item.id ? (
+                              <input
+                                type="text"
+                                inputMode="numeric"
+                                pattern="[0-9]*"
+                                maxLength={2}
+                                value={editingQtyValue}
+                                autoFocus
+                                onFocus={(e) => e.target.select()}
+                                onChange={handleQtyChange}
+                                onBlur={() => commitQtyEdit(item.id)}
+                                onKeyDown={handleQtyKeyDown}
+                                onPaste={handleQtyPaste}
+                                className="w-8 text-center font-medium text-foreground bg-transparent outline-none border-none"
+                              />
+                            ) : (
+                              <span
+                                className="w-8 text-center font-medium text-foreground hover:bg-muted cursor-text rounded transition-colors"
+                                onClick={() => { setEditingQtyId(item.id); setEditingQtyValue(String(item.quantity)); }}
+                                title="Click to edit quantity"
+                              >
+                                {item.quantity}
+                              </span>
+                            )}
                             <button
                               onClick={() => updateQuantity(item.id, item.quantity + 1)}
-                              className="p-1 hover:bg-muted rounded transition-colors"
+                              disabled={item.quantity >= QTY_MAX}
+                              className="p-1 hover:bg-muted rounded transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                             >
                               <Plus className="w-4 h-4 text-muted-foreground" />
                             </button>

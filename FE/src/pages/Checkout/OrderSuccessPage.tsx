@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useCart } from '../../context/CartContext';
 import { Link, useLocation } from 'react-router-dom';
 import { 
   CheckCircle, 
@@ -43,6 +44,7 @@ function getDeliveryScheduleLabel(config: any): string {
 
 export default function OrderSuccessPage() {
   const location = useLocation();
+  const { clearCart } = useCart();
   const [orderData, setOrderData] = useState<any>(null);
   const [subscriptionConfig, setSubscriptionConfig] = useState<any>(null);
   const [verificationStatus, setVerificationStatus] = useState<"idle" | "verifying" | "verified">("idle");
@@ -203,6 +205,8 @@ export default function OrderSuccessPage() {
                 } catch { /* non-fatal — fall back to cached data */ }
               }
               setOrderData(mergedData);
+              // Clear cart after successful MoMo payment
+              clearCart(true).catch(() => {});
               // Capture subscription config for UI display
               if (subscriptionConfig) {
                 setSubscriptionConfig(subscriptionConfig);
@@ -449,7 +453,7 @@ export default function OrderSuccessPage() {
                 Order Date
               </div>
               <div className="text-lg font-semibold text-foreground">
-                {new Date().toLocaleDateString('vi-VN')}
+                {new Date().toLocaleDateString('en-US')}
               </div>
             </div>
 

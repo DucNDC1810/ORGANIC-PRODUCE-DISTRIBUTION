@@ -24,6 +24,8 @@ import chatRoutes from './routes/chat.routes';
 import blogRoutes from './routes/blog.routes';
 import groupRoutes from './routes/group.routes';
 import walletRoutes from './routes/wallet.routes';
+import notificationRoutes from './routes/notification.routes';
+import dashboardRoutes from './routes/dashboard.routes';
 // import exampleRoutes from './routes/example.routes'; // Uncomment để test
 import { configurePassport } from './config/passport';
 // Register models that are referenced via populate but may not be auto-imported
@@ -67,6 +69,8 @@ app.use('/api/chat', chatRoutes);
 app.use('/api/blogs', blogRoutes);
 app.use('/api/groups', groupRoutes);
 app.use('/api/wallet', walletRoutes);
+app.use('/api/notifications', notificationRoutes);
+app.use('/api/dashboard', dashboardRoutes);
 // app.use('/api/example', exampleRoutes); // Uncomment để test authentication
 
 // 404 Handler - Must be after all routes
