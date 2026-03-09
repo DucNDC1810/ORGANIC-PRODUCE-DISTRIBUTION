@@ -344,7 +344,7 @@ export default function CheckoutPage() {
       const response = await voucherService.validateVoucher(code, {
         purchaseAmount: subtotal,
       });
-      setVoucherDiscount(response.data.discountValue);
+      setVoucherDiscount((response as any).data.discountValue);
       setAppliedVoucher(code);
       setVoucherError("");
     } catch (err: any) {
