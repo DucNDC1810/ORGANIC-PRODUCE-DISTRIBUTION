@@ -370,7 +370,7 @@ export default function ProductDetailPage() {
               {/* Action Buttons */}
               <div className="flex gap-4">
                 <Button
-                  onClick={handleAddToCart}
+                  onClick={() => handleAddToCart()}
                   variant="outline"
                   size="lg"
                   className="flex-1 border-emerald-500 text-emerald-600 hover:bg-emerald-50"
