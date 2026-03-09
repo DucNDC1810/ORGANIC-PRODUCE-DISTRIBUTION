@@ -51,14 +51,25 @@ export default function CheckoutPage() {
 
   // isGroupOrder = true if we arrived from the group page OR there is an
   // active group session saved in localStorage
-  const isGroupOrder = navGroupData != null || groupSession != null;
-  const activeGroupId = navGroupData?.groupId ?? groupSession?.groupId ?? null;
-  const groupDiscountPct = navGroupData?.activePct ?? 0;
+  //
+  // groupOrderDismissed is set to true when the user switches to Store pickup,
+  // which resets all group order data to prevent stale payload on submit.
+  const [groupOrderDismissed, setGroupOrderDismissed] = useState(false);
+  const isGroupOrder = !groupOrderDismissed && (navGroupData != null || groupSession != null);
+  const activeGroupId = isGroupOrder ? (navGroupData?.groupId ?? groupSession?.groupId ?? null) : null;
+  const groupDiscountPct = isGroupOrder ? (navGroupData?.activePct ?? 0) : 0;
   // ─────────────────────────────────────────────────────────────────────────
 
   const [deliveryType, setDeliveryType] = useState<"delivery" | "pickup">(
     "delivery",
   );
+
+  // Auto-reset group order state when switching to Store pickup
+  useEffect(() => {
+    if (deliveryType === "pickup") {
+      setGroupOrderDismissed(true);
+    }
+  }, [deliveryType]);
   const [showRecurringModal, setShowRecurringModal] = useState(false);
   const [recurringData, setRecurringData] = useState<RecurringData | null>(null);
   const isRecurringOrder = recurringData !== null;
@@ -1039,7 +1050,14 @@ export default function CheckoutPage() {
               </div>
             </div>
 
-            {/* Đặt theo nhóm — Clickable card */}
+            {/* Đặt theo nhóm — Clickable card (hidden with fade when Store pickup is selected) */}
+            <div
+              className={`transition-all duration-300 ease-in-out overflow-hidden ${
+                deliveryType === "pickup"
+                  ? "opacity-0 max-h-0 pointer-events-none"
+                  : "opacity-100 max-h-[500px]"
+              }`}
+            >
             <button
               type="button"
               onClick={() =>
@@ -1102,6 +1120,7 @@ export default function CheckoutPage() {
                 </span>
               </div>
             </button>
+            </div>
 
             {/* Scheduled Recurring Delivery — Clickable card */}
             <button
