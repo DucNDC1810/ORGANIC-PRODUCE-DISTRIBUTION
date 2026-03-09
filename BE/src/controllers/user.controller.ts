@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import { UserService } from '../services/user.service';
 import { AuthRequest } from '../middlewares/auth.middleware';
 import { UserRole } from '../constants/roles';
+import { getSecurityConfig, updateSecurityConfig } from '../config/securityConfig';
 
 export class UserController {
   private userService: UserService;
@@ -385,6 +386,83 @@ export class UserController {
       });
     } catch (error) {
       next(error);
+    }
+  };
+
+  /**
+   * Request unlock — public endpoint, user sends unlock request to admin
+   */
+  requestUnlock = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const { email } = req.body;
+      if (!email) {
+        res.status(400).json({ success: false, message: 'Email is required' });
+        return;
+      }
+      await this.userService.requestUnlock(email);
+      res.status(200).json({
+        success: true,
+        message: 'Unlock request sent. Admin will review and unlock your account shortly.'
+      });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  /**
+   * Get locked users (admin only)
+   */
+  getLockedUsers = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const users = await this.userService.getLockedUsers();
+      res.status(200).json({ success: true, data: users });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  /**
+   * Unlock a locked user account (admin only)
+   */
+  unlockUser = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const { id } = req.params;
+      const user = await this.userService.unlockUser(id);
+      res.status(200).json({
+        success: true,
+        message: 'User account has been unlocked successfully',
+        data: user
+      });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  /**
+   * Get security config (admin only)
+   */
+  getSecurityConfig = async (_req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      res.status(200).json({ success: true, data: getSecurityConfig() });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  /**
+   * Update security config (admin only)
+   */
+  updateSecurityConfig = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const { maxLoginAttempts } = req.body;
+      const updated = updateSecurityConfig({ maxLoginAttempts });
+      res.status(200).json({
+        success: true,
+        message: 'Security configuration updated successfully',
+        data: updated
+      });
+    } catch (error: any) {
+      res.status(400).json({ success: false, message: error.message });
     }
   };
 

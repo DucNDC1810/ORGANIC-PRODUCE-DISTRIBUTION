@@ -13,6 +13,9 @@ const userController = new UserController();
 router.get('/check-email', userController.checkEmailExists as any);
 router.get('/check-username', userController.checkUsernameExists as any);
 
+// Request account unlock (no auth required — user is locked out)
+router.post('/request-unlock', userController.requestUnlock as any);
+
 // ===== PROTECTED ROUTES (Requires Authentication) =====
 
 // Get current user profile
@@ -26,6 +29,37 @@ router.get(
   authenticate as any,
   checkPermission(Permission.USER_MANAGE_ALL) as any,
   userController.getUserStats as any
+);
+
+// Get locked users (Admin only)
+router.get(
+  '/locked',
+  authenticate as any,
+  checkRole(UserRole.ADMIN) as any,
+  userController.getLockedUsers as any
+);
+
+// Unlock a user account (Admin only)
+router.patch(
+  '/:id/unlock',
+  authenticate as any,
+  checkRole(UserRole.ADMIN) as any,
+  userController.unlockUser as any
+);
+
+// Security config (Admin only)
+router.get(
+  '/security-config',
+  authenticate as any,
+  checkRole(UserRole.ADMIN) as any,
+  userController.getSecurityConfig as any
+);
+
+router.patch(
+  '/security-config',
+  authenticate as any,
+  checkRole(UserRole.ADMIN) as any,
+  userController.updateSecurityConfig as any
 );
 
 // Search users (Admin/Manager only)

@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, lazy, Suspense } from 'react';
+import { useState, useRef, useEffect, useCallback, lazy, Suspense } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { 
   Leaf, 
@@ -7,12 +7,30 @@ import {
   ChevronDown,
   Bell,
   Store,
+  Package,
+  Lock,
+  Unlock,
+  ShoppingCart,
+  Star,
+  AlertTriangle,
+  Check,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useCart } from '../../context/CartContext';
 import { toast } from 'sonner';
+import api from '../../services/api';
 import Sidebar from './Sidebar';
 import { cn } from '../../components/ui/utils';
+
+interface AdminNotification {
+  _id: string;
+  type: 'new_order' | 'account_locked' | 'unlock_request' | 'new_review' | 'stock_low' | 'system';
+  title: string;
+  message: string;
+  link?: string;
+  isRead: boolean;
+  createdAt: string;
+}
 
 // Lazy load components for better performance
 const Overview = lazy(() => import('./Overview'));
@@ -34,11 +52,58 @@ export default function AdminDashboard() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [notificationOpen, setNotificationOpen] = useState(false);
+  const [notifications, setNotifications] = useState<AdminNotification[]>([]);
+  const [unreadCount, setUnreadCount] = useState(0);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const notificationRef = useRef<HTMLDivElement>(null);
   const { user, logout } = useAuth();
   const { clearLocalCart } = useCart();
   const navigate = useNavigate();
+
+  const fetchUnreadCount = useCallback(async () => {
+    try {
+      const res = await api.get('/notifications/unread-count') as any;
+      setUnreadCount(res.data?.count ?? 0);
+    } catch { /* ignore */ }
+  }, []);
+
+  const fetchNotifications = useCallback(async () => {
+    try {
+      const res = await api.get('/notifications') as any;
+      setNotifications(res.data ?? []);
+      setUnreadCount((res.data ?? []).filter((n: AdminNotification) => !n.isRead).length);
+    } catch { /* ignore */ }
+  }, []);
+
+  const handleMarkRead = async (notif: AdminNotification) => {
+    if (!notif.isRead) {
+      try {
+        await api.patch(`/notifications/${notif._id}/read`);
+        setNotifications(prev => prev.map(n => n._id === notif._id ? { ...n, isRead: true } : n));
+        setUnreadCount(prev => Math.max(0, prev - 1));
+      } catch { /* ignore */ }
+    }
+    if (notif.link) {
+      const tab = new URLSearchParams(notif.link.replace('?', '')).get('tab');
+      if (tab) setActiveTab(tab);
+    }
+    setNotificationOpen(false);
+  };
+
+  const handleMarkAllRead = async () => {
+    try {
+      await api.patch('/notifications/read-all');
+      setNotifications(prev => prev.map(n => ({ ...n, isRead: true })));
+      setUnreadCount(0);
+    } catch { /* ignore */ }
+  };
+
+  // Auto-poll unread count every 30s
+  useEffect(() => {
+    fetchUnreadCount();
+    const interval = setInterval(fetchUnreadCount, 30_000);
+    return () => clearInterval(interval);
+  }, [fetchUnreadCount]);
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -174,43 +239,90 @@ export default function AdminDashboard() {
             {/* Notifications */}
             <div className="relative" ref={notificationRef}>
               <button
-                onClick={() => setNotificationOpen(!notificationOpen)}
+                onClick={() => {
+                  setNotificationOpen(!notificationOpen);
+                  if (!notificationOpen) fetchNotifications();
+                }}
                 className="relative p-2 hover:bg-gray-100 rounded-lg transition-colors"
                 aria-label="Notifications"
               >
                 <Bell className="w-5 h-5 text-gray-600" />
-                <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full ring-2 ring-white"></span>
+                {unreadCount > 0 && (
+                  <span className="absolute top-1 right-1 min-w-[16px] h-4 bg-red-500 rounded-full ring-2 ring-white flex items-center justify-center">
+                    <span className="text-[9px] font-bold text-white px-0.5">{unreadCount > 9 ? '9+' : unreadCount}</span>
+                  </span>
+                )}
               </button>
 
               {/* Notification Dropdown */}
               {notificationOpen && (
-                <div className="absolute right-0 mt-3 w-80 bg-white border border-gray-200 rounded-xl shadow-xl py-2 z-[100] max-h-96 overflow-y-auto">
-                  <div className="px-4 py-3 border-b border-gray-100">
-                    <h3 className="font-semibold text-gray-900">Notifications</h3>
-                    <p className="text-xs text-gray-500 mt-0.5">You have 3 unread messages</p>
-                  </div>
-                  <div className="py-2">
-                    {[
-                      { title: 'New order received', time: '5 min ago', unread: true },
-                      { title: 'Product stock low', time: '1 hour ago', unread: true },
-                      { title: 'Customer review', time: '2 hours ago', unread: true },
-                    ].map((notif, idx) => (
+                <div className="absolute right-0 mt-3 w-96 bg-white border border-gray-200 rounded-xl shadow-xl py-2 z-[100] max-h-[480px] flex flex-col">
+                  <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between flex-shrink-0">
+                    <div>
+                      <h3 className="font-semibold text-gray-900">Thông báo</h3>
+                      <p className="text-xs text-gray-500 mt-0.5">
+                        {unreadCount > 0 ? `${unreadCount} chưa đọc` : 'Tất cả đã đọc'}
+                      </p>
+                    </div>
+                    {unreadCount > 0 && (
                       <button
-                        key={idx}
-                        className="w-full px-4 py-3 hover:bg-gray-50 transition-colors text-left flex items-start gap-3"
+                        onClick={handleMarkAllRead}
+                        className="flex items-center gap-1 text-xs text-emerald-600 hover:text-emerald-700 font-medium"
                       >
-                        <div className={`w-2 h-2 rounded-full mt-1.5 ${notif.unread ? 'bg-blue-500' : 'bg-gray-300'}`}></div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium text-gray-900 truncate">{notif.title}</p>
-                          <p className="text-xs text-gray-500">{notif.time}</p>
-                        </div>
+                        <Check className="w-3.5 h-3.5" />
+                        Đọc tất cả
                       </button>
-                    ))}
+                    )}
                   </div>
-                  <div className="border-t border-gray-100 p-2">
-                    <button className="w-full text-sm text-emerald-600 hover:text-emerald-700 font-medium py-2">
-                      View all notifications
-                    </button>
+                  <div className="overflow-y-auto flex-1">
+                    {notifications.length === 0 ? (
+                      <div className="py-10 text-center text-sm text-gray-400">Không có thông báo</div>
+                    ) : (
+                      notifications.map((notif) => {
+                        const Icon =
+                          notif.type === 'new_order' ? ShoppingCart :
+                          notif.type === 'account_locked' ? Lock :
+                          notif.type === 'unlock_request' ? Unlock :
+                          notif.type === 'new_review' ? Star :
+                          notif.type === 'stock_low' ? AlertTriangle :
+                          Package;
+                        const iconColor =
+                          notif.type === 'new_order' ? 'text-emerald-600 bg-emerald-50' :
+                          notif.type === 'account_locked' ? 'text-red-600 bg-red-50' :
+                          notif.type === 'unlock_request' ? 'text-orange-600 bg-orange-50' :
+                          notif.type === 'new_review' ? 'text-yellow-600 bg-yellow-50' :
+                          notif.type === 'stock_low' ? 'text-red-500 bg-red-50' :
+                          'text-blue-600 bg-blue-50';
+                        const timeAgo = (() => {
+                          const diff = Date.now() - new Date(notif.createdAt).getTime();
+                          const mins = Math.floor(diff / 60000);
+                          if (mins < 1) return 'Vừa xong';
+                          if (mins < 60) return `${mins} phút trước`;
+                          const hrs = Math.floor(mins / 60);
+                          if (hrs < 24) return `${hrs} giờ trước`;
+                          return `${Math.floor(hrs / 24)} ngày trước`;
+                        })();
+                        return (
+                          <button
+                            key={notif._id}
+                            onClick={() => handleMarkRead(notif)}
+                            className={`w-full px-4 py-3 hover:bg-gray-50 transition-colors text-left flex items-start gap-3 ${!notif.isRead ? 'bg-blue-50/40' : ''}`}
+                          >
+                            <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${iconColor}`}>
+                              <Icon className="w-4 h-4" />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className={`text-sm truncate ${!notif.isRead ? 'font-semibold text-gray-900' : 'font-medium text-gray-700'}`}>
+                                {notif.title}
+                              </p>
+                              <p className="text-xs text-gray-500 mt-0.5 line-clamp-2 whitespace-normal">{notif.message}</p>
+                              <p className="text-xs text-gray-400 mt-1">{timeAgo}</p>
+                            </div>
+                            {!notif.isRead && <div className="w-2 h-2 rounded-full bg-blue-500 flex-shrink-0 mt-1.5"></div>}
+                          </button>
+                        );
+                      })
+                    )}
                   </div>
                 </div>
               )}

@@ -5,6 +5,7 @@ import { Address } from '../models/Address.model';
 import { User } from '../models/User.model';
 import { AuthRequest } from '../middlewares/auth.middleware';
 import { AppError } from '../utils/AppError';
+import { createNotification } from '../models/Notification.model';
 
 export class OrderController {
   /**
@@ -55,6 +56,16 @@ export class OrderController {
         message: 'Order created successfully',
         data: order
       });
+
+      // Notify admin (fire-and-forget)
+      const buyerName = (order as any).userId?.name || 'Khách hàng';
+      const amount = order.totalAmount.toLocaleString('vi-VN');
+      createNotification(
+        'new_order',
+        'Đơn hàng mới',
+        `${buyerName} vừa đặt đơn hàng #${order._id?.toString().slice(-6).toUpperCase()} — ${amount}₫`,
+        { link: '?tab=orders', metadata: { orderId: order._id } }
+      );
     } catch (error) {
       next(error);
     }

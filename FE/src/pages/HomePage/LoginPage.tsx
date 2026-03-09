@@ -1,8 +1,9 @@
 import { useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
-import { Leaf, Eye, EyeOff } from 'lucide-react';
+import { Leaf, Eye, EyeOff, Lock, Send } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { toast } from 'sonner';
+import api from '../../services/api';
 
 export default function LoginPage() {
   const navigate = useNavigate();
@@ -11,6 +12,8 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [isLocked, setIsLocked] = useState(false);
+  const [requestingSent, setRequestingSent] = useState(false);
   const [formData, setFormData] = useState({
     email: '',
     password: '',
@@ -75,7 +78,10 @@ export default function LoginPage() {
       const status = error.response?.status;
       const message = error.response?.data?.message;
       
-      if (status === 403) {
+      if (status === 423) {
+        setIsLocked(true);
+        toast.error(message || 'Your account has been locked. Please contact admin to unlock.', { duration: 6000 });
+      } else if (status === 403) {
         // Email not verified or account deactivated
         toast.error(message || 'Please verify your email before logging in.', {
           duration: 5000,
@@ -89,10 +95,27 @@ export default function LoginPage() {
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (isLocked) setIsLocked(false);
     setFormData({
       ...formData,
       [e.target.name]: e.target.value,
     });
+  };
+
+  const handleRequestUnlock = async () => {
+    if (!formData.email) {
+      toast.error('Please enter your email first.');
+      return;
+    }
+    setRequestingSent(true);
+    try {
+      await (api as any).post('/users/request-unlock', { email: formData.email });
+      toast.success('Unlock request sent! Admin will review and unlock your account shortly.', { duration: 7000 });
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || 'Failed to send unlock request. Please contact admin directly.');
+    } finally {
+      setRequestingSent(false);
+    }
   };
 
   return (
@@ -161,7 +184,7 @@ export default function LoginPage() {
           </div>
 
           {/* Login Form */}
-          <form onSubmit={handleSubmit} className="space-y-6">
+          <form onSubmit={handleSubmit} autoComplete="off" className="space-y-6">
             {/* Email or Username Field */}
             <div>
               <label htmlFor="email" className="block text-sm font-medium text-foreground mb-2">
@@ -171,6 +194,7 @@ export default function LoginPage() {
                 id="email"
                 name="email"
                 type="text"
+                autoComplete="off"
                 required
                 value={formData.email}
                 onChange={handleInputChange}
@@ -189,6 +213,7 @@ export default function LoginPage() {
                   id="password"
                   name="password"
                   type={showPassword ? 'text' : 'password'}
+                  autoComplete="off"
                   required
                   value={formData.password}
                   onChange={handleInputChange}
@@ -233,6 +258,28 @@ export default function LoginPage() {
             >
               {loading ? 'Signing in...' : 'Sign In'}
             </button>
+
+            {/* Account Locked Banner */}
+            {isLocked && (
+              <div className="rounded-xl border border-red-200 bg-red-50 p-4 space-y-3">
+                <div className="flex items-center gap-2 text-red-700">
+                  <Lock className="w-4 h-4 flex-shrink-0" />
+                  <p className="text-sm font-semibold">Tài khoản bị khóa</p>
+                </div>
+                <p className="text-xs text-red-600">
+                  Tài khoản của bạn đã bị khóa do nhập sai mật khẩu quá nhiều lần. Nhấn nút bên dưới để gửi yêu cầu mở khóa đến quản trị viên.
+                </p>
+                <button
+                  type="button"
+                  onClick={handleRequestUnlock}
+                  disabled={requestingSent}
+                  className="w-full flex items-center justify-center gap-2 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
+                >
+                  <Send className="w-4 h-4" />
+                  {requestingSent ? 'Đang gửi...' : 'Gửi yêu cầu mở khóa'}
+                </button>
+              </div>
+            )}
 
             {/* Divider */}
             <div className="relative py-6">
