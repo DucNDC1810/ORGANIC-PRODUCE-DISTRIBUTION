@@ -8,6 +8,7 @@ import {
   CheckCircle2,
   Copy,
   XCircle,
+  RefreshCw,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '../../components/ui/button';
@@ -292,7 +293,17 @@ export default function ManagerVouchers() {
           <h2 className="text-3xl font-bold text-foreground">Discount Vouchers</h2>
           <p className="text-muted-foreground mt-1">Create and manage discount codes</p>
         </div>
-        <Dialog open={isAddOpen} onOpenChange={setIsAddOpen}>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={fetchData}
+            disabled={loading}
+            title="Refresh"
+          >
+            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+          </Button>
+          <Dialog open={isAddOpen} onOpenChange={setIsAddOpen}>
           <DialogTrigger asChild>
             <Button
               className="bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white shadow-md"
@@ -310,6 +321,7 @@ export default function ManagerVouchers() {
             {VoucherFormContent}
           </DialogContent>
         </Dialog>
+        </div>
       </div>
 
       {/* Edit dialog */}
