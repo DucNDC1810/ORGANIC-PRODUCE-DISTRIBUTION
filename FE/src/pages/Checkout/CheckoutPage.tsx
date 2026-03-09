@@ -552,6 +552,14 @@ export default function CheckoutPage() {
               console.warn("Subscription creation failed:", subErr);
             }
           }
+          // Snapshot cart items before clearing (for display on success page)
+          const cartItemsSnapshot = cart.map((item) => ({
+            productId: { _id: item.id, name: item.name, thumbnail: item.image },
+            quantity: item.quantity,
+            price: item.price,
+            subtotal: item.price * item.quantity,
+          }));
+
           // Xoá giỏ hàng sau khi đặt hàng thành công
           await clearCart(true);
 
@@ -564,6 +572,7 @@ export default function CheckoutPage() {
               isRecurring: isRecurringOrder,
               subscriptionConfig: isRecurringOrder ? buildSubscriptionPayload() : null,
               deliveryType,
+              cartItems: cartItemsSnapshot,
               pickupLocation:
                 deliveryType === "pickup" && selectedStore
                   ? { name: selectedStore.name, address: selectedStore.address }
@@ -638,6 +647,14 @@ export default function CheckoutPage() {
         const newBalance = result?.walletBalance ?? walletBalance - total;
         setWalletBalance(newBalance);
 
+        // Snapshot cart items before clearing (for display on success page)
+        const cartItemsSnapshot = cart.map((item) => ({
+          productId: { _id: item.id, name: item.name, thumbnail: item.image },
+          quantity: item.quantity,
+          price: item.price,
+          subtotal: item.price * item.quantity,
+        }));
+
         // Xoá giỏ hàng sau khi thanh toán thành công
         await clearCart(true);
 
@@ -649,6 +666,7 @@ export default function CheckoutPage() {
             totalAmount: total,
             notes: formData.notes || null,
             deliveryType,
+            cartItems: cartItemsSnapshot,
             pickupLocation:
               deliveryType === "pickup" && selectedStore
                 ? { name: selectedStore.name, address: selectedStore.address }
