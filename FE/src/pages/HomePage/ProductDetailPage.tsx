@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { 
   ChevronLeft, 
@@ -35,6 +35,33 @@ export default function ProductDetailPage() {
   const [quantity, setQuantity] = useState(1);
   const [isWishlisted, setIsWishlisted] = useState(false);
 
+  // ── Inline qty editing ──────────────────────────────────────────────
+  const [editingQty, setEditingQty] = useState(false);
+  const [editingQtyValue, setEditingQtyValue] = useState('');
+  const qtyInputRef = useRef<HTMLInputElement>(null);
+
+  const startQtyEdit = () => {
+    setEditingQtyValue(String(quantity));
+    setEditingQty(true);
+    setTimeout(() => qtyInputRef.current?.select(), 0);
+  };
+
+  const commitQtyEdit = () => {
+    const parsed = parseInt(editingQtyValue, 10);
+    const max = selectedProduct?.stock ?? 999;
+    const newQty = isNaN(parsed) || parsed < 1 ? 1 : Math.min(parsed, max);
+    setQuantity(newQty);
+    setEditingQty(false);
+    setEditingQtyValue('');
+  };
+
+  const handleQtyKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (['e', 'E', '+', '-', '.'].includes(e.key)) { e.preventDefault(); return; }
+    if (e.key === 'Enter') { (e.target as HTMLInputElement).blur(); return; }
+    if (e.key === 'Escape') { setEditingQty(false); setEditingQtyValue(''); return; }
+  };
+  // ───────────────────────────────────────────────────────────────────
+
   useEffect(() => {
     if (id) {
       // Scroll to top with smooth animation when product changes
@@ -50,7 +77,7 @@ export default function ProductDetailPage() {
     }
   }, [id, fetchProductById, fetchProducts]);
 
-  const handleAddToCart = () => {
+  const handleAddToCart = async (openCart = true) => {
     if (selectedProduct) {
       const cartProduct = {
         id: selectedProduct._id,
@@ -60,15 +87,14 @@ export default function ProductDetailPage() {
         image: selectedProduct.images?.[0] || selectedProduct.thumbnail || '',
         category: selectedProduct.category
       };
-      for (let i = 0; i < quantity; i++) {
-        addToCart(cartProduct);
-      }
+      await addToCart(cartProduct, quantity, !openCart);
     }
   };
 
-  const handleBuyNow = () => {
-    handleAddToCart();
-    navigate('/cart');
+  const handleBuyNow = async () => {
+    if (!selectedProduct) return;
+    await handleAddToCart(false);
+    navigate('/checkout', { state: { selectedItemIds: [selectedProduct._id] } });
   };
 
   const nextImage = () => {
@@ -307,7 +333,30 @@ export default function ProductDetailPage() {
                   >
                     <Minus className="w-4 h-4" />
                   </button>
-                  <span className="w-12 text-center font-medium">{quantity}</span>
+                  {editingQty ? (
+                    <input
+                      ref={qtyInputRef}
+                      type="text"
+                      inputMode="numeric"
+                      pattern="[0-9]*"
+                      maxLength={3}
+                      value={editingQtyValue}
+                      autoFocus
+                      onFocus={(e) => e.target.select()}
+                      onChange={(e) => setEditingQtyValue(e.target.value.replace(/\D/g, ''))}
+                      onBlur={commitQtyEdit}
+                      onKeyDown={handleQtyKeyDown}
+                      className="w-12 text-center font-medium bg-transparent outline-none border border-emerald-500 rounded text-sm"
+                    />
+                  ) : (
+                    <button
+                      onClick={startQtyEdit}
+                      className="w-12 text-center font-medium hover:bg-gray-50 rounded transition-colors py-1"
+                      title="Click to edit quantity"
+                    >
+                      {quantity}
+                    </button>
+                  )}
                   <button
                     onClick={() => setQuantity(Math.min(selectedProduct.stock, quantity + 1))}
                     className="p-3 hover:bg-gray-50 transition-colors"

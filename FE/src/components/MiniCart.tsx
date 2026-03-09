@@ -1,11 +1,79 @@
+import { useState, useRef, useEffect } from 'react';
 import { X, Minus, Plus, ShoppingBag } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useCart } from '../context/CartContext';
 import { ImageWithFallback } from '../components/figma/ImageWithFallback';
 
+const QTY_MAX = 999;
+
 export default function MiniCart() {
-  const { cart, isCartOpen, closeCart, updateQuantity, removeFromCart, getTotalPrice, getTotalItems } = useCart();
+  const { cart, isCartOpen, closeCart, updateQuantity, removeFromCart, clearCart } = useCart();
+  const navigate = useNavigate();
+
+  // ── Item selection ──────────────────────────────────────────────────────
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set(cart.map((i) => i.id)));
+
+  // Keep selection in sync when cart changes (new items auto-selected, removed items cleaned up)
+  useEffect(() => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      cart.forEach((i) => { if (!next.has(i.id)) next.add(i.id); });
+      next.forEach((id) => { if (!cart.find((i) => i.id === id)) next.delete(id); });
+      return next;
+    });
+  }, [cart]);
+
+  const allSelected = cart.length > 0 && cart.every((i) => selectedIds.has(i.id));
+  const someSelected = cart.some((i) => selectedIds.has(i.id));
+
+  const toggleSelectAll = () => {
+    if (allSelected) setSelectedIds(new Set());
+    else setSelectedIds(new Set(cart.map((i) => i.id)));
+  };
+
+  const toggleItem = (id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  };
+
+  const selectedItems = cart.filter((i) => selectedIds.has(i.id));
+  const subtotal = selectedItems.reduce((sum, i) => sum + i.price * i.quantity, 0);
+
+  const handleCheckout = () => {
+    closeCart();
+    navigate('/checkout', { state: { selectedItemIds: Array.from(selectedIds) } });
+  };
+  // ─────────────────────────────────────────────────────────────────────
+
+  // ── Inline qty editing ────────────────────────────────────────────────
+  const [editingQtyId, setEditingQtyId] = useState<string | null>(null);
+  const [editingQtyValue, setEditingQtyValue] = useState('');
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const startEdit = (id: string, current: number) => {
+    setEditingQtyId(id);
+    setEditingQtyValue(String(current));
+    setTimeout(() => inputRef.current?.select(), 0);
+  };
+
+  const commitEdit = async (id: string) => {
+    const parsed = parseInt(editingQtyValue, 10);
+    const newQty = isNaN(parsed) || parsed < 1 ? 1 : Math.min(parsed, QTY_MAX);
+    setEditingQtyId(null);
+    setEditingQtyValue('');
+    await updateQuantity(id, newQty);
+  };
+
+  const handleQtyKeyDown = (e: React.KeyboardEvent<HTMLInputElement>, id: string) => {
+    if (['e', 'E', '+', '-', '.'].includes(e.key)) { e.preventDefault(); return; }
+    if (e.key === 'Enter') { (e.target as HTMLInputElement).blur(); return; }
+    if (e.key === 'Escape') { setEditingQtyId(null); setEditingQtyValue(''); return; }
+  };
+  // ─────────────────────────────────────────────────────────────────────
 
   return (
     <AnimatePresence>
@@ -37,15 +105,29 @@ export default function MiniCart() {
                 </div>
                 <div>
                   <h2 className="text-lg font-semibold text-foreground">Shopping Cart</h2>
-                  <p className="text-sm text-muted-foreground">{getTotalItems()} items</p>
+                  <p className="text-sm text-muted-foreground">{cart.length} items</p>
                 </div>
               </div>
-              <button
-                onClick={closeCart}
-                className="p-2 hover:bg-muted rounded-lg transition-colors"
-              >
-                <X className="w-5 h-5 text-muted-foreground" />
-              </button>
+              <div className="flex items-center gap-3">
+                {cart.length > 0 && (
+                  <label className="flex items-center gap-1.5 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={allSelected}
+                      ref={(el) => { if (el) el.indeterminate = !allSelected && someSelected; }}
+                      onChange={toggleSelectAll}
+                      className="w-4 h-4 rounded accent-primary cursor-pointer"
+                    />
+                    <span className="text-xs font-medium text-muted-foreground">All</span>
+                  </label>
+                )}
+                <button
+                  onClick={closeCart}
+                  className="p-2 hover:bg-muted rounded-lg transition-colors"
+                >
+                  <X className="w-5 h-5 text-muted-foreground" />
+                </button>
+              </div>
             </div>
 
             {/* Cart Items */}
@@ -72,8 +154,17 @@ export default function MiniCart() {
                       initial={{ opacity: 0, y: 20 }}
                       animate={{ opacity: 1, y: 0 }}
                       exit={{ opacity: 0, x: -100 }}
-                      className="flex gap-4 p-4 bg-muted rounded-xl"
+                      className={`flex gap-3 p-4 bg-muted rounded-xl transition-opacity ${!selectedIds.has(item.id) ? 'opacity-50' : ''}`}
                     >
+                      {/* Checkbox */}
+                      <div className="flex items-center flex-shrink-0 pt-1">
+                        <input
+                          type="checkbox"
+                          checked={selectedIds.has(item.id)}
+                          onChange={() => toggleItem(item.id)}
+                          className="w-4 h-4 rounded accent-primary cursor-pointer"
+                        />
+                      </div>
                       {/* Product Image */}
                       <Link 
                         to={`/product/${item.id}`}
@@ -117,9 +208,30 @@ export default function MiniCart() {
                             >
                               <Minus className="w-4 h-4 text-muted-foreground" />
                             </button>
-                            <span className="w-8 text-center font-medium text-foreground">
-                              {item.quantity}
-                            </span>
+                            {editingQtyId === item.id ? (
+                              <input
+                                ref={inputRef}
+                                type="text"
+                                inputMode="numeric"
+                                pattern="[0-9]*"
+                                maxLength={3}
+                                value={editingQtyValue}
+                                autoFocus
+                                onFocus={(e) => e.target.select()}
+                                onChange={(e) => setEditingQtyValue(e.target.value.replace(/\D/g, ''))}
+                                onBlur={() => commitEdit(item.id)}
+                                onKeyDown={(e) => handleQtyKeyDown(e, item.id)}
+                                className="w-8 text-center font-medium text-foreground bg-transparent outline-none border border-primary rounded text-sm"
+                              />
+                            ) : (
+                              <button
+                                onClick={() => startEdit(item.id, item.quantity)}
+                                className="w-8 text-center font-medium text-foreground hover:bg-muted rounded transition-colors py-0.5"
+                                title="Click to edit quantity"
+                              >
+                                {item.quantity}
+                              </button>
+                            )}
                             <button
                               onClick={() => updateQuantity(item.id, item.quantity + 1)}
                               className="p-1 hover:bg-muted rounded transition-colors"
@@ -153,8 +265,11 @@ export default function MiniCart() {
                 {/* Subtotal */}
                 <div className="flex items-center justify-between text-lg">
                   <span className="text-muted-foreground">Subtotal</span>
-                  <span className="font-bold text-foreground">${getTotalPrice().toFixed(2)}</span>
+                  <span className="font-bold text-foreground">${subtotal.toFixed(2)}</span>
                 </div>
+                {selectedItems.length > 0 && selectedItems.length < cart.length && (
+                  <p className="text-xs text-muted-foreground -mt-2">{selectedItems.length} of {cart.length} items selected</p>
+                )}
 
                 {/* Note */}
                 <p className="text-sm text-muted-foreground">
@@ -163,20 +278,29 @@ export default function MiniCart() {
 
                 {/* Actions */}
                 <div className="space-y-3">
-                  <Link
-                    to="/cart"
-                    onClick={closeCart}
-                    className="block w-full px-6 py-4 bg-white border-2 border-primary text-primary rounded-xl font-semibold text-center hover:bg-primary/5 transition-colors"
+                  <div className="flex gap-2">
+                    <Link
+                      to="/cart"
+                      onClick={closeCart}
+                      className="flex-1 px-4 py-3 bg-white border-2 border-primary text-primary rounded-xl font-semibold text-center hover:bg-primary/5 transition-colors text-sm"
+                    >
+                      View Cart
+                    </Link>
+                    <button
+                      onClick={() => clearCart()}
+                      className="px-4 py-3 bg-white border-2 border-destructive text-destructive rounded-xl font-semibold hover:bg-destructive/5 transition-colors text-sm"
+                      title="Clear all items"
+                    >
+                      Clear
+                    </button>
+                  </div>
+                  <button
+                    onClick={handleCheckout}
+                    disabled={selectedItems.length === 0}
+                    className="block w-full px-6 py-4 bg-primary text-white rounded-xl font-semibold text-center hover:bg-primary-dark hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    View Cart
-                  </Link>
-                  <Link
-                    to="/checkout"
-                    onClick={closeCart}
-                    className="block w-full px-6 py-4 bg-primary text-white rounded-xl font-semibold text-center hover:bg-primary-dark hover:shadow-lg transition-all"
-                  >
-                    Checkout →
-                  </Link>
+                    Checkout ({selectedItems.length}) →
+                  </button>
                 </div>
               </div>
             )}

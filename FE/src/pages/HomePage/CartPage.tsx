@@ -1,17 +1,74 @@
-import { Link } from 'react-router-dom';
+import { useState, useRef } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { Minus, Plus, X, ShoppingCart, Truck, Shield } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useCart } from '../../context/CartContext';
 import { ImageWithFallback } from '../../components/figma/ImageWithFallback';
 import Header from '../../components/Header';
 
-export default function CartPage() {
-  const { cart, updateQuantity, removeFromCart, getTotalPrice } = useCart();
+const QTY_MAX = 999;
 
-  const subtotal = getTotalPrice();
+export default function CartPage() {
+  const { cart, updateQuantity, removeFromCart } = useCart();
+  const navigate = useNavigate();
+
+  // ── Item selection ──────────────────────────────────────────────────────
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set(cart.map((i) => i.id)));
+
+  const allSelected = cart.length > 0 && cart.every((i) => selectedIds.has(i.id));
+  const someSelected = cart.some((i) => selectedIds.has(i.id));
+
+  const toggleSelectAll = () => {
+    if (allSelected) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(cart.map((i) => i.id)));
+    }
+  };
+
+  const toggleItem = (id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  };
+
+  // ── Inline qty editing ──────────────────────────────────────────────────
+  const [editingQtyId, setEditingQtyId] = useState<string | null>(null);
+  const [editingQtyValue, setEditingQtyValue] = useState('');
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const startEdit = (id: string, current: number) => {
+    setEditingQtyId(id);
+    setEditingQtyValue(String(current));
+    setTimeout(() => inputRef.current?.select(), 0);
+  };
+
+  const commitEdit = async (id: string) => {
+    const parsed = parseInt(editingQtyValue, 10);
+    const newQty = isNaN(parsed) || parsed < 1 ? 1 : Math.min(parsed, QTY_MAX);
+    setEditingQtyId(null);
+    setEditingQtyValue('');
+    await updateQuantity(id, newQty);
+  };
+
+  const handleQtyKeyDown = (e: React.KeyboardEvent<HTMLInputElement>, id: string) => {
+    if (['e', 'E', '+', '-', '.'].includes(e.key)) { e.preventDefault(); return; }
+    if (e.key === 'Enter') { (e.target as HTMLInputElement).blur(); return; }
+    if (e.key === 'Escape') { setEditingQtyId(null); setEditingQtyValue(''); return; }
+  };
+
+  // ── Totals (only selected items) ────────────────────────────────────────
+  const selectedItems = cart.filter((i) => selectedIds.has(i.id));
+  const subtotal = selectedItems.reduce((sum, i) => sum + i.price * i.quantity, 0);
   const shipping = subtotal > 0 ? (subtotal >= 50 ? 0 : 5.99) : 0;
   const tax = subtotal * 0.08;
   const total = subtotal + shipping + tax;
+
+  const handleCheckout = () => {
+    navigate('/checkout', { state: { selectedItemIds: Array.from(selectedIds) } });
+  };
 
   return (
     <div className="min-h-screen bg-background">
@@ -42,9 +99,22 @@ export default function CartPage() {
           <div className="grid lg:grid-cols-3 gap-8">
             {/* Cart Items - Left Column (2/3) */}
             <div className="lg:col-span-2 space-y-6">
-              <div>
-                <h1 className="text-3xl font-bold text-foreground mb-2">Shopping Cart</h1>
-                <p className="text-muted-foreground">{cart.length} items in your cart</p>
+              <div className="flex items-center justify-between">
+                <div>
+                  <h1 className="text-3xl font-bold text-foreground mb-2">Shopping Cart</h1>
+                  <p className="text-muted-foreground">{cart.length} items in your cart</p>
+                </div>
+                {/* Select All */}
+                <label className="flex items-center gap-2 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={allSelected}
+                    ref={(el) => { if (el) el.indeterminate = !allSelected && someSelected; }}
+                    onChange={toggleSelectAll}
+                    className="w-4 h-4 rounded accent-primary cursor-pointer"
+                  />
+                  <span className="text-sm font-medium text-foreground">Select all</span>
+                </label>
               </div>
 
               <div className="space-y-4">
@@ -54,9 +124,19 @@ export default function CartPage() {
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, x: -100 }}
-                    className="bg-white rounded-2xl p-6 shadow-sm hover:shadow-md transition-shadow"
+                    className={`bg-white rounded-2xl p-6 shadow-sm hover:shadow-md transition-shadow ${!selectedIds.has(item.id) ? 'opacity-60' : ''}`}
                   >
                     <div className="flex gap-6">
+                      {/* Checkbox */}
+                      <div className="flex items-center flex-shrink-0">
+                        <input
+                          type="checkbox"
+                          checked={selectedIds.has(item.id)}
+                          onChange={() => toggleItem(item.id)}
+                          className="w-4 h-4 rounded accent-primary cursor-pointer"
+                        />
+                      </div>
+
                       {/* Product Image */}
                       <Link 
                         to={`/product/${item.id}`} 
@@ -107,9 +187,30 @@ export default function CartPage() {
                               >
                                 <Minus className="w-4 h-4 text-muted-foreground" />
                               </button>
-                              <span className="w-12 text-center font-semibold text-foreground">
-                                {item.quantity}
-                              </span>
+                              {editingQtyId === item.id ? (
+                                <input
+                                  ref={inputRef}
+                                  type="text"
+                                  inputMode="numeric"
+                                  pattern="[0-9]*"
+                                  maxLength={3}
+                                  value={editingQtyValue}
+                                  autoFocus
+                                  onFocus={(e) => e.target.select()}
+                                  onChange={(e) => setEditingQtyValue(e.target.value.replace(/\D/g, ''))}
+                                  onBlur={() => commitEdit(item.id)}
+                                  onKeyDown={(e) => handleQtyKeyDown(e, item.id)}
+                                  className="w-12 text-center font-semibold text-foreground bg-white rounded-lg outline-none border border-primary text-sm"
+                                />
+                              ) : (
+                                <button
+                                  onClick={() => startEdit(item.id, item.quantity)}
+                                  className="w-12 text-center font-semibold text-foreground hover:bg-white rounded-lg transition-colors py-1"
+                                  title="Click to edit quantity"
+                                >
+                                  {item.quantity}
+                                </button>
+                              )}
                               <button
                                 onClick={() => updateQuantity(item.id, item.quantity + 1)}
                                 className="p-2 hover:bg-white rounded-lg transition-colors"
@@ -143,6 +244,11 @@ export default function CartPage() {
               <div className="sticky top-24">
                 <div className="bg-white rounded-2xl p-6 shadow-sm space-y-6">
                   <h2 className="text-xl font-semibold text-foreground">Order Summary</h2>
+                  {selectedItems.length > 0 && selectedItems.length < cart.length && (
+                    <p className="text-xs text-muted-foreground -mt-4">
+                      {selectedItems.length} of {cart.length} items selected
+                    </p>
+                  )}
 
                   {/* Price Breakdown */}
                   <div className="space-y-3 py-4 border-y border-border">
@@ -187,12 +293,13 @@ export default function CartPage() {
                   )}
 
                   {/* Checkout Button */}
-                  <Link
-                    to="/checkout"
-                    className="block w-full px-6 py-4 bg-primary text-white rounded-xl font-semibold text-center hover:bg-primary-dark hover:shadow-lg hover:-translate-y-0.5 transition-all"
+                  <button
+                    onClick={handleCheckout}
+                    disabled={selectedItems.length === 0}
+                    className="block w-full px-6 py-4 bg-primary text-white rounded-xl font-semibold text-center hover:bg-primary-dark hover:shadow-lg hover:-translate-y-0.5 transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0 disabled:hover:shadow-none"
                   >
-                    Proceed to Checkout →
-                  </Link>
+                    Proceed to Checkout ({selectedItems.length}) →
+                  </button>
 
                   {/* Trust Badges */}
                   <div className="pt-6 space-y-3 border-t border-border">
