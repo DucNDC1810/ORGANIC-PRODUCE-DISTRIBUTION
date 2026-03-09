@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { X, Minus, Plus, ShoppingBag } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Link, useNavigate } from 'react-router-dom';
@@ -47,40 +47,10 @@ export default function MiniCart() {
     closeCart();
     navigate('/checkout', { state: { selectedItemIds: Array.from(selectedIds) } });
   };
-  // ─────────────────────────────────────────────────────────────────────
 
-  // ── Inline qty editing ────────────────────────────────────────────────
-  const [editingQtyId, setEditingQtyId] = useState<string | null>(null);
-  const [editingQtyValue, setEditingQtyValue] = useState('');
-  const inputRef = useRef<HTMLInputElement>(null);
-
-  const startEdit = (id: string, current: number) => {
-    setEditingQtyId(id);
-    setEditingQtyValue(String(current));
-    setTimeout(() => inputRef.current?.select(), 0);
-  };
-
-  const commitEdit = async (id: string) => {
-    const parsed = parseInt(editingQtyValue, 10);
-    const newQty = isNaN(parsed) || parsed < 1 ? 1 : Math.min(parsed, QTY_MAX);
-    setEditingQtyId(null);
-    setEditingQtyValue('');
-    await updateQuantity(id, newQty);
-  };
-
-  const handleQtyKeyDown = (e: React.KeyboardEvent<HTMLInputElement>, id: string) => {
-    if (['e', 'E', '+', '-', '.'].includes(e.key)) { e.preventDefault(); return; }
-    if (e.key === 'Enter') { (e.target as HTMLInputElement).blur(); return; }
-    if (e.key === 'Escape') { setEditingQtyId(null); setEditingQtyValue(''); return; }
-  };
-  // ─────────────────────────────────────────────────────────────────────
-  const { cart, isCartOpen, closeCart, updateQuantity, removeFromCart, getTotalPrice, getTotalItems } = useCart();
-  const fmt = (n: number) => n.toLocaleString('vi-VN') + ' ₫';
-
-  // ── Click-to-edit quantity ─────────────────────────────────────────────
-  const QTY_MAX = 99;
   const [editingQtyId, setEditingQtyId] = useState<string | null>(null);
   const [editingQtyValue, setEditingQtyValue] = useState<string>('');
+  const fmt = (n: number) => n.toLocaleString('vi-VN') + ' ₫';
 
   const commitQtyEdit = async (itemId: string) => {
     const parsed = parseInt(editingQtyValue, 10);
