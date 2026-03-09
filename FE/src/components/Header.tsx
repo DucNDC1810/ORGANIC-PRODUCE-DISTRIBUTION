@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { Search, ShoppingCart, Leaf, Apple, Carrot, Wheat, Milk, Lightbulb, Gift, LogOut, Settings, X, Bell, ChevronDown } from 'lucide-react';
+import { Search, ShoppingCart, Leaf, Apple, Carrot, Wheat, Milk, Lightbulb, Gift, LogOut, Settings, X, Bell, ChevronDown, LayoutDashboard } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
@@ -322,6 +322,20 @@ export default function Header() {
 
                       {/* Menu Items */}
                       <div className="py-2">
+                        {user?.role === 'manager' && (
+                          <button
+                            onClick={() => { setUserDropdownOpen(false); navigate('/manager'); }}
+                            className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors group"
+                          >
+                            <div className="w-8 h-8 rounded-lg bg-gray-100 flex items-center justify-center group-hover:bg-emerald-100 transition-colors">
+                              <LayoutDashboard className="w-4 h-4 text-gray-600 group-hover:text-emerald-600 transition-colors" />
+                            </div>
+                            <div className="flex-1 text-left">
+                              <p className="font-medium">Manager Dashboard</p>
+                              <p className="text-xs text-gray-500">Go to manager portal</p>
+                            </div>
+                          </button>
+                        )}
                         <button
                           onClick={() => { setUserDropdownOpen(false); navigate(user?.role === 'admin' ? '/admin' : '/profile'); }}
                           className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors group"
