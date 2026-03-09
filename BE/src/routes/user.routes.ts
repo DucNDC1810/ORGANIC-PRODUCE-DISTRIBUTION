@@ -27,7 +27,7 @@ router.get('/me', authenticate as any, userController.getCurrentUser as any);
 router.get(
   '/stats',
   authenticate as any,
-  checkPermission(Permission.USER_MANAGE_ALL) as any,
+  checkRole(UserRole.ADMIN, UserRole.MANAGER) as any,
   userController.getUserStats as any
 );
 

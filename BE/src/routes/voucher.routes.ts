@@ -28,26 +28,22 @@ router.post('/:code/validate', voucherController.validateVoucher as any);
 // Apply voucher (use voucher - requires auth)
 router.post('/:code/apply', authenticate as any, voucherController.applyVoucher as any);
 
-// ===== WILDCARD ROUTES - MUST BE LAST =====
-
-// Get voucher by code
-router.get('/:code', voucherController.getVoucherByCode as any);
-
-// Get voucher by ID
-router.get('/:id', voucherController.getVoucherById as any);
-
-// ===== ADMIN CRUD ROUTES - ID BASED =====
+// ===== ADMIN CRUD ROUTES =====
 
 // Create voucher (admin only)
 router.post('/', authenticate as any, checkRole(UserRole.ADMIN, UserRole.MANAGER) as any, voucherController.createVoucher as any);
 
 // Update voucher (admin only)
-router.patch('/:id', authenticate as any, checkRole(UserRole.ADMIN, UserRole.MANAGER) as any, voucherController.updateVoucher as any);
-
-// Deactivate voucher (admin only)
 router.patch('/:id/deactivate', authenticate as any, checkRole(UserRole.ADMIN, UserRole.MANAGER) as any, voucherController.deactivateVoucher as any);
+
+router.patch('/:id', authenticate as any, checkRole(UserRole.ADMIN, UserRole.MANAGER) as any, voucherController.updateVoucher as any);
 
 // Delete voucher (admin only)
 router.delete('/:id', authenticate as any, checkRole(UserRole.ADMIN, UserRole.MANAGER) as any, voucherController.deleteVoucher as any);
+
+// ===== WILDCARD ROUTE - MUST BE LAST =====
+
+// Get voucher by ID or code (single param)
+router.get('/:id', voucherController.getVoucherById as any);
 
 export default router;
