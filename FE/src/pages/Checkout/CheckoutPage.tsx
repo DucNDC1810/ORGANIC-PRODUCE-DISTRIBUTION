@@ -31,15 +31,22 @@ import RecurringDeliveryModal, {
 } from "../../components/RecurringDeliveryModal";
 
 export default function CheckoutPage() {
-  const { cart, getTotalPrice, removeFromCart, updateQuantity, clearCart } = useCart();
+  const { cart, removeFromCart, updateQuantity, clearCart } = useCart();
   const { user } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const { groupSession } = useGroup();
 
+  // Buy Now: single item passed directly from ProductDetailPage (does not touch cart)
+  const buyNowItem = (location.state as any)?.buyNowItem as {
+    id: string; name: string; price: number; image: string; category: string; quantity: number;
+  } | undefined;
+
   // Items selected in CartPage (undefined = all items)
   const selectedItemIds = (location.state as any)?.selectedItemIds as string[] | undefined;
-  const checkoutItems = selectedItemIds
+  const checkoutItems = buyNowItem
+    ? [{ ...buyNowItem }]
+    : selectedItemIds
     ? cart.filter((i) => selectedItemIds.includes(i.id))
     : cart;
 
@@ -388,7 +395,7 @@ export default function CheckoutPage() {
       frequency: frequencyMap[recurringData.recurringFrequency],
       deliveryDay,
       nextDeliveryDate: nextDelivery.toISOString(),
-      items: cart.map((item) => ({
+      items: checkoutItems.map((item) => ({
         productId: item.id,
         quantity: item.quantity,
         priceAtSubscription: item.price,
@@ -425,7 +432,7 @@ export default function CheckoutPage() {
           ...(deliveryType === 'pickup' && selectedStore
             ? { pickupLocation: { name: selectedStore.name, address: selectedStore.address } }
             : {}),
-          items: cart.map((item) => ({
+          items: checkoutItems.map((item) => ({
             productId: item.id,
             quantity: item.quantity,
             price: item.price,
@@ -451,7 +458,7 @@ export default function CheckoutPage() {
             address: momoBuiltAddress,
             type: deliveryType,
           },
-          items: cart.map((item) => ({
+          items: checkoutItems.map((item) => ({
             productId: item.id,
             quantity: item.quantity,
             price: item.price,
@@ -523,7 +530,7 @@ export default function CheckoutPage() {
           ...(deliveryType === 'pickup' && selectedStore
             ? { pickupLocation: { name: selectedStore.name, address: selectedStore.address } }
             : {}),
-          items: cart.map((item) => ({
+          items: checkoutItems.map((item) => ({
             productId: item.id,
             quantity: item.quantity,
             price: item.price,
@@ -558,8 +565,8 @@ export default function CheckoutPage() {
               console.warn("Subscription creation failed:", subErr);
             }
           }
-          // Xoá giỏ hàng sau khi đặt hàng thành công
-          await clearCart(true);
+          // Xoá giỏ hàng sau khi đặt hàng thành công (không xoá nếu là Buy Now)
+          if (!buyNowItem) await clearCart(true);
 
           navigate("/order-success", {
             state: {
@@ -570,7 +577,7 @@ export default function CheckoutPage() {
               isRecurring: isRecurringOrder,
               subscriptionConfig: isRecurringOrder ? buildSubscriptionPayload() : null,
               deliveryType,
-              cartItems: cartItemsSnapshot,
+              cartItems: checkoutItems,
               pickupLocation:
                 deliveryType === "pickup" && selectedStore
                   ? { name: selectedStore.name, address: selectedStore.address }
@@ -629,7 +636,7 @@ export default function CheckoutPage() {
           ...(deliveryType === "pickup" && selectedStore
             ? { pickupLocation: { name: selectedStore.name, address: selectedStore.address } }
             : {}),
-          items: cart.map((item) => ({
+          items: checkoutItems.map((item) => ({
             productId: item.id,
             quantity: item.quantity,
             price: item.price,
@@ -645,8 +652,8 @@ export default function CheckoutPage() {
         const newBalance = result?.walletBalance ?? walletBalance - total;
         setWalletBalance(newBalance);
 
-        // Xoá giỏ hàng sau khi thanh toán thành công
-        await clearCart(true);
+        // Xoá giỏ hàng sau khi thanh toán thành công (không xoá nếu là Buy Now)
+        if (!buyNowItem) await clearCart(true);
 
         navigate("/order-success", {
           state: {
@@ -656,7 +663,7 @@ export default function CheckoutPage() {
             totalAmount: total,
             notes: formData.notes || null,
             deliveryType,
-            cartItems: cartItemsSnapshot,
+            cartItems: checkoutItems,
             pickupLocation:
               deliveryType === "pickup" && selectedStore
                 ? { name: selectedStore.name, address: selectedStore.address }
@@ -1318,7 +1325,7 @@ export default function CheckoutPage() {
                 </h3>
 
                 <div className="space-y-4">
-                  {cart.map((item) => (
+                  {checkoutItems.map((item) => (
                     <div key={item.id} className="flex gap-3">
                       <div className="w-14 h-14 bg-gray-100 rounded-lg overflow-hidden flex-shrink-0">
                         <img
@@ -1615,11 +1622,11 @@ export default function CheckoutPage() {
               <div className="rounded-xl border border-gray-100 overflow-hidden">
                 <div className="px-3 py-1.5 bg-gray-50 border-b border-gray-100">
                   <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
-                    Products ({cart.length})
+                    Products ({checkoutItems.length})
                   </p>
                 </div>
                 <div className="divide-y divide-gray-50">
-                  {cart.map((item) => (
+                  {checkoutItems.map((item) => (
                     <div key={item.id} className="flex items-center gap-2.5 px-3 py-2">
                       <div className="w-8 h-8 bg-gray-100 rounded-lg overflow-hidden flex-shrink-0">
                         <img src={item.image} alt={item.name} className="w-full h-full object-cover" />

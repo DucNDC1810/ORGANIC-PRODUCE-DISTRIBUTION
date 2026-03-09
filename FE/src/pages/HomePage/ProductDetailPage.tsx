@@ -48,8 +48,7 @@ export default function ProductDetailPage() {
 
   const commitQtyEdit = () => {
     const parsed = parseInt(editingQtyValue, 10);
-    const max = selectedProduct?.stock ?? 999;
-    const newQty = isNaN(parsed) || parsed < 1 ? 1 : Math.min(parsed, max);
+    const newQty = isNaN(parsed) || parsed < 1 ? 1 : parsed;
     setQuantity(newQty);
     setEditingQty(false);
     setEditingQtyValue('');
@@ -91,10 +90,20 @@ export default function ProductDetailPage() {
     }
   };
 
-  const handleBuyNow = async () => {
+  const handleBuyNow = () => {
     if (!selectedProduct) return;
-    await handleAddToCart(false);
-    navigate('/checkout', { state: { selectedItemIds: [selectedProduct._id] } });
+    navigate('/checkout', {
+      state: {
+        buyNowItem: {
+          id: selectedProduct._id,
+          name: selectedProduct.name,
+          price: selectedProduct.price,
+          image: selectedProduct.images?.[0] || selectedProduct.thumbnail || '',
+          category: selectedProduct.category,
+          quantity,
+        },
+      },
+    });
   };
 
   const nextImage = () => {
@@ -368,25 +377,32 @@ export default function ProductDetailPage() {
               </div>
 
               {/* Action Buttons */}
-              <div className="flex gap-4">
-                <Button
-                  onClick={() => handleAddToCart()}
-                  variant="outline"
-                  size="lg"
-                  className="flex-1 border-emerald-500 text-emerald-600 hover:bg-emerald-50"
-                  disabled={selectedProduct.stock <= 0}
-                >
-                  <ShoppingCart className="w-5 h-5 mr-2" />
-                  Add to Cart
-                </Button>
-                <Button
-                  onClick={handleBuyNow}
-                  size="lg"
-                  className="flex-1 bg-emerald-600 hover:bg-emerald-700"
-                  disabled={selectedProduct.stock <= 0}
-                >
-                  Buy Now
-                </Button>
+              <div className="flex flex-col gap-2">
+                {quantity > selectedProduct.stock && selectedProduct.stock > 0 && (
+                  <p className="text-xs text-red-500">
+                    Only {selectedProduct.stock} in stock. Please reduce quantity.
+                  </p>
+                )}
+                <div className="flex gap-4">
+                  <Button
+                    onClick={() => handleAddToCart()}
+                    variant="outline"
+                    size="lg"
+                    className="flex-1 border-emerald-500 text-emerald-600 hover:bg-emerald-50"
+                    disabled={selectedProduct.stock <= 0 || quantity > selectedProduct.stock}
+                  >
+                    <ShoppingCart className="w-5 h-5 mr-2" />
+                    Add to Cart
+                  </Button>
+                  <Button
+                    onClick={handleBuyNow}
+                    size="lg"
+                    className="flex-1 bg-emerald-600 hover:bg-emerald-700"
+                    disabled={selectedProduct.stock <= 0 || quantity > selectedProduct.stock}
+                  >
+                    Buy Now
+                  </Button>
+                </div>
               </div>
 
               {/* Share */}

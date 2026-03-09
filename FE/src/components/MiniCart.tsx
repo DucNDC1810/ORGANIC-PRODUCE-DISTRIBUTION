@@ -60,6 +60,17 @@ export default function MiniCart() {
     await updateQuantity(itemId, newQty);
   };
 
+  const handleQtyChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value.replace(/[^0-9]/g, '');
+    setEditingQtyValue(val);
+  };
+
+  const handleQtyPaste = (e: React.ClipboardEvent<HTMLInputElement>) => {
+    e.preventDefault();
+    const pasted = e.clipboardData.getData('text').replace(/[^0-9]/g, '');
+    if (pasted) setEditingQtyValue(pasted);
+  };
+
   const handleQtyKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (['e', 'E', '+', '-', '.'].includes(e.key)) {
       e.preventDefault();
@@ -68,8 +79,6 @@ export default function MiniCart() {
     if (e.key === 'Enter') { (e.target as HTMLInputElement).blur(); return; }
     if (e.key === 'Escape') { setEditingQtyId(null); setEditingQtyValue(''); }
   };
-  // ─────────────────────────────────────────────────────────────────────
-  const fmt = (n: number) => n.toLocaleString('vi-VN') + ' ₫';
 
   return (
     <AnimatePresence>
