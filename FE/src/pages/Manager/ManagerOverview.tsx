@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react';
 import { 
   Package, 
   ShoppingCart, 
@@ -10,61 +11,97 @@ import {
   AlertTriangle,
   Sparkles,
   CheckCircle2,
+  Loader2,
 } from 'lucide-react';
 import { Button } from '../../components/ui/button';
 import { Badge } from '../../components/ui/badge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../components/ui/card';
 import { BarChart, Bar, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Area, AreaChart } from 'recharts';
-
-// Mock data
-const recentOrders = [
-  { id: '#ORD-001', customer: 'John Smith', date: '2025-01-30', items: 3, total: 45.90, status: 'Completed' },
-  { id: '#ORD-002', customer: 'Emma Wilson', date: '2025-01-30', items: 2, total: 32.50, status: 'Processing' },
-  { id: '#ORD-003', customer: 'Michael Brown', date: '2025-01-29', items: 5, total: 78.30, status: 'Shipped' },
-  { id: '#ORD-004', customer: 'Sarah Davis', date: '2025-01-29', items: 4, total: 55.20, status: 'Processing' },
-  { id: '#ORD-005', customer: 'James Johnson', date: '2025-01-28', items: 2, total: 29.90, status: 'Completed' },
-];
-
-const lowStockItems = [
-  { name: 'Fresh Strawberries', stock: 8, threshold: 20, category: 'Fruits' },
-  { name: 'Organic Kale', stock: 12, threshold: 25, category: 'Vegetables' },
-  { name: 'Cherry Tomatoes', stock: 15, threshold: 30, category: 'Vegetables' },
-  { name: 'Fresh Raspberries', stock: 6, threshold: 20, category: 'Fruits' },
-];
-
-const categorySalesData = [
-  { category: 'Fruits', sales: 45280, color: '#ff6b6b' },
-  { category: 'Vegetables', sales: 38450, color: '#2D5A27' },
-  { category: 'Herbs', sales: 18920, color: '#51cf66' },
-  { category: 'Mushrooms', sales: 12340, color: '#ffd43b' },
-];
-
-const revenueData = [
-  { date: 'Jan 24', revenue: 12500, orders: 45 },
-  { date: 'Jan 25', revenue: 15800, orders: 52 },
-  { date: 'Jan 26', revenue: 14200, orders: 48 },
-  { date: 'Jan 27', revenue: 18400, orders: 58 },
-  { date: 'Jan 28', revenue: 19800, orders: 65 },
-  { date: 'Jan 29', revenue: 22400, orders: 71 },
-  { date: 'Jan 30', revenue: 25600, orders: 78 },
-];
-
-const aiInsights = [
-  { product: 'Fresh Strawberries', prediction: 'Stock depleting in 3 days', confidence: 92, action: 'Reorder now' },
-  { product: 'Organic Kale', prediction: 'High demand expected', confidence: 85, action: 'Increase stock' },
-  { product: 'Cherry Tomatoes', prediction: 'Running low', confidence: 88, action: 'Order 50 units' },
-];
+import {
+  dashboardService,
+  type OrderStats,
+  type ProductStats,
+  type UserStats,
+  type RecentOrder,
+  type LowStockProduct,
+  type RevenueDataPoint,
+  type CategoryWithCount,
+} from '../../services/dashboardService';
 
 export default function ManagerOverview() {
-  const getStatusBadge = (status: string) => {
-    const statusConfig: any = {
-      'Completed': { className: 'bg-green-100 text-green-800 hover:bg-green-100' },
-      'Processing': { className: 'bg-yellow-100 text-yellow-800 hover:bg-yellow-100' },
-      'Shipped': { className: 'bg-blue-100 text-blue-800 hover:bg-blue-100' },
-      'Cancelled': { className: 'bg-red-100 text-red-800 hover:bg-red-100' },
+  const [orderStats, setOrderStats] = useState<OrderStats | null>(null);
+  const [productStats, setProductStats] = useState<ProductStats | null>(null);
+  const [userStats, setUserStats] = useState<UserStats | null>(null);
+  const [recentOrders, setRecentOrders] = useState<RecentOrder[]>([]);
+  const [lowStockItems, setLowStockItems] = useState<LowStockProduct[]>([]);
+  const [revenueData, setRevenueData] = useState<RevenueDataPoint[]>([]);
+  const [categories, setCategories] = useState<CategoryWithCount[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchAll = async () => {
+      setLoading(true);
+      try {
+        const stats = await dashboardService.getStats();
+        setOrderStats(stats.orderStats);
+        setProductStats(stats.productStats);
+        setUserStats(stats.userStats);
+        setRecentOrders(stats.recentOrders ?? []);
+        setLowStockItems(stats.lowStockItems ?? []);
+        setRevenueData(stats.revenueByDay ?? []);
+        setCategories(stats.categoryProductCounts ?? []);
+      } catch (err) {
+        console.error('[Dashboard] Failed to load stats:', err);
+      } finally {
+        setLoading(false);
+      }
     };
-    return statusConfig[status] || { className: 'bg-gray-100 text-gray-800' };
+
+    fetchAll();
+  }, []);
+
+  // Map categories to chart-friendly format (top 6 by productCount)
+  const categorySalesData = categories
+    .filter((c) => c.productCount > 0)
+    .sort((a, b) => b.productCount - a.productCount)
+    .slice(0, 6)
+    .map((c) => ({ category: c.name, products: c.productCount }));
+
+  // Format YYYY-MM-DD → "Mar 9" for revenue chart x-axis
+  const revenueChartData = revenueData.map((d) => ({
+    ...d,
+    date: new Date(d.date + 'T00:00:00Z').toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      timeZone: 'UTC',
+    }),
+  }));
+
+  const getStatusBadge = (status: string) => {
+    const normalised = status.charAt(0).toUpperCase() + status.slice(1).toLowerCase();
+    const statusConfig: Record<string, { className: string }> = {
+      Completed:  { className: 'bg-green-100 text-green-800 hover:bg-green-100' },
+      Delivered:  { className: 'bg-green-100 text-green-800 hover:bg-green-100' },
+      Processing: { className: 'bg-yellow-100 text-yellow-800 hover:bg-yellow-100' },
+      Confirmed:  { className: 'bg-blue-100 text-blue-800 hover:bg-blue-100' },
+      Shipped:    { className: 'bg-blue-100 text-blue-800 hover:bg-blue-100' },
+      Pending:    { className: 'bg-orange-100 text-orange-800 hover:bg-orange-100' },
+      Cancelled:  { className: 'bg-red-100 text-red-800 hover:bg-red-100' },
+      Refunded:   { className: 'bg-gray-100 text-gray-800 hover:bg-gray-100' },
+    };
+    return statusConfig[normalised] ?? { className: 'bg-gray-100 text-gray-800' };
   };
+
+  const formatCurrency = (value: number) =>
+    new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(value);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-96">
+        <Loader2 className="w-10 h-10 text-emerald-600 animate-spin" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -79,14 +116,16 @@ export default function ManagerOverview() {
         </Button>
       </div>
 
-      {/* Summary Cards with Trend Lines */}
+      {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <Card className="border-l-4 border-l-green-500 shadow-sm hover:shadow-md transition-shadow">
           <CardContent className="pt-6">
             <div className="flex items-center justify-between mb-3">
               <div>
-                <p className="text-sm font-medium text-muted-foreground">Total Sales</p>
-                <h3 className="text-3xl font-bold text-foreground mt-1">$124,580</h3>
+                <p className="text-sm font-medium text-muted-foreground">Total Revenue</p>
+                <h3 className="text-3xl font-bold text-foreground mt-1">
+                  {orderStats ? formatCurrency(orderStats.totalRevenue) : '—'}
+                </h3>
               </div>
               <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center">
                 <DollarSign className="w-6 h-6 text-green-600" />
@@ -95,9 +134,9 @@ export default function ManagerOverview() {
             <div className="flex items-center gap-2 text-sm">
               <span className="flex items-center gap-1 text-green-600 font-medium">
                 <TrendingUp className="w-4 h-4" />
-                +12.5%
+                All time
               </span>
-              <span className="text-gray-500">vs last month</span>
+              <span className="text-gray-500">total revenue</span>
             </div>
           </CardContent>
         </Card>
@@ -107,7 +146,9 @@ export default function ManagerOverview() {
             <div className="flex items-center justify-between mb-3">
               <div>
                 <p className="text-sm font-medium text-gray-600">Total Orders</p>
-                <h3 className="text-3xl font-bold text-gray-900 mt-1">417</h3>
+                <h3 className="text-3xl font-bold text-gray-900 mt-1">
+                  {orderStats ? orderStats.totalOrders.toLocaleString() : '—'}
+                </h3>
               </div>
               <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
                 <ShoppingCart className="w-6 h-6 text-blue-600" />
@@ -116,9 +157,9 @@ export default function ManagerOverview() {
             <div className="flex items-center gap-2 text-sm">
               <span className="flex items-center gap-1 text-blue-600 font-medium">
                 <TrendingUp className="w-4 h-4" />
-                +8.2%
+                All time
               </span>
-              <span className="text-gray-500">vs last month</span>
+              <span className="text-gray-500">total orders</span>
             </div>
           </CardContent>
         </Card>
@@ -128,7 +169,9 @@ export default function ManagerOverview() {
             <div className="flex items-center justify-between mb-3">
               <div>
                 <p className="text-sm font-medium text-gray-600">Active Products</p>
-                <h3 className="text-3xl font-bold text-gray-900 mt-1">107</h3>
+                <h3 className="text-3xl font-bold text-gray-900 mt-1">
+                  {productStats ? productStats.activeProducts.toLocaleString() : '—'}
+                </h3>
               </div>
               <div className="w-12 h-12 bg-purple-100 rounded-full flex items-center justify-center">
                 <Package className="w-6 h-6 text-purple-600" />
@@ -137,9 +180,9 @@ export default function ManagerOverview() {
             <div className="flex items-center gap-2 text-sm">
               <span className="flex items-center gap-1 text-purple-600 font-medium">
                 <Plus className="w-4 h-4" />
-                5 new
+                {productStats ? productStats.lowStockProducts : 0} low stock
               </span>
-              <span className="text-gray-500">this week</span>
+              <span className="text-gray-500">need restock</span>
             </div>
           </CardContent>
         </Card>
@@ -149,7 +192,9 @@ export default function ManagerOverview() {
             <div className="flex items-center justify-between mb-3">
               <div>
                 <p className="text-sm font-medium text-gray-600">Total Customers</p>
-                <h3 className="text-3xl font-bold text-gray-900 mt-1">1,248</h3>
+                <h3 className="text-3xl font-bold text-gray-900 mt-1">
+                  {userStats ? userStats.totalUsers.toLocaleString() : '—'}
+                </h3>
               </div>
               <div className="w-12 h-12 bg-orange-100 rounded-full flex items-center justify-center">
                 <Users className="w-6 h-6 text-orange-600" />
@@ -158,9 +203,9 @@ export default function ManagerOverview() {
             <div className="flex items-center gap-2 text-sm">
               <span className="flex items-center gap-1 text-orange-600 font-medium">
                 <TrendingUp className="w-4 h-4" />
-                +15.3%
+                +{userStats?.newUsersThisMonth ?? 0}
               </span>
-              <span className="text-gray-500">vs last month</span>
+              <span className="text-gray-500">new this month</span>
             </div>
           </CardContent>
         </Card>
@@ -168,11 +213,11 @@ export default function ManagerOverview() {
 
       {/* Charts Section */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Product Sales by Category */}
+        {/* Products by Category */}
         <Card className="shadow-sm">
           <CardHeader>
-            <CardTitle className="text-lg font-semibold text-gray-900">Product Sales by Category</CardTitle>
-            <CardDescription>Revenue distribution across categories</CardDescription>
+            <CardTitle className="text-lg font-semibold text-gray-900">Products by Category</CardTitle>
+            <CardDescription>Number of products per category</CardDescription>
           </CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={300}>
@@ -183,7 +228,7 @@ export default function ManagerOverview() {
                 <Tooltip 
                   contentStyle={{ backgroundColor: '#fff', border: '1px solid #e5e7eb', borderRadius: '8px' }}
                 />
-                <Bar dataKey="sales" fill="#2D5A27" radius={[8, 8, 0, 0]} />
+                <Bar dataKey="products" fill="#2D5A27" radius={[8, 8, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </CardContent>
@@ -197,7 +242,7 @@ export default function ManagerOverview() {
           </CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={300}>
-              <AreaChart data={revenueData}>
+              <AreaChart data={revenueChartData}>
                 <defs>
                   <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="5%" stopColor="#2D5A27" stopOpacity={0.8}/>
@@ -218,39 +263,46 @@ export default function ManagerOverview() {
         </Card>
       </div>
 
-      {/* AI Insights Widget */}
+      {/* AI Insights Widget — driven by real low-stock data */}
       <Card className="border-l-4 border-l-purple-500 shadow-sm bg-gradient-to-br from-purple-50 to-white">
         <CardHeader>
           <div className="flex items-center gap-2">
             <Sparkles className="w-5 h-5 text-purple-600" />
-            <CardTitle className="text-lg font-semibold text-gray-900">AI Insights</CardTitle>
+            <CardTitle className="text-lg font-semibold text-gray-900">Low Stock Insights</CardTitle>
           </div>
-          <CardDescription>Predictive analytics for inventory management</CardDescription>
+          <CardDescription>Products that need your attention soon</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="space-y-3">
-            {aiInsights.map((insight, index) => (
-              <div key={index} className="flex items-center justify-between p-4 bg-white rounded-lg border border-purple-100 shadow-sm">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center">
-                    <BarChart3 className="w-5 h-5 text-purple-600" />
+          {lowStockItems.length === 0 ? (
+            <div className="text-center py-8">
+              <CheckCircle2 className="w-10 h-10 text-green-500 mx-auto mb-2" />
+              <p className="text-sm text-gray-500">All products are well-stocked!</p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {lowStockItems.slice(0, 5).map((item) => (
+                <div key={item._id} className="flex items-center justify-between p-4 bg-white rounded-lg border border-purple-100 shadow-sm">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center">
+                      <BarChart3 className="w-5 h-5 text-purple-600" />
+                    </div>
+                    <div>
+                      <p className="font-medium text-gray-900">{item.name}</p>
+                      <p className="text-sm text-gray-600">Only {item.stock} units remaining</p>
+                    </div>
                   </div>
-                  <div>
-                    <p className="font-medium text-gray-900">{insight.product}</p>
-                    <p className="text-sm text-gray-600">{insight.prediction}</p>
+                  <div className="flex items-center gap-3">
+                    <Badge variant="outline" className="bg-purple-50 text-purple-700 border-purple-200">
+                      {item.category}
+                    </Badge>
+                    <Badge className="bg-red-100 text-red-700 hover:bg-red-100">
+                      Restock needed
+                    </Badge>
                   </div>
                 </div>
-                <div className="flex items-center gap-3">
-                  <Badge variant="outline" className="bg-purple-50 text-purple-700 border-purple-200">
-                    {insight.confidence}% confidence
-                  </Badge>
-                  <Button size="sm" className="bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white">
-                    {insight.action}
-                  </Button>
-                </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </CardContent>
       </Card>
 
@@ -277,15 +329,19 @@ export default function ManagerOverview() {
             ) : (
               <div className="space-y-3">
                 {recentOrders.map((order) => (
-                  <div key={order.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
+                  <div key={order._id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
                     <div>
-                      <p className="font-semibold text-gray-900">{order.id}</p>
-                      <p className="text-sm text-gray-600">{order.customer} • {order.items} items</p>
+                      <p className="font-semibold text-gray-900">
+                        #{order._id.slice(-6).toUpperCase()}
+                      </p>
+                      <p className="text-sm text-gray-600">
+                        {order.userId?.name ?? 'Unknown'} • {order.items.length} items
+                      </p>
                     </div>
                     <div className="text-right">
-                      <p className="font-semibold text-gray-900">${order.total}</p>
+                      <p className="font-semibold text-gray-900">{formatCurrency(order.totalAmount)}</p>
                       <Badge {...getStatusBadge(order.status)} className="mt-1">
-                        {order.status}
+                        {order.status.charAt(0).toUpperCase() + order.status.slice(1)}
                       </Badge>
                     </div>
                   </div>
@@ -315,8 +371,8 @@ export default function ManagerOverview() {
               </div>
             ) : (
               <div className="space-y-3">
-                {lowStockItems.map((item, index) => (
-                  <div key={index} className="flex items-center justify-between p-3 bg-red-50 rounded-lg border border-red-100">
+                {lowStockItems.map((item) => (
+                  <div key={item._id} className="flex items-center justify-between p-3 bg-red-50 rounded-lg border border-red-100">
                     <div>
                       <p className="font-medium text-gray-900">{item.name}</p>
                       <p className="text-sm text-gray-600">
@@ -327,7 +383,7 @@ export default function ManagerOverview() {
                     </div>
                     <div className="text-right">
                       <p className="text-2xl font-bold text-red-600">{item.stock}</p>
-                      <p className="text-xs text-gray-500">Min: {item.threshold}</p>
+                      <p className="text-xs text-gray-500">Min: 10</p>
                     </div>
                   </div>
                 ))}

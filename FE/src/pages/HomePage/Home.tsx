@@ -162,18 +162,18 @@ export default function HomePage() {
             ) : error ? (
               <div className="flex justify-center py-12">
                 <div className="text-red-500 text-center">
-                  <p>Lỗi khi tải sản phẩm: {error}</p>
+                  <p>Error loading product: {error}</p>
                   <button 
                     onClick={() => fetchProducts({ isFeatured: true })} 
                     className="mt-2 px-4 py-2 bg-emerald-500 text-white rounded hover:bg-emerald-600 transition-colors"
                   >
-                    Thử lại
+                    Try again
                   </button>
                 </div>
               </div>
             ) : featuredProducts.length === 0 ? (
               <div className="flex justify-center py-12">
-                <p className="text-gray-500">Không có sản phẩm nổi bật nào</p>
+                <p className="text-gray-500">No featured products available</p>
               </div>
             ) : (
               <>

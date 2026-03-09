@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
-import { Leaf, Eye, EyeOff } from 'lucide-react';
+import { Leaf, Eye, EyeOff, Lock, Send } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { toast } from 'sonner';
+import api from '../../services/api';
 
 export default function LoginPage() {
   const navigate = useNavigate();
@@ -11,10 +12,36 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [isLocked, setIsLocked] = useState(false);
+  const [requestingSent, setRequestingSent] = useState(false);
   const [formData, setFormData] = useState({
     email: '',
     password: '',
   });
+
+  const emailRef = useRef<HTMLInputElement>(null);
+  const passwordRef = useRef<HTMLInputElement>(null);
+  const submitRef = useRef<HTMLButtonElement>(null);
+
+  // Auto-focus username on mount
+  useEffect(() => {
+    emailRef.current?.focus();
+  }, []);
+
+  // Tab focus trap: cycle only between email → password → submit
+  const handleTabTrap = useCallback((e: React.KeyboardEvent, current: 'email' | 'password' | 'submit') => {
+    if (e.key !== 'Tab') return;
+    e.preventDefault();
+    if (!e.shiftKey) {
+      if (current === 'email') passwordRef.current?.focus();
+      else if (current === 'password') submitRef.current?.focus();
+      else emailRef.current?.focus();
+    } else {
+      if (current === 'submit') passwordRef.current?.focus();
+      else if (current === 'password') emailRef.current?.focus();
+      else submitRef.current?.focus();
+    }
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -75,13 +102,19 @@ export default function LoginPage() {
       const status = error.response?.status;
       const message = error.response?.data?.message;
       
-      if (status === 403) {
+      if (status === 423) {
+        setIsLocked(true);
+        toast.error(message || 'Your account has been locked. Please contact admin to unlock.', { duration: 6000 });
+      } else if (status === 403) {
         // Email not verified or account deactivated
         toast.error(message || 'Please verify your email before logging in.', {
           duration: 5000,
         });
       } else {
         toast.error(message || 'Login failed. Please check your credentials.');
+        // Select all text in password field so user can retype immediately
+        passwordRef.current?.focus();
+        passwordRef.current?.select();
       }
     } finally {
       setLoading(false);
@@ -89,10 +122,27 @@ export default function LoginPage() {
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (isLocked) setIsLocked(false);
     setFormData({
       ...formData,
       [e.target.name]: e.target.value,
     });
+  };
+
+  const handleRequestUnlock = async () => {
+    if (!formData.email) {
+      toast.error('Please enter your email first.');
+      return;
+    }
+    setRequestingSent(true);
+    try {
+      await (api as any).post('/users/request-unlock', { email: formData.email });
+      toast.success('Unlock request sent! Admin will review and unlock your account shortly.', { duration: 7000 });
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || 'Failed to send unlock request. Please contact admin directly.');
+    } finally {
+      setRequestingSent(false);
+    }
   };
 
   return (
@@ -161,7 +211,7 @@ export default function LoginPage() {
           </div>
 
           {/* Login Form */}
-          <form onSubmit={handleSubmit} className="space-y-6">
+          <form onSubmit={handleSubmit} autoComplete="off" className="space-y-6">
             {/* Email or Username Field */}
             <div>
               <label htmlFor="email" className="block text-sm font-medium text-foreground mb-2">
@@ -171,9 +221,13 @@ export default function LoginPage() {
                 id="email"
                 name="email"
                 type="text"
+                autoComplete="off"
                 required
+                tabIndex={1}
+                ref={emailRef}
                 value={formData.email}
                 onChange={handleInputChange}
+                onKeyDown={(e) => handleTabTrap(e, 'email')}
                 className="block w-full px-4 py-3.5 bg-white border-2 border-primary/30 rounded-xl text-foreground placeholder:text-muted-foreground focus:border-primary focus:ring-0 transition-all outline-none hover:border-primary/50"
                 placeholder="you@example.com or username"
               />
@@ -189,14 +243,19 @@ export default function LoginPage() {
                   id="password"
                   name="password"
                   type={showPassword ? 'text' : 'password'}
+                  autoComplete="off"
                   required
+                  tabIndex={2}
+                  ref={passwordRef}
                   value={formData.password}
                   onChange={handleInputChange}
+                  onKeyDown={(e) => handleTabTrap(e, 'password')}
                   className="block w-full px-4 py-3.5 pr-12 bg-white border-2 border-primary/30 rounded-xl text-foreground placeholder:text-muted-foreground focus:border-primary focus:ring-0 transition-all outline-none hover:border-primary/50"
                   placeholder="Enter your password"
                 />
                 <button
                   type="button"
+                  tabIndex={-1}
                   onClick={() => setShowPassword(!showPassword)}
                   className="absolute inset-y-0 right-0 pr-4 flex items-center text-muted-foreground hover:text-primary transition-colors"
                 >
@@ -214,13 +273,14 @@ export default function LoginPage() {
               <label className="flex items-center gap-2 cursor-pointer">
                 <input
                   type="checkbox"
+                  tabIndex={-1}
                   checked={rememberMe}
                   onChange={(e) => setRememberMe(e.target.checked)}
                   className="w-4 h-4 rounded border-primary/30 text-primary focus:ring-primary focus:ring-offset-0"
                 />
                 <span className="text-sm text-foreground">Remember me</span>
               </label>
-              <Link to="/forgot-password" className="text-sm text-primary hover:text-primary-dark font-medium transition-colors">
+              <Link to="/forgot-password" tabIndex={-1} className="text-sm text-primary hover:text-primary-dark font-medium transition-colors">
                 Forgot password?
               </Link>
             </div>
@@ -228,11 +288,36 @@ export default function LoginPage() {
             {/* Sign In Button */}
             <button
               type="submit"
+              tabIndex={3}
+              ref={submitRef}
               disabled={loading}
+              onKeyDown={(e) => handleTabTrap(e, 'submit')}
               className="w-full py-4 bg-gradient-to-r from-[#6ee7b7] via-primary to-primary-dark text-white rounded-xl font-semibold text-lg shadow-lg hover:shadow-xl hover:-translate-y-0.5 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0"
             >
               {loading ? 'Signing in...' : 'Sign In'}
             </button>
+
+            {/* Account Locked Banner */}
+            {isLocked && (
+              <div className="rounded-xl border border-red-200 bg-red-50 p-4 space-y-3">
+                <div className="flex items-center gap-2 text-red-700">
+                  <Lock className="w-4 h-4 flex-shrink-0" />
+                  <p className="text-sm font-semibold">Tài khoản bị khóa</p>
+                </div>
+                <p className="text-xs text-red-600">
+                  Tài khoản của bạn đã bị khóa do nhập sai mật khẩu quá nhiều lần. Nhấn nút bên dưới để gửi yêu cầu mở khóa đến quản trị viên.
+                </p>
+                <button
+                  type="button"
+                  onClick={handleRequestUnlock}
+                  disabled={requestingSent}
+                  className="w-full flex items-center justify-center gap-2 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
+                >
+                  <Send className="w-4 h-4" />
+                  {requestingSent ? 'Đang gửi...' : 'Gửi yêu cầu mở khóa'}
+                </button>
+              </div>
+            )}
 
             {/* Divider */}
             <div className="relative py-6">

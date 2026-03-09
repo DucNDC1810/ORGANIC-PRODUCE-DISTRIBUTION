@@ -363,4 +363,180 @@ export class EmailService {
       console.error('❌ Error sending subscription payment reminder email:', error);
     }
   }
+
+  // ────────────────────────────────────────────────────────────
+  // Account lockout emails
+  // ────────────────────────────────────────────────────────────
+
+  /** Gửi email thông báo tài khoản bị khóa cho người dùng */
+  async sendAccountLockedToUser(to: string, name: string, failedAttempts: number): Promise<void> {
+    const adminEmail = process.env.ADMIN_EMAIL || process.env.EMAIL_USER || '';
+    const mailOptions = {
+      from: `"Organic Produce Distribution" <${process.env.EMAIL_USER}>`,
+      to,
+      subject: '🔒 Tài khoản của bạn đã bị khóa',
+      html: `
+        <!DOCTYPE html><html><head>
+        <style>
+          body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+          .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+          .header { background-color: #ef4444; color: white; padding: 20px; text-align: center; border-radius: 5px 5px 0 0; }
+          .content { background-color: #f9f9f9; padding: 30px; border-radius: 0 0 5px 5px; }
+          .info-box { background: #fef2f2; border-left: 4px solid #ef4444; padding: 12px 16px; margin: 16px 0; border-radius: 4px; }
+          .footer { text-align: center; margin-top: 20px; color: #666; font-size: 12px; }
+        </style>
+        </head><body>
+        <div class="container">
+          <div class="header"><h2>🔒 Tài khoản bị khóa</h2></div>
+          <div class="content">
+            <p>Xin chào <strong>${name}</strong>,</p>
+            <p>Tài khoản của bạn đã bị <strong>khóa tạm thời</strong> do nhập sai mật khẩu quá <strong>${failedAttempts} lần</strong> liên tiếp.</p>
+            <div class="info-box">
+              <p style="margin:0;"><strong>Để mở khóa tài khoản</strong>, vui lòng liên hệ quản trị viên:</p>
+              <p style="margin:8px 0 0;">📧 Email: <a href="mailto:${adminEmail}">${adminEmail}</a></p>
+            </div>
+            <p>Nếu bạn không thực hiện những lần đăng nhập này, tài khoản của bạn có thể đang bị tấn công. Vui lòng liên hệ ngay với chúng tôi.</p>
+          </div>
+          <div class="footer"><p>© 2026 Organic Produce Distribution. All rights reserved.</p></div>
+        </div>
+        </body></html>
+      `,
+    };
+    try {
+      await this.transporter.sendMail(mailOptions);
+      console.log(`✅ Account locked notification sent to user ${to}`);
+    } catch (error) {
+      console.error('❌ Error sending account locked email to user:', error);
+    }
+  }
+
+  /** Gửi email thông báo cho admin khi có tài khoản bị khóa */
+  async sendAccountLockedToAdmin(lockedUserName: string, lockedUserEmail: string, failedAttempts: number): Promise<void> {
+    const adminEmail = process.env.ADMIN_EMAIL || process.env.EMAIL_USER;
+    if (!adminEmail) return;
+
+    const mailOptions = {
+      from: `"Organic Produce Distribution" <${process.env.EMAIL_USER}>`,
+      to: adminEmail,
+      subject: `🚨 Tài khoản bị khóa: ${lockedUserEmail}`,
+      html: `
+        <!DOCTYPE html><html><head>
+        <style>
+          body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+          .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+          .header { background-color: #f97316; color: white; padding: 20px; text-align: center; border-radius: 5px 5px 0 0; }
+          .content { background-color: #f9f9f9; padding: 30px; border-radius: 0 0 5px 5px; }
+          .info-box { background: #fff7ed; border-left: 4px solid #f97316; padding: 12px 16px; margin: 16px 0; border-radius: 4px; }
+          .footer { text-align: center; margin-top: 20px; color: #666; font-size: 12px; }
+        </style>
+        </head><body>
+        <div class="container">
+          <div class="header"><h2>🚨 Cảnh báo: Tài khoản bị khóa</h2></div>
+          <div class="content">
+            <p>Một tài khoản vừa bị <strong>tự động khóa</strong> do nhập sai mật khẩu quá nhiều lần.</p>
+            <div class="info-box">
+              <p><strong>Tên:</strong> ${lockedUserName}</p>
+              <p><strong>Email:</strong> ${lockedUserEmail}</p>
+              <p><strong>Số lần nhập sai:</strong> ${failedAttempts}</p>
+              <p><strong>Thời gian:</strong> ${new Date().toLocaleString('vi-VN')}</p>
+            </div>
+            <p>Người dùng cần bạn <strong>mở khóa thủ công</strong> qua trang quản trị trước khi có thể đăng nhập lại.</p>
+          </div>
+          <div class="footer"><p>© 2026 Organic Produce Distribution. All rights reserved.</p></div>
+        </div>
+        </body></html>
+      `,
+    };
+    try {
+      await this.transporter.sendMail(mailOptions);
+      console.log(`✅ Account locked notification sent to admin for user ${lockedUserEmail}`);
+    } catch (error) {
+      console.error('❌ Error sending account locked email to admin:', error);
+    }
+  }
+
+  /** Gửi email xác nhận yêu cầu mở khóa đã được gửi đến admin */
+  async sendUnlockRequestConfirmation(to: string, name: string): Promise<void> {
+    const adminEmail = process.env.ADMIN_EMAIL || process.env.EMAIL_USER || '';
+    const mailOptions = {
+      from: `"Organic Produce Distribution" <${process.env.EMAIL_USER}>`,
+      to,
+      subject: '📨 Yêu cầu mở khóa tài khoản đã được gửi',
+      html: `
+        <!DOCTYPE html><html><head>
+        <style>
+          body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+          .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+          .header { background-color: #10b981; color: white; padding: 20px; text-align: center; border-radius: 5px 5px 0 0; }
+          .content { background-color: #f9f9f9; padding: 30px; border-radius: 0 0 5px 5px; }
+          .info-box { background: #ecfdf5; border-left: 4px solid #10b981; padding: 12px 16px; margin: 16px 0; border-radius: 4px; }
+          .footer { text-align: center; margin-top: 20px; color: #666; font-size: 12px; }
+        </style>
+        </head><body>
+        <div class="container">
+          <div class="header"><h2>📨 Yêu cầu mở khóa đã được gửi</h2></div>
+          <div class="content">
+            <p>Xin chào <strong>${name}</strong>,</p>
+            <p>Yêu cầu mở khóa tài khoản của bạn đã được gửi đến quản trị viên.</p>
+            <div class="info-box">
+              <p style="margin:0;">Quản trị viên sẽ xem xét và mở khóa tài khoản trong thời gian sớm nhất. Bạn sẽ nhận được thông báo qua email <strong>${to}</strong> khi tài khoản được mở khóa.</p>
+            </div>
+            <p>Nếu cần hỗ trợ khẩn cấp, vui lòng liên hệ trực tiếp: <a href="mailto:${adminEmail}">${adminEmail}</a></p>
+          </div>
+          <div class="footer"><p>© 2026 Organic Produce Distribution. All rights reserved.</p></div>
+        </div>
+        </body></html>
+      `,
+    };
+    try {
+      await this.transporter.sendMail(mailOptions);
+      console.log(`✅ Unlock request confirmation sent to ${to}`);
+    } catch (error) {
+      console.error('❌ Error sending unlock request confirmation email:', error);
+    }
+  }
+
+  /** Gửi email thông báo cho admin khi nhận được yêu cầu mở khóa từ người dùng */
+  async sendUnlockRequestToAdmin(lockedUserName: string, lockedUserEmail: string): Promise<void> {
+    const adminEmail = process.env.ADMIN_EMAIL || process.env.EMAIL_USER;
+    if (!adminEmail) return;
+
+    const mailOptions = {
+      from: `"Organic Produce Distribution" <${process.env.EMAIL_USER}>`,
+      to: adminEmail,
+      subject: `📩 Yêu cầu mở khóa từ: ${lockedUserEmail}`,
+      html: `
+        <!DOCTYPE html><html><head>
+        <style>
+          body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+          .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+          .header { background-color: #6366f1; color: white; padding: 20px; text-align: center; border-radius: 5px 5px 0 0; }
+          .content { background-color: #f9f9f9; padding: 30px; border-radius: 0 0 5px 5px; }
+          .info-box { background: #eef2ff; border-left: 4px solid #6366f1; padding: 12px 16px; margin: 16px 0; border-radius: 4px; }
+          .footer { text-align: center; margin-top: 20px; color: #666; font-size: 12px; }
+        </style>
+        </head><body>
+        <div class="container">
+          <div class="header"><h2>📩 Yêu cầu mở khóa tài khoản</h2></div>
+          <div class="content">
+            <p>Người dùng sau đang yêu cầu mở khóa tài khoản:</p>
+            <div class="info-box">
+              <p><strong>Tên:</strong> ${lockedUserName}</p>
+              <p><strong>Email:</strong> ${lockedUserEmail}</p>
+              <p><strong>Thời gian yêu cầu:</strong> ${new Date().toLocaleString('vi-VN')}</p>
+            </div>
+            <p>Vui lòng đăng nhập vào trang quản trị để xem xét và mở khóa tài khoản này.</p>
+          </div>
+          <div class="footer"><p>© 2026 Organic Produce Distribution. All rights reserved.</p></div>
+        </div>
+        </body></html>
+      `,
+    };
+    try {
+      await this.transporter.sendMail(mailOptions);
+      console.log(`✅ Unlock request forwarded to admin for user ${lockedUserEmail}`);
+    } catch (error) {
+      console.error('❌ Error sending unlock request to admin:', error);
+    }
+  }
 }

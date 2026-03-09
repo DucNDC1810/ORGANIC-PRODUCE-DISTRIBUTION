@@ -1,59 +1,143 @@
+import { useState, useEffect } from 'react';
 import { 
   DollarSign, 
   ShoppingCart, 
   Users, 
   Package, 
   TrendingUp, 
-  Plus 
+  Plus,
+  Loader2
 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../components/ui/card';
 import { Badge } from '../../components/ui/badge';
 import { LineChart, Line, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import { orderService } from '../../services/orderService';
+import { productService } from '../../services/productService';
+import api from '../../services/api';
 
-// Mock data
-const revenueData = [
-  { month: 'Jan', revenue: 12500, orders: 45 },
-  { month: 'Feb', revenue: 15800, orders: 52 },
-  { month: 'Mar', revenue: 18200, orders: 68 },
-  { month: 'Apr', revenue: 22400, orders: 78 },
-  { month: 'May', revenue: 19800, orders: 65 },
-  { month: 'Jun', revenue: 25600, orders: 85 },
-];
+const CHART_COLORS = ['#10b981', '#f59e0b', '#8b5cf6', '#ef4444', '#3b82f6', '#ec4899', '#14b8a6', '#f97316'];
 
-const categoryData = [
-  { name: 'Vegetables', value: 45, color: '#10b981' },
-  { name: 'Fruits', value: 32, color: '#f59e0b' },
-  { name: 'Herbs', value: 18, color: '#8b5cf6' },
-  { name: 'Mushrooms', value: 12, color: '#ef4444' },
-];
-
-const topProducts = [
-  { name: 'Organic Avocados', sold: 245, revenue: 1467.55 },
-  { name: 'Mixed Greens', sold: 198, revenue: 889.02 },
-  { name: 'Fresh Strawberries', sold: 176, revenue: 1230.24 },
-  { name: 'Organic Tomatoes', sold: 165, revenue: 823.35 },
-  { name: 'Fresh Blueberries', sold: 142, revenue: 1134.58 },
-];
-
-const mockOrders = [
-  { id: '#ORD-001', customer: 'John Smith', date: '2025-01-26', total: 45.90, status: 'Shipping', items: 3, payment: 'Paid' },
-  { id: '#ORD-002', customer: 'Jane Doe', date: '2025-01-26', total: 32.50, status: 'Processing', items: 2, payment: 'Paid' },
-  { id: '#ORD-003', customer: 'Michael Lee', date: '2025-01-25', total: 78.30, status: 'Completed', items: 5, payment: 'Paid' },
-  { id: '#ORD-004', customer: 'Sarah Johnson', date: '2025-01-25', total: 55.20, status: 'Shipping', items: 4, payment: 'Paid' },
-  { id: '#ORD-005', customer: 'David Brown', date: '2025-01-24', total: 29.90, status: 'Cancelled', items: 2, payment: 'Refunded' },
-];
-
-const getStatusBadge = (status: string) => {
-  const statusConfig: any = {
-    'Shipping': { variant: 'default', className: 'bg-blue-500 hover:bg-blue-600' },
-    'Processing': { variant: 'secondary', className: 'bg-yellow-500 hover:bg-yellow-600 text-white' },
-    'Completed': { variant: 'default', className: 'bg-green-500 hover:bg-green-600' },
-    'Cancelled': { variant: 'destructive', className: '' },
-  };
-  return statusConfig[status] || { variant: 'default', className: '' };
+const STATUS_CONFIG: Record<string, { label: string; className: string }> = {
+  pending:    { label: 'Pending',    className: 'bg-yellow-500 hover:bg-yellow-600 text-white' },
+  confirmed:  { label: 'Confirmed',  className: 'bg-blue-400 hover:bg-blue-500 text-white' },
+  processing: { label: 'Processing', className: 'bg-orange-500 hover:bg-orange-600 text-white' },
+  shipped:    { label: 'Shipped',    className: 'bg-indigo-500 hover:bg-indigo-600 text-white' },
+  delivered:  { label: 'Delivered',  className: 'bg-green-500 hover:bg-green-600 text-white' },
+  cancelled:  { label: 'Cancelled',  className: 'bg-red-500 hover:bg-red-600 text-white' },
+  refunded:   { label: 'Refunded',   className: 'bg-gray-500 hover:bg-gray-600 text-white' },
 };
 
+const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+interface RevenuePoint { month: string; revenue: number; orders: number; }
+interface CategoryPoint { name: string; value: number; color: string; [key: string]: unknown; }
+interface TopProduct    { name: string; sold: number; revenue: number; }
+interface RecentOrder   { _id: string; customerName: string; total: number; status: string; }
+
 export default function Overview() {
+  const [loading, setLoading]           = useState(true);
+  const [totalRevenue, setTotalRevenue] = useState(0);
+  const [totalOrders, setTotalOrders]   = useState(0);
+  const [totalCustomers, setTotalCustomers] = useState(0);
+  const [totalProducts, setTotalProducts]   = useState(0);
+  const [revenueData, setRevenueData]   = useState<RevenuePoint[]>([]);
+  const [categoryData, setCategoryData] = useState<CategoryPoint[]>([]);
+  const [topProducts, setTopProducts]   = useState<TopProduct[]>([]);
+  const [recentOrders, setRecentOrders] = useState<RecentOrder[]>([]);
+
+  useEffect(() => {
+    async function fetchAll() {
+      try {
+        const sixMonthsAgo = new Date();
+        sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
+        const startDate = sixMonthsAgo.toISOString().split('T')[0];
+
+        const [orderStats, productStats, userStats, recentRes, topProductsRes, monthlyRes] =
+          await Promise.all([
+            orderService.getOrderStats() as Promise<any>,
+            productService.getProductStats(),
+            api.get('/users/stats') as Promise<any>,
+            orderService.getAllOrders({ limit: 5 }) as Promise<any>,
+            productService.getAllProducts({ sortBy: 'soldCount', sortOrder: 'desc', limit: 5, isActive: true }),
+            orderService.getAllOrders({ limit: 500, startDate }) as Promise<any>,
+          ]);
+
+        // ── Stats cards ──────────────────────────────────────────
+        setTotalRevenue(orderStats.data?.totalRevenue ?? 0);
+        setTotalOrders(orderStats.data?.totalOrders ?? 0);
+        setTotalCustomers(userStats.data?.totalUsers ?? 0);
+        setTotalProducts(productStats.data?.totalProducts ?? 0);
+
+        // ── Category pie ─────────────────────────────────────────
+        const catDist: Record<string, number> = productStats.data?.categoryDistribution ?? {};
+        setCategoryData(
+          Object.entries(catDist)
+            .sort(([, a], [, b]) => b - a)
+            .map(([name, value], i) => ({
+              name,
+              value,
+              color: CHART_COLORS[i % CHART_COLORS.length],
+            }))
+        );
+
+        // ── Top products ─────────────────────────────────────────
+        setTopProducts(
+          (topProductsRes.data ?? []).map((p: any) => ({
+            name: p.name,
+            sold: p.soldCount ?? 0,
+            revenue: (p.soldCount ?? 0) * (p.price ?? 0),
+          }))
+        );
+
+        // ── Recent orders ────────────────────────────────────────
+        setRecentOrders(
+          (recentRes.data ?? []).map((o: any) => ({
+            _id: o._id,
+            customerName: (o.userId as any)?.name ?? 'Unknown',
+            total: o.totalAmount ?? 0,
+            status: o.status ?? 'pending',
+          }))
+        );
+
+        // ── Monthly revenue chart (last 6 months) ────────────────
+        const monthlyMap: Record<string, { revenue: number; orders: number }> = {};
+        const now = new Date();
+        for (let i = 5; i >= 0; i--) {
+          const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+          monthlyMap[`${d.getFullYear()}-${d.getMonth()}`] = { revenue: 0, orders: 0 };
+        }
+        (monthlyRes.data ?? []).forEach((order: any) => {
+          const d = new Date(order.orderDate ?? order.createdAt);
+          const key = `${d.getFullYear()}-${d.getMonth()}`;
+          if (monthlyMap[key]) {
+            monthlyMap[key].revenue += order.totalAmount ?? 0;
+            monthlyMap[key].orders  += 1;
+          }
+        });
+        setRevenueData(
+          Object.entries(monthlyMap).map(([key, val]) => {
+            const month = parseInt(key.split('-')[1]);
+            return { month: MONTH_NAMES[month], revenue: Math.round(val.revenue), orders: val.orders };
+          })
+        );
+      } catch (err) {
+        console.error('Failed to load overview data:', err);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    fetchAll();
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <Loader2 className="w-8 h-8 animate-spin text-emerald-600" />
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       <div>
@@ -69,10 +153,12 @@ export default function Overview() {
             <DollarSign className="w-5 h-5 text-green-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-foreground">$114,300</div>
+            <div className="text-2xl font-bold text-foreground">
+              {totalRevenue.toLocaleString('vi-VN')} ₫
+            </div>
             <p className="text-xs text-green-600 flex items-center gap-1 mt-1">
               <TrendingUp className="w-3 h-3" />
-              +12.5% from last month
+              All-time revenue
             </p>
           </CardContent>
         </Card>
@@ -83,10 +169,10 @@ export default function Overview() {
             <ShoppingCart className="w-5 h-5 text-blue-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-foreground">393</div>
+            <div className="text-2xl font-bold text-foreground">{totalOrders.toLocaleString()}</div>
             <p className="text-xs text-blue-600 flex items-center gap-1 mt-1">
               <TrendingUp className="w-3 h-3" />
-              +8.2% from last month
+              Total orders
             </p>
           </CardContent>
         </Card>
@@ -97,10 +183,10 @@ export default function Overview() {
             <Users className="w-5 h-5 text-purple-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-foreground">1,248</div>
+            <div className="text-2xl font-bold text-foreground">{totalCustomers.toLocaleString()}</div>
             <p className="text-xs text-purple-600 flex items-center gap-1 mt-1">
               <TrendingUp className="w-3 h-3" />
-              +15.3% from last month
+              Registered users
             </p>
           </CardContent>
         </Card>
@@ -111,10 +197,10 @@ export default function Overview() {
             <Package className="w-5 h-5 text-orange-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-foreground">107</div>
+            <div className="text-2xl font-bold text-foreground">{totalProducts.toLocaleString()}</div>
             <p className="text-xs text-orange-600 flex items-center gap-1 mt-1">
               <Plus className="w-3 h-3" />
-              5 new products this week
+              Active products
             </p>
           </CardContent>
         </Card>
@@ -125,7 +211,7 @@ export default function Overview() {
         <Card>
           <CardHeader>
             <CardTitle>6-Month Revenue</CardTitle>
-            <CardDescription>Revenue and orders chart</CardDescription>
+            <CardDescription>Revenue and orders over the last 6 months</CardDescription>
           </CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={300}>
@@ -133,12 +219,15 @@ export default function Overview() {
                 <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
                 <XAxis dataKey="month" stroke="#6b7280" />
                 <YAxis stroke="#6b7280" />
-                <Tooltip 
+                <Tooltip
                   contentStyle={{ backgroundColor: '#fff', border: '1px solid #e5e7eb', borderRadius: '8px' }}
+                  formatter={(value: number | undefined, name: string | undefined) =>
+                    name === 'Revenue (₫)' ? (value ?? 0).toLocaleString('vi-VN') + ' ₫' : value ?? 0
+                  }
                 />
                 <Legend />
-                <Line type="monotone" dataKey="revenue" stroke="#10b981" strokeWidth={2} name="Revenue ($)" />
-                <Line type="monotone" dataKey="orders" stroke="#3b82f6" strokeWidth={2} name="Orders" />
+                <Line type="monotone" dataKey="revenue" stroke="#10b981" strokeWidth={2} name="Revenue (₫)" />
+                <Line type="monotone" dataKey="orders"  stroke="#3b82f6" strokeWidth={2} name="Orders" />
               </LineChart>
             </ResponsiveContainer>
           </CardContent>
@@ -150,25 +239,32 @@ export default function Overview() {
             <CardDescription>Products by category</CardDescription>
           </CardHeader>
           <CardContent>
-            <ResponsiveContainer width="100%" height={300}>
-              <PieChart>
-                <Pie
-                  data={categoryData}
-                  cx="50%"
-                  cy="50%"
-                  labelLine={false}
-                  label={({ name, percent }) => `${name} ${percent !== undefined ? (percent * 100).toFixed(2) : '0'}%`}
-                  outerRadius={100}
-                  fill="#8884d8"
-                  dataKey="value"
-                >
-                  {categoryData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.color} />
-                  ))}
-                </Pie>
-                <Tooltip />
-              </PieChart>
-            </ResponsiveContainer>
+            {categoryData.length === 0 ? (
+              <div className="flex items-center justify-center h-[300px] text-muted-foreground text-sm">
+                No category data available
+              </div>
+            ) : (
+              <ResponsiveContainer width="100%" height={300}>
+                <PieChart>
+                  <Pie
+                    data={categoryData}
+                    cx="50%"
+                    cy="50%"
+                    labelLine={false}
+                    label={({ name, percent }) =>
+                      `${name} ${percent !== undefined ? (percent * 100).toFixed(1) : '0'}%`
+                    }
+                    outerRadius={100}
+                    dataKey="value"
+                  >
+                    {categoryData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.color} />
+                    ))}
+                  </Pie>
+                  <Tooltip formatter={(value: number | undefined) => [value ?? 0, 'Products']} />
+                </PieChart>
+              </ResponsiveContainer>
+            )}
           </CardContent>
         </Card>
       </div>
@@ -181,47 +277,64 @@ export default function Overview() {
             <CardDescription>5 latest orders</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="space-y-4">
-              {mockOrders.slice(0, 5).map((order) => (
-                <div key={order.id} className="flex items-center justify-between p-3 bg-muted rounded-lg">
-                  <div>
-                    <p className="font-medium text-foreground">{order.id}</p>
-                    <p className="text-sm text-muted-foreground">{order.customer}</p>
-                  </div>
-                  <div className="text-right">
-                    <p className="font-semibold text-foreground">${order.total}</p>
-                    <Badge {...getStatusBadge(order.status)} className="mt-1">
-                      {order.status}
-                    </Badge>
-                  </div>
-                </div>
-              ))}
-            </div>
+            {recentOrders.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-8">No orders yet</p>
+            ) : (
+              <div className="space-y-4">
+                {recentOrders.map((order) => {
+                  const cfg = STATUS_CONFIG[order.status] ?? STATUS_CONFIG['pending'];
+                  return (
+                    <div key={order._id} className="flex items-center justify-between p-3 bg-muted rounded-lg">
+                      <div>
+                        <p className="font-medium text-foreground font-mono text-sm">
+                          #{order._id.slice(-8).toUpperCase()}
+                        </p>
+                        <p className="text-sm text-muted-foreground">{order.customerName}</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="font-semibold text-foreground text-sm">
+                          {order.total.toLocaleString('vi-VN')} ₫
+                        </p>
+                        <Badge className={`mt-1 text-xs ${cfg.className}`}>
+                          {cfg.label}
+                        </Badge>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader>
             <CardTitle>Top Selling Products</CardTitle>
-            <CardDescription>Top 5 products by revenue</CardDescription>
+            <CardDescription>Top 5 products by sold count</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="space-y-4">
-              {topProducts.map((product, index) => (
-                <div key={index} className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 bg-gradient-to-br from-green-500 to-emerald-600 rounded-lg flex items-center justify-center text-white font-semibold text-sm">
-                      {index + 1}
+            {topProducts.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-8">No product data yet</p>
+            ) : (
+              <div className="space-y-4">
+                {topProducts.map((product, index) => (
+                  <div key={index} className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 bg-gradient-to-br from-green-500 to-emerald-600 rounded-lg flex items-center justify-center text-white font-semibold text-sm">
+                        {index + 1}
+                      </div>
+                      <div>
+                        <p className="font-medium text-foreground">{product.name}</p>
+                        <p className="text-sm text-muted-foreground">{product.sold} sold</p>
+                      </div>
                     </div>
-                    <div>
-                      <p className="font-medium text-foreground">{product.name}</p>
-                      <p className="text-sm text-muted-foreground">{product.sold} sold</p>
-                    </div>
+                    <p className="font-semibold text-green-600 text-sm">
+                      {product.revenue.toLocaleString('vi-VN')} ₫
+                    </p>
                   </div>
-                  <p className="font-semibold text-green-600">${product.revenue.toFixed(2)}</p>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>

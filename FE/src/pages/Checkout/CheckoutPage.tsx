@@ -344,7 +344,7 @@ export default function CheckoutPage() {
       const response = await voucherService.validateVoucher(code, {
         purchaseAmount: subtotal,
       });
-      setVoucherDiscount(response.data.data.discountValue);
+      setVoucherDiscount(response.data.discountValue);
       setAppliedVoucher(code);
       setVoucherError("");
     } catch (err: any) {
@@ -552,6 +552,14 @@ export default function CheckoutPage() {
               console.warn("Subscription creation failed:", subErr);
             }
           }
+          // Snapshot cart items before clearing (for display on success page)
+          const cartItemsSnapshot = cart.map((item) => ({
+            productId: { _id: item.id, name: item.name, thumbnail: item.image },
+            quantity: item.quantity,
+            price: item.price,
+            subtotal: item.price * item.quantity,
+          }));
+
           // Xoá giỏ hàng sau khi đặt hàng thành công
           await clearCart(true);
 
@@ -560,9 +568,11 @@ export default function CheckoutPage() {
               orderId: result?._id || result?.data?._id,
               paymentMethod: "COD",
               totalAmount: total,
+              notes: formData.notes || null,
               isRecurring: isRecurringOrder,
               subscriptionConfig: isRecurringOrder ? buildSubscriptionPayload() : null,
               deliveryType,
+              cartItems: cartItemsSnapshot,
               pickupLocation:
                 deliveryType === "pickup" && selectedStore
                   ? { name: selectedStore.name, address: selectedStore.address }
@@ -637,6 +647,14 @@ export default function CheckoutPage() {
         const newBalance = result?.walletBalance ?? walletBalance - total;
         setWalletBalance(newBalance);
 
+        // Snapshot cart items before clearing (for display on success page)
+        const cartItemsSnapshot = cart.map((item) => ({
+          productId: { _id: item.id, name: item.name, thumbnail: item.image },
+          quantity: item.quantity,
+          price: item.price,
+          subtotal: item.price * item.quantity,
+        }));
+
         // Xoá giỏ hàng sau khi thanh toán thành công
         await clearCart(true);
 
@@ -646,7 +664,9 @@ export default function CheckoutPage() {
             paymentMethod: "Wallet",
             walletBalance: newBalance,
             totalAmount: total,
+            notes: formData.notes || null,
             deliveryType,
+            cartItems: cartItemsSnapshot,
             pickupLocation:
               deliveryType === "pickup" && selectedStore
                 ? { name: selectedStore.name, address: selectedStore.address }

@@ -16,13 +16,16 @@ export class VoucherController {
         discountAmount,
         discountPercentage,
         discountType,
+        startDate,
         expiryDate,
         minPurchaseAmount,
         maxDiscountAmount,
         usageLimit,
+        perCustomerLimit,
         applicableCategories,
         applicableProducts,
-        description
+        description,
+        isActive
       } = req.body;
 
       if (!code || !discountType || !expiryDate) {
@@ -46,9 +49,11 @@ export class VoucherController {
         throw new AppError('Discount percentage must be between 0 and 100', 400);
       }
 
+      const start = startDate ? new Date(startDate) : new Date();
       const expiry = new Date(expiryDate);
-      if (expiry <= new Date()) {
-        throw new AppError('Expiry date must be in the future', 400);
+
+      if (expiry <= start) {
+        throw new AppError('Expiry date must be after start date', 400);
       }
 
       const voucher = await Voucher.create({
@@ -56,15 +61,17 @@ export class VoucherController {
         discountAmount,
         discountPercentage,
         discountType,
+        startDate: start,
         expiryDate: expiry,
         minPurchaseAmount: minPurchaseAmount || 0,
         maxDiscountAmount,
         usageLimit,
+        perCustomerLimit: perCustomerLimit || 1,
         applicableCategories: applicableCategories || [],
         applicableProducts: applicableProducts || [],
         description,
         usageCount: 0,
-        isActive: true
+        isActive: isActive !== undefined ? isActive : true
       });
 
       res.status(201).json({
@@ -83,19 +90,31 @@ export class VoucherController {
    */
   getAllVouchers = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
     try {
-      const { page = 1, limit = 10, code, isActive, sortBy = 'createdAt', sortOrder = 'desc' } = req.query;
+      const { page = 1, limit = 10, code, isActive, status, sortBy = 'createdAt', sortOrder = 'desc' } = req.query;
 
       const pageNum = parseInt(page as string) || 1;
       const limitNum = parseInt(limit as string) || 10;
       const skip = (pageNum - 1) * limitNum;
 
       const filter: any = {};
+      const now = new Date();
 
       if (code) {
         filter.code = { $regex: code as string, $options: 'i' };
       }
 
-      if (isActive !== undefined) {
+      if (status) {
+        if (status === 'active') {
+          filter.isActive = true;
+          filter.startDate = { $lte: now };
+          filter.expiryDate = { $gt: now };
+        } else if (status === 'scheduled') {
+          filter.isActive = true;
+          filter.startDate = { $gt: now };
+        } else if (status === 'expired') {
+          filter.expiryDate = { $lte: now };
+        }
+      } else if (isActive !== undefined) {
         filter.isActive = isActive === 'true';
       }
 
@@ -139,18 +158,13 @@ export class VoucherController {
 
       const now = new Date();
 
-      const vouchers = await Voucher.find({
-        isActive: true,
-        expiryDate: { $gt: now }
-      })
+      const activeFilter = { isActive: true, startDate: { $lte: now }, expiryDate: { $gt: now } };
+      const vouchers = await Voucher.find(activeFilter)
         .sort({ expiryDate: 1 })
         .skip(skip)
         .limit(limitNum);
 
-      const total = await Voucher.countDocuments({
-        isActive: true,
-        expiryDate: { $gt: now }
-      });
+      const total = await Voucher.countDocuments(activeFilter);
       const pages = Math.ceil(total / limitNum);
 
       res.status(200).json({
@@ -175,8 +189,9 @@ export class VoucherController {
   getVoucherByCode = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
     try {
       const { code } = req.params;
+      const escapedCode = code.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
-      const voucher = await Voucher.findOne({ code: code.toUpperCase() }).populate(
+      const voucher = await Voucher.findOne({ code: { $regex: new RegExp(`^${escapedCode}$`, 'i') } }).populate(
         'applicableProducts',
         'name price'
       );
@@ -195,14 +210,22 @@ export class VoucherController {
   };
 
   /**
-   * Get voucher by ID
+   * Get voucher by ID or code
    * GET /api/vouchers/:id
    */
   getVoucherById = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
     try {
       const { id } = req.params;
 
-      const voucher = await Voucher.findById(id).populate('applicableProducts', 'name price');
+      // Try by MongoDB ObjectId first, fallback to code search
+      let voucher = null;
+      if (id.match(/^[a-f\d]{24}$/i)) {
+        voucher = await Voucher.findById(id).populate('applicableProducts', 'name price');
+      }
+      if (!voucher) {
+        const escapedCode = id.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        voucher = await Voucher.findOne({ code: { $regex: new RegExp(`^${escapedCode}$`, 'i') } }).populate('applicableProducts', 'name price');
+      }
 
       if (!voucher) {
         throw new AppError('Voucher not found', 404);
@@ -225,15 +248,23 @@ export class VoucherController {
     try {
       const { code } = req.params;
       const { purchaseAmount, userId, productIds, categoryId } = req.body;
+      const escapedCode = code.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
-      const voucher = await Voucher.findOne({ code: code.toUpperCase() });
+      const voucher = await Voucher.findOne({ code: { $regex: new RegExp(`^${escapedCode}$`, 'i') } });
 
       if (!voucher) {
         throw new AppError('Voucher not found', 404);
       }
 
+      const now = new Date();
+
+      // Check if not yet started
+      if (now < voucher.startDate) {
+        throw new AppError('Voucher is not yet active', 400);
+      }
+
       // Check if expired
-      if (new Date() > voucher.expiryDate) {
+      if (now > voucher.expiryDate) {
         throw new AppError('Voucher has expired', 400);
       }
 
@@ -255,9 +286,13 @@ export class VoucherController {
         );
       }
 
-      // Check if user has already used this voucher
-      if (userId && voucher.usedBy?.includes(userId)) {
-        throw new AppError('You have already used this voucher', 400);
+      // Check per-customer usage limit
+      if (userId) {
+        const userUsageCount = voucher.usedBy?.filter((id) => id.toString() === userId).length || 0;
+        const perCustomerLimit = voucher.perCustomerLimit || 1;
+        if (userUsageCount >= perCustomerLimit) {
+          throw new AppError('You have reached the usage limit for this voucher', 400);
+        }
       }
 
       // Check applicable products
@@ -316,15 +351,23 @@ export class VoucherController {
       if (!userId) {
         throw new AppError('User not authenticated', 401);
       }
+      const escapedCode = code.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
-      const voucher = await Voucher.findOne({ code: code.toUpperCase() });
+      const voucher = await Voucher.findOne({ code: { $regex: new RegExp(`^${escapedCode}$`, 'i') } });
 
       if (!voucher) {
         throw new AppError('Voucher not found', 404);
       }
 
+      const now = new Date();
+
+      // Check if not yet started
+      if (now < voucher.startDate) {
+        throw new AppError('Voucher is not yet active', 400);
+      }
+
       // Check if expired
-      if (new Date() > voucher.expiryDate) {
+      if (now > voucher.expiryDate) {
         throw new AppError('Voucher has expired', 400);
       }
 
@@ -338,9 +381,11 @@ export class VoucherController {
         throw new AppError('Voucher usage limit reached', 400);
       }
 
-      // Check if user has already used this voucher
-       if (voucher.usedBy?.some((id) => id.toString() === userId)) {
-        throw new AppError('You have already used this voucher', 400);
+      // Check per-customer usage limit
+      const userUsageCount = voucher.usedBy?.filter((id) => id.toString() === userId).length || 0;
+      const perCustomerLimit = voucher.perCustomerLimit || 1;
+      if (userUsageCount >= perCustomerLimit) {
+        throw new AppError('You have reached the usage limit for this voucher', 400);
       }
 
       // Update voucher
@@ -369,7 +414,7 @@ export class VoucherController {
   updateVoucher = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
     try {
       const { id } = req.params;
-      const { discountAmount, discountPercentage, expiryDate, minPurchaseAmount, maxDiscountAmount, usageLimit, isActive, description } =
+      const { discountAmount, discountPercentage, startDate, expiryDate, minPurchaseAmount, maxDiscountAmount, usageLimit, perCustomerLimit, isActive, description } =
         req.body;
 
       const voucher = await Voucher.findById(id);
@@ -387,10 +432,12 @@ export class VoucherController {
         }
         updateData.discountPercentage = discountPercentage;
       }
+      if (startDate) updateData.startDate = new Date(startDate);
       if (expiryDate) updateData.expiryDate = new Date(expiryDate);
       if (minPurchaseAmount !== undefined) updateData.minPurchaseAmount = minPurchaseAmount;
       if (maxDiscountAmount !== undefined) updateData.maxDiscountAmount = maxDiscountAmount;
       if (usageLimit !== undefined) updateData.usageLimit = usageLimit;
+      if (perCustomerLimit !== undefined) updateData.perCustomerLimit = perCustomerLimit;
       if (isActive !== undefined) updateData.isActive = isActive;
       if (description !== undefined) updateData.description = description;
 
@@ -462,9 +509,13 @@ export class VoucherController {
    */
   getVoucherStats = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
     try {
-      const totalVouchers = await Voucher.countDocuments();
-      const activeVouchers = await Voucher.countDocuments({ isActive: true });
-      const expiredVouchers = await Voucher.countDocuments({ expiryDate: { $lt: new Date() } });
+      const now = new Date();
+      const [totalVouchers, activeVouchers, scheduledVouchers, expiredVouchers] = await Promise.all([
+        Voucher.countDocuments(),
+        Voucher.countDocuments({ isActive: true, startDate: { $lte: now }, expiryDate: { $gt: now } }),
+        Voucher.countDocuments({ isActive: true, startDate: { $gt: now } }),
+        Voucher.countDocuments({ expiryDate: { $lte: now } })
+      ]);
 
       const stats = await Voucher.aggregate([
         {
@@ -490,6 +541,7 @@ export class VoucherController {
         data: {
           totalVouchers,
           activeVouchers,
+          scheduledVouchers,
           expiredVouchers,
           totalUsage: stats[0]?.totalUsage || 0,
           avgUsage: Math.round(stats[0]?.avgUsage || 0),

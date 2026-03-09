@@ -19,7 +19,7 @@ export interface CartItem extends Product {
 interface CartContextType {
   cart: CartItem[];
   loading: boolean;
-  addToCart: (product: Product) => Promise<void>;
+  addToCart: (product: Product, quantity?: number, silent?: boolean) => Promise<void>;
   removeFromCart: (productId: string) => Promise<void>;
   updateQuantity: (productId: string, quantity: number) => Promise<void>;
   clearCart: (silent?: boolean) => Promise<void>;
@@ -109,13 +109,13 @@ export function CartProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const addToCart = async (product: Product) => {
+  const addToCart = async (product: Product, quantity: number = 1, silent: boolean = false) => {
     try {
       if (isAuthenticated) {
         setLoading(true);
         const apiCart = await cartService.addToCart({
           productId: product.id,
-          quantity: 1
+          quantity
         });
         console.log('API Cart response:', apiCart);
         if (apiCart && apiCart.items && Array.isArray(apiCart.items)) {
@@ -134,18 +134,18 @@ export function CartProvider({ children }: { children: ReactNode }) {
           if (existingItem) {
             newCart = prevCart.map((item) =>
               item.id === product.id
-                ? { ...item, quantity: item.quantity + 1 }
+                ? { ...item, quantity: item.quantity + quantity }
                 : item
             );
           } else {
-            newCart = [...prevCart, { ...product, quantity: 1 }];
+            newCart = [...prevCart, { ...product, quantity }];
           }
           saveLocalCart(newCart);
           return newCart;
         });
         toast.success('Added to cart');
       }
-      setIsCartOpen(true);
+      if (!silent) setIsCartOpen(true);
     } catch (error: any) {
       toast.error(error.response?.data?.message || 'Failed to add to cart');
       console.error('Error adding to cart:', error);
@@ -188,9 +188,12 @@ export function CartProvider({ children }: { children: ReactNode }) {
       return;
     }
 
+    // Optimistic update — apply immediately so the UI feels instant
+    const prevCart = cart;
+    setCart((prev) => prev.map((item) => item.id === productId ? { ...item, quantity } : item));
+
     try {
       if (isAuthenticated) {
-        setLoading(true);
         const apiCart = await cartService.updateCartItem(productId, { quantity });
         if (apiCart && apiCart.items && Array.isArray(apiCart.items)) {
           const localCart = apiCart.items
@@ -199,19 +202,16 @@ export function CartProvider({ children }: { children: ReactNode }) {
           setCart(localCart);
         }
       } else {
-        setCart((prevCart) => {
-          const newCart = prevCart.map((item) =>
-            item.id === productId ? { ...item, quantity } : item
-          );
-          saveLocalCart(newCart);
-          return newCart;
+        setCart((prev) => {
+          saveLocalCart(prev);
+          return prev;
         });
       }
     } catch (error: any) {
+      // Revert on failure
+      setCart(prevCart);
       toast.error(error.response?.data?.message || 'Failed to update cart');
       console.error('Error updating quantity:', error);
-    } finally {
-      setLoading(false);
     }
   };
 

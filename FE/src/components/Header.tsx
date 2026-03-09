@@ -1,9 +1,10 @@
-import { useState, useRef, useEffect } from 'react';
-import { Search, ShoppingCart, Leaf, Apple, Carrot, Wheat, Milk, Lightbulb, Gift, LogOut, Settings, X, Bell, ChevronDown } from 'lucide-react';
+import { useState, useRef, useEffect, useCallback } from 'react';
+import { Search, ShoppingCart, Leaf, Apple, Carrot, Wheat, Milk, Lightbulb, Gift, LogOut, Settings, X, Bell, ChevronDown, LayoutDashboard } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
 import { cn } from './ui/utils';
+import { productService, Product } from '../services/productService';
 
 
 interface DropdownItem {
@@ -64,9 +65,14 @@ export default function Header() {
   const [searchQuery, setSearchQuery] = useState('');
   const [userDropdownOpen, setUserDropdownOpen] = useState(false);
   const [notificationOpen, setNotificationOpen] = useState(false);
+  const [suggestions, setSuggestions] = useState<Product[]>([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [isSearching, setIsSearching] = useState(false);
   const userDropdownRef = useRef<HTMLDivElement>(null);
   const notificationRef = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const searchContainerRef = useRef<HTMLDivElement>(null);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     if (searchOpen && searchInputRef.current) {
@@ -74,11 +80,41 @@ export default function Header() {
     }
   }, [searchOpen]);
 
+  const fetchSuggestions = useCallback((query: string) => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    if (!query.trim()) {
+      setSuggestions([]);
+      setShowSuggestions(false);
+      return;
+    }
+    setIsSearching(true);
+    debounceRef.current = setTimeout(async () => {
+      try {
+        const res = await productService.getAllProducts({ search: query.trim(), limit: 5, isActive: true });
+        setSuggestions(res.data || []);
+        setShowSuggestions(true);
+      } catch {
+        setSuggestions([]);
+      } finally {
+        setIsSearching(false);
+      }
+    }, 300);
+  }, []);
+
   const handleSearchSubmit = (query: string) => {
     if (!query.trim()) return;
     navigate(`/products?search=${encodeURIComponent(query.trim())}`);
     setSearchOpen(false);
     setSearchQuery('');
+    setSuggestions([]);
+    setShowSuggestions(false);
+  };
+
+  const closeSearch = () => {
+    setSearchOpen(false);
+    setSearchQuery('');
+    setSuggestions([]);
+    setShowSuggestions(false);
   };
 
   // Close dropdowns on outside click
@@ -89,6 +125,9 @@ export default function Header() {
       }
       if (notificationRef.current && !notificationRef.current.contains(event.target as Node)) {
         setNotificationOpen(false);
+      }
+      if (searchContainerRef.current && !searchContainerRef.current.contains(event.target as Node)) {
+        setShowSuggestions(false);
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
@@ -283,6 +322,20 @@ export default function Header() {
 
                       {/* Menu Items */}
                       <div className="py-2">
+                        {user?.role === 'manager' && (
+                          <button
+                            onClick={() => { setUserDropdownOpen(false); navigate('/manager'); }}
+                            className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors group"
+                          >
+                            <div className="w-8 h-8 rounded-lg bg-gray-100 flex items-center justify-center group-hover:bg-emerald-100 transition-colors">
+                              <LayoutDashboard className="w-4 h-4 text-gray-600 group-hover:text-emerald-600 transition-colors" />
+                            </div>
+                            <div className="flex-1 text-left">
+                              <p className="font-medium">Manager Dashboard</p>
+                              <p className="text-xs text-gray-500">Go to manager portal</p>
+                            </div>
+                          </button>
+                        )}
                         <button
                           onClick={() => { setUserDropdownOpen(false); navigate(user?.role === 'admin' ? '/admin' : '/profile'); }}
                           className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors group"
@@ -317,35 +370,79 @@ export default function Header() {
                 </div>
               </>
             )}
-            <div className="relative flex items-center">
+            <div className="relative flex items-center" ref={searchContainerRef}>
               {searchOpen && (
-                <form
-                  onSubmit={(e) => { e.preventDefault(); handleSearchSubmit(searchQuery); }}
-                  className="absolute right-8 flex items-center animate-in slide-in-from-right-4 duration-200"
-                  style={{ width: '280px' }}
+                <div
+                  className="absolute right-8 animate-in slide-in-from-right-4 duration-200"
+                  style={{ width: '300px' }}
                 >
-                  <input
-                    ref={searchInputRef}
-                    type="text"
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    placeholder="Search products..."
-                    className="w-full pl-4 pr-8 py-2 text-sm border border-gray-200 rounded-lg bg-white shadow-md focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
-                    onKeyDown={(e) => {
-                      if (e.key === 'Escape') {
-                        setSearchOpen(false);
-                        setSearchQuery('');
-                      }
-                    }}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => { setSearchOpen(false); setSearchQuery(''); }}
-                    className="absolute right-2 p-0.5 text-gray-400 hover:text-gray-600"
+                  <form
+                    onSubmit={(e) => { e.preventDefault(); handleSearchSubmit(searchQuery); }}
+                    className="relative flex items-center"
                   >
-                    <X className="w-4 h-4" />
-                  </button>
-                </form>
+                    <input
+                      ref={searchInputRef}
+                      type="text"
+                      value={searchQuery}
+                      onChange={(e) => { setSearchQuery(e.target.value); fetchSuggestions(e.target.value); }}
+                      placeholder="Search products..."
+                      className="w-full pl-4 pr-8 py-2 text-sm border border-gray-200 rounded-lg bg-white shadow-md focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+                      onKeyDown={(e) => {
+                        if (e.key === 'Escape') closeSearch();
+                      }}
+                      autoComplete="off"
+                    />
+                    <button
+                      type="button"
+                      onClick={closeSearch}
+                      className="absolute right-2 p-0.5 text-gray-400 hover:text-gray-600"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </form>
+
+                  {/* Suggestions dropdown */}
+                  {showSuggestions && (suggestions.length > 0 || isSearching) && (
+                    <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-xl z-[200] overflow-hidden">
+                      {isSearching ? (
+                        <div className="px-4 py-3 text-sm text-gray-500 text-center">Đang tìm kiếm...</div>
+                      ) : (
+                        <>
+                          {suggestions.map((product) => (
+                            <button
+                              key={product._id}
+                              onMouseDown={(e) => e.preventDefault()}
+                              onClick={() => {
+                                navigate(`/products/${product._id}`);
+                                closeSearch();
+                              }}
+                              className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-emerald-50 transition-colors text-left border-b border-gray-50 last:border-0"
+                            >
+                              <img
+                                src={product.thumbnail}
+                                alt={product.name}
+                                className="w-10 h-10 rounded-lg object-cover flex-shrink-0 bg-gray-100"
+                              />
+                              <div className="flex-1 min-w-0">
+                                <p className="text-sm font-medium text-gray-900 truncate">{product.name}</p>
+                                <p className="text-xs text-emerald-600 font-semibold mt-0.5">
+                                  {product.price.toLocaleString('vi-VN')} ₫
+                                </p>
+                              </div>
+                            </button>
+                          ))}
+                          <button
+                            onMouseDown={(e) => e.preventDefault()}
+                            onClick={() => handleSearchSubmit(searchQuery)}
+                            className="w-full px-4 py-2.5 text-sm text-emerald-600 hover:bg-emerald-50 text-center border-t border-gray-100 font-medium"
+                          >
+                            Xem tất cả kết quả cho "{searchQuery}"
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  )}
+                </div>
               )}
 
               <button

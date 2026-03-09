@@ -25,6 +25,8 @@ export interface IUser extends Document {
   passwordResetExpires?: Date;
   walletBalance: number;
   firstTopupBonusClaimed: boolean;
+  failedLoginAttempts: number;
+  lockedUntil?: Date;
   createdAt: Date;
   updatedAt: Date;
   comparePassword(candidatePassword: string): Promise<boolean>;
@@ -106,6 +108,14 @@ const userSchema = new Schema<IUser>(
     firstTopupBonusClaimed: {
       type: Boolean,
       default: false
+    },
+    failedLoginAttempts: {
+      type: Number,
+      default: 0
+    },
+    lockedUntil: {
+      type: Date,
+      default: null
     }
   },
   {

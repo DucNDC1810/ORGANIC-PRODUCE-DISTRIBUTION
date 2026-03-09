@@ -7,6 +7,7 @@ import {
   LogOut,
   ChevronDown,
   Bell,
+  ArrowLeft,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useCart } from '../../context/CartContext';
@@ -91,6 +92,15 @@ export default function ManagerDashboard() {
         <div className="flex items-center justify-between h-16 px-6 max-w-[1920px] mx-auto">
           {/* Left Section */}
           <div className="flex items-center gap-4">
+            <button
+              onClick={() => navigate('/')}
+              className="flex items-center gap-2 px-3 py-2 text-sm text-gray-600 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-all duration-200 group"
+              aria-label="Back to home"
+            >
+              <ArrowLeft className="w-4 h-4 transition-transform group-hover:-translate-x-0.5" />
+              <span className="hidden sm:inline font-medium">Back to Home</span>
+            </button>
+            <div className="h-6 w-px bg-gray-200"></div>
             <button
               onClick={() => setSidebarOpen(!sidebarOpen)}
               className="flex items-center gap-3 cursor-pointer group relative"

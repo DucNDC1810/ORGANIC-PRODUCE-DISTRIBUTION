@@ -2,6 +2,7 @@ import { Response, NextFunction } from 'express';
 import mongoose from 'mongoose';
 import { User } from '../models/User.model';
 import { Order } from '../models/Order.model';
+import { Product } from '../models/Product.model';
 import { Transaction } from '../models/Transaction.model';
 import momoService from '../services/momo.service';
 import { AuthRequest } from '../middlewares/auth.middleware';
@@ -71,7 +72,7 @@ export class WalletController {
         amount: Math.floor(amount),
         type: 'topup',
         status: 'pending',
-        description: `Nạp tiền vào ví FreshMarket`,
+        description: `Top-up to FreshMarket Wallet`,
         metadata: safeGroupId ? { groupId: safeGroupId } : {}
       });
 
@@ -159,6 +160,26 @@ export class WalletController {
         throw new AppError('Total amount must be a positive number', 400);
       }
 
+      // 0. Validate and deduct product stock
+      const productIds = items.map((item: any) => item.productId);
+      const products = await Product.find({ _id: { $in: productIds } }).session(session);
+      for (const item of items) {
+        const product = products.find((p: any) => p._id.toString() === item.productId?.toString());
+        if (!product) {
+          throw new AppError(`Product not found: ${item.productId}`, 404);
+        }
+        if (product.stock < item.quantity) {
+          throw new AppError(`Product "${product.name}" has insufficient stock. Available: ${product.stock}, Requested: ${item.quantity}`, 400);
+        }
+      }
+      const stockDeductOps = items.map((item: any) => ({
+        updateOne: {
+          filter: { _id: item.productId, stock: { $gte: item.quantity } },
+          update: { $inc: { stock: -item.quantity } }
+        }
+      }));
+      await Product.bulkWrite(stockDeductOps, { session });
+
       // 1. Kiểm tra và trừ số dư ví (atomic với $inc)
       const updatedUser = await User.findOneAndUpdate(
         {
@@ -213,7 +234,7 @@ export class WalletController {
             type: 'payment',
             status: 'success',
             orderId: order._id,
-            description: `Thanh toán đơn hàng #${order._id}`
+            description: `Payment for order #${order._id}`
           }
         ],
         { session }
@@ -296,7 +317,7 @@ export class WalletController {
 
       // 5. Ghi transaction cho người nhận (refund/receive)
       await Transaction.create(
-        [{ userId: toUserId, amount, type: 'refund', status: 'success', description: `Nhận tiền từ ${updatedSender.name}` }],
+        [{ userId: toUserId, amount, type: 'refund', status: 'success', description: `Received from ${updatedSender.name}` }],
         { session }
       );
 
@@ -422,7 +443,7 @@ export class WalletController {
                 amount: FIRST_TOPUP_BONUS,
                 type: 'bonus',
                 status: 'success',
-                description: 'Thưởng nạp tiền lần đầu +10.000₫'
+                description: 'First top-up bonus (+10,000₫)'
               }],
               { session }
             );

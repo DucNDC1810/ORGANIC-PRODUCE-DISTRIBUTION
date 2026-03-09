@@ -8,11 +8,13 @@ export interface Voucher {
   discountAmount?: number;
   discountPercentage?: number;
   discountType: 'fixed' | 'percentage';
+  startDate: string;
   expiryDate: string;
   minPurchaseAmount?: number;
   maxDiscountAmount?: number;
   usageLimit?: number;
   usageCount: number;
+  perCustomerLimit?: number;
   usedBy?: string[];
   applicableCategories?: string[];
   applicableProducts?: string[];
@@ -27,22 +29,27 @@ export interface CreateVoucherPayload {
   discountAmount?: number;
   discountPercentage?: number;
   discountType: 'fixed' | 'percentage';
+  startDate?: string;
   expiryDate: string;
   minPurchaseAmount?: number;
   maxDiscountAmount?: number;
   usageLimit?: number;
+  perCustomerLimit?: number;
   applicableCategories?: string[];
   applicableProducts?: string[];
   description?: string;
+  isActive?: boolean;
 }
 
 export interface UpdateVoucherPayload {
   discountAmount?: number;
   discountPercentage?: number;
+  startDate?: string;
   expiryDate?: string;
   minPurchaseAmount?: number;
   maxDiscountAmount?: number;
   usageLimit?: number;
+  perCustomerLimit?: number;
   isActive?: boolean;
   description?: string;
 }
@@ -81,56 +88,85 @@ export interface ValidateVoucherResponse {
   };
 }
 
+export interface VoucherStats {
+  totalVouchers: number;
+  activeVouchers: number;
+  scheduledVouchers: number;
+  expiredVouchers: number;
+  totalUsage: number;
+  avgUsage: number;
+  byDiscountType: { _id: string; count: number }[];
+}
+
+export interface VoucherStatsResponse {
+  success: boolean;
+  data: VoucherStats;
+}
+
 // ===== API CALLS =====
+// NOTE: axios interceptor returns response.data directly, so res = JSON body.
+// e.g. for GET /vouchers: res = { success, data: Voucher[], pagination }
+// Access pattern: res.data (NOT res.data.data)
 
 export const voucherService = {
   // Create voucher (admin)
-  createVoucher: (payload: CreateVoucherPayload) =>
-    api.post<VoucherResponse>('/vouchers', payload),
+  async createVoucher(payload: CreateVoucherPayload): Promise<VoucherResponse> {
+    const res: any = await api.post('/vouchers', payload);
+    return res;
+  },
 
   // Get all vouchers
-  getAllVouchers: (page = 1, limit = 10, code?: string, isActive?: boolean) =>
-    api.get<VouchersResponse>('/vouchers', {
-      params: { page, limit, code, isActive }
-    }),
+  async getAllVouchers(page = 1, limit = 10, code?: string, isActive?: boolean, status?: string): Promise<VouchersResponse> {
+    const res: any = await api.get('/vouchers', { params: { page, limit, code, isActive, status } });
+    return res;
+  },
 
   // Get active vouchers
-  getActiveVouchers: (page = 1, limit = 10) =>
-    api.get<VouchersResponse>('/vouchers/active', {
-      params: { page, limit }
-    }),
-
-  // Get voucher by code
-  getVoucherByCode: (code: string) =>
-    api.get<VoucherResponse>(`/vouchers/${code}`),
+  async getActiveVouchers(page = 1, limit = 10): Promise<VouchersResponse> {
+    const res: any = await api.get('/vouchers/active', { params: { page, limit } });
+    return res;
+  },
 
   // Get voucher by ID
-  getVoucherById: (id: string) =>
-    api.get<VoucherResponse>(`/vouchers/${id}`),
+  async getVoucherById(id: string): Promise<VoucherResponse> {
+    const res: any = await api.get(`/vouchers/${id}`);
+    return res;
+  },
 
   // Validate voucher (check if can use)
-  validateVoucher: (code: string, payload: ValidateVoucherPayload) =>
-    api.post<ValidateVoucherResponse>(`/vouchers/${code}/validate`, payload),
+  async validateVoucher(code: string, payload: ValidateVoucherPayload): Promise<ValidateVoucherResponse> {
+    const res: any = await api.post(`/vouchers/${code}/validate`, payload);
+    return res;
+  },
 
   // Apply voucher (use voucher)
-  applyVoucher: (code: string) =>
-    api.post<VoucherResponse>(`/vouchers/${code}/apply`, {}),
+  async applyVoucher(code: string): Promise<VoucherResponse> {
+    const res: any = await api.post(`/vouchers/${code}/apply`, {});
+    return res;
+  },
 
   // Update voucher (admin)
-  updateVoucher: (id: string, payload: UpdateVoucherPayload) =>
-    api.patch<VoucherResponse>(`/vouchers/${id}`, payload),
+  async updateVoucher(id: string, payload: UpdateVoucherPayload): Promise<VoucherResponse> {
+    const res: any = await api.patch(`/vouchers/${id}`, payload);
+    return res;
+  },
 
   // Deactivate voucher (admin)
-  deactivateVoucher: (id: string) =>
-    api.patch<VoucherResponse>(`/vouchers/${id}/deactivate`, {}),
+  async deactivateVoucher(id: string): Promise<VoucherResponse> {
+    const res: any = await api.patch(`/vouchers/${id}/deactivate`, {});
+    return res;
+  },
 
   // Delete voucher (admin)
-  deleteVoucher: (id: string) =>
-    api.delete(`/vouchers/${id}`),
+  async deleteVoucher(id: string): Promise<void> {
+    await api.delete(`/vouchers/${id}`);
+  },
 
   // Get voucher statistics (admin)
-  getVoucherStats: () =>
-    api.get('/vouchers/stats/summary')
+  async getVoucherStats(): Promise<VoucherStatsResponse> {
+    const res: any = await api.get('/vouchers/stats/summary');
+    return res;
+  },
 };
 
 export default voucherService;

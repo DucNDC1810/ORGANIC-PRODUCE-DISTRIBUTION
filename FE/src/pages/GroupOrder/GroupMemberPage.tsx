@@ -197,6 +197,7 @@ export default function GroupMemberPage() {
   const [error,           setError]           = useState("");
   const [myCart,          setMyCart]          = useState<GroupCartItem[]>([]);
   const [confirming,      setConfirming]      = useState(false);
+  const [unconfirming,    setUnconfirming]    = useState(false);
   const [leaving,         setLeaving]         = useState(false);
   const [expandedMember,  setExpandedMember]  = useState<string | null>(null);
 
@@ -313,7 +314,6 @@ export default function GroupMemberPage() {
       const tierIdx      = TIERS.reduce((acc, t, i) => (orderedCount >= t.members ? i : acc), -1);
       const pct          = tierIdx >= 0 ? TIERS[tierIdx].pct : 0;
 
-      clearGroupSession();
       navigate("/group-order/success", {
         replace: true,
         state: {
@@ -327,6 +327,7 @@ export default function GroupMemberPage() {
           groupTotal:       data.total,
         },
       });
+      clearGroupSession();
     });
 
     return () => { socket.disconnect(); };
@@ -369,6 +370,20 @@ export default function GroupMemberPage() {
       toast.error("An error occurred. Please try again.");
     } finally {
       setConfirming(false);
+    }
+  };
+
+  // ── Unconfirm (edit items) ─────────────────────────────────────────────────
+  const handleUnconfirm = async () => {
+    if (!groupId || !memberId) return;
+    setUnconfirming(true);
+    try {
+      await groupService.setMemberReady(groupId, memberId, false);
+      toast.info("You can now edit your items.");
+    } catch {
+      toast.error("An error occurred. Please try again.");
+    } finally {
+      setUnconfirming(false);
     }
   };
 
@@ -1147,12 +1162,27 @@ export default function GroupMemberPage() {
 
           {/* ── Confirm / Already ready ── */}
           {isReady ? (
-            <div className="bg-green-50 border border-green-200 rounded-2xl p-4 flex items-center gap-3">
-              <CheckCircle2 className="w-7 h-7 text-green-500 flex-shrink-0" />
-              <div>
-                <p className="text-sm font-bold text-green-700">You're done!</p>
-                <p className="text-xs text-green-600 mt-0.5">Waiting for the owner to place the order...</p>
+            <div className="space-y-2">
+              <div className="bg-green-50 border border-green-200 rounded-2xl p-4 flex items-center gap-3">
+                <CheckCircle2 className="w-7 h-7 text-green-500 flex-shrink-0" />
+                <div className="flex-1">
+                  <p className="text-sm font-bold text-green-700">You're done!</p>
+                  <p className="text-xs text-green-600 mt-0.5">Waiting for the owner to place the order...</p>
+                </div>
               </div>
+              {!myMember?.walletPaid && !isLocked && (
+                <button
+                  onClick={handleUnconfirm}
+                  disabled={unconfirming}
+                  className="w-full py-2.5 rounded-2xl border border-gray-200 text-gray-500 text-sm font-medium hover:bg-gray-50 transition-colors flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
+                >
+                  {unconfirming ? (
+                    <><RefreshCw className="w-4 h-4 animate-spin" /> Updating...</>
+                  ) : (
+                    <><Minus className="w-4 h-4" /> Edit items</>
+                  )}
+                </button>
+              )}
             </div>
           ) : (
             <>

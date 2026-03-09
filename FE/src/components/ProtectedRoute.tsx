@@ -27,7 +27,7 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
 
   // Not authenticated - redirect to login
   if (!isAuthenticated || !user) {
-    toast.error('Vui lòng đăng nhập để tiếp tục.');
+    toast.error('Please log in to continue.');
     return <Navigate to={redirectTo} replace />;
   }
 
