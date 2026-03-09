@@ -74,6 +74,8 @@ export default function MiniCart() {
     if (e.key === 'Escape') { setEditingQtyId(null); setEditingQtyValue(''); return; }
   };
   // ─────────────────────────────────────────────────────────────────────
+  const { cart, isCartOpen, closeCart, updateQuantity, removeFromCart, getTotalPrice, getTotalItems } = useCart();
+  const fmt = (n: number) => n.toLocaleString('vi-VN') + ' ₫';
 
   return (
     <AnimatePresence>
@@ -243,11 +245,11 @@ export default function MiniCart() {
                           {/* Price */}
                           <div className="text-right">
                             <div className="font-semibold text-primary">
-                              ${(item.price * item.quantity).toFixed(2)}
+                              {fmt(item.price * item.quantity)}
                             </div>
                             {item.quantity > 1 && (
                               <div className="text-xs text-muted-foreground">
-                                ${item.price.toFixed(2)} each
+                                {fmt(item.price)} / sản phẩm
                               </div>
                             )}
                           </div>

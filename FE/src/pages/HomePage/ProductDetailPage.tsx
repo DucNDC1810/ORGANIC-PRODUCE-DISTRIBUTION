@@ -272,11 +272,11 @@ export default function ProductDetailPage() {
               {/* Price */}
               <div className="flex items-baseline gap-3">
                 <span className="text-3xl font-bold text-emerald-600">
-                  ${selectedProduct.price.toFixed(2)}
+                  {selectedProduct.price.toLocaleString('vi-VN')} ₫
                 </span>
                 {selectedProduct.originalPrice && selectedProduct.originalPrice > selectedProduct.price && (
                   <span className="text-xl text-gray-400 line-through">
-                    ${selectedProduct.originalPrice.toFixed(2)}
+                    {selectedProduct.originalPrice.toLocaleString('vi-VN')} ₫
                   </span>
                 )}
                 <span className="text-gray-500">/ {selectedProduct.unit || 'unit'}</span>

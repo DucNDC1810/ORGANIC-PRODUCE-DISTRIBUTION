@@ -5,6 +5,7 @@ import { motion } from 'framer-motion';
 import { useCart } from '../../context/CartContext';
 import { ImageWithFallback } from '../../components/figma/ImageWithFallback';
 import Header from '../../components/Header';
+import { formatVND } from '../../utils/formatCurrency';
 
 const QTY_MAX = 999;
 
@@ -223,11 +224,11 @@ export default function CartPage() {
                           {/* Price */}
                           <div className="text-right">
                             <div className="text-2xl font-bold text-primary">
-                              ${(item.price * item.quantity).toFixed(2)}
+                              {formatVND(item.price * item.quantity)}
                             </div>
                             {item.quantity > 1 && (
                               <div className="text-sm text-muted-foreground">
-                                ${item.price.toFixed(2)} each
+                                {formatVND(item.price)} / sản phẩm
                               </div>
                             )}
                           </div>
@@ -254,28 +255,28 @@ export default function CartPage() {
                   <div className="space-y-3 py-4 border-y border-border">
                     <div className="flex justify-between text-foreground">
                       <span>Subtotal</span>
-                      <span className="font-medium">${subtotal.toFixed(2)}</span>
+                      <span className="font-medium">{formatVND(subtotal)}</span>
                     </div>
                     <div className="flex justify-between text-foreground">
                       <span>Shipping</span>
                       <span className="font-medium">
                         {shipping === 0 ? (
-                          <span className="text-primary">Free</span>
+                          <span className="text-primary">Miễn phí</span>
                         ) : (
-                          `$${shipping.toFixed(2)}`
+                          formatVND(shipping)
                         )}
                       </span>
                     </div>
                     <div className="flex justify-between text-foreground">
-                      <span>Tax</span>
-                      <span className="font-medium">${tax.toFixed(2)}</span>
+                      <span>Thuế</span>
+                      <span className="font-medium">{formatVND(tax)}</span>
                     </div>
                   </div>
 
                   {/* Total */}
                   <div className="flex justify-between items-center py-2">
                     <span className="text-lg font-semibold text-foreground">Total</span>
-                    <span className="text-3xl font-bold text-primary">${total.toFixed(2)}</span>
+                    <span className="text-3xl font-bold text-primary">{formatVND(total)}</span>
                   </div>
 
                   {/* Free Shipping Message */}
@@ -285,7 +286,7 @@ export default function CartPage() {
                         <Truck className="w-5 h-5 text-primary flex-shrink-0 mt-0.5" />
                         <div className="text-sm">
                           <span className="font-medium text-secondary-foreground">
-                            Add ${(50 - subtotal).toFixed(2)} more for free shipping!
+                            Thêm {formatVND(50 - subtotal)} nữa để được miễn phí vận chuyển!
                           </span>
                         </div>
                       </div>
