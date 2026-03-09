@@ -130,17 +130,17 @@ export default function MiniCart() {
                   />
                   <span className="text-xs font-medium text-muted-foreground">
                     {allSelected
-                      ? 'Bỏ chọn tất cả'
+                      ? 'clear all'
                       : someSelected
-                        ? `Đã chọn ${selectedItems.length}/${cart.length}`
-                        : 'Chọn tất cả'}
+                        ? `selected ${selectedItems.length}/${cart.length}`
+                        : 'delete all'}
                   </span>
                 </label>
                 <button
                   onClick={() => clearCart()}
                   className="text-xs text-destructive hover:text-destructive/80 font-medium transition-colors"
                 >
-                  Xóa tất cả
+                  Clear all
                 </button>
               </div>
             )}
