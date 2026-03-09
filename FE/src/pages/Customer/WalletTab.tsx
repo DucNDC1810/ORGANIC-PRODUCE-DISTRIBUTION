@@ -36,8 +36,14 @@ function txColor(type: Transaction['type']) {
   return type === 'payment' ? 'text-red-600' : 'text-emerald-600';
 }
 
-function resolveOrderId(orderId: any): string | null {
-  if (!orderId) return null;
+function resolveOrderId(orderId: any, description?: string): string | null {
+  if (!orderId) {
+    if (description) {
+      const match = description.match(/#([a-f0-9]{24})/i);
+      if (match) return match[1].slice(-8);
+    }
+    return null;
+  }
   if (typeof orderId === 'string') return orderId.slice(-8);
   if (typeof orderId === 'object' && orderId._id) return String(orderId._id).slice(-8);
   return String(orderId).slice(-8);
@@ -49,7 +55,7 @@ function txLabel(tx: Transaction) {
   if (tx.type === 'payment') {
     const desc = tx.description ?? '';
     const isGroup = /nh.m/i.test(desc);
-    const oid = resolveOrderId(tx.orderId);
+    const oid = resolveOrderId(tx.orderId, desc);
     if (isGroup) return `Group order payment${oid ? ` #${oid}` : ''}`;
     return `Payment for order${oid ? ` #${oid}` : ''}`;
   }
