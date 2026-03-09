@@ -15,7 +15,8 @@ import {
   User,
   Navigation2,
   Store,
-  Repeat
+  Repeat,
+  MessageSquare
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import Header from '../../components/Header';
@@ -85,6 +86,7 @@ export default function OrderSuccessPage() {
           const walletOrderId = location.state.orderId;
           const stateDeliveryInfo = location.state.deliveryInfo || null;
           const statePickupLocation = location.state.pickupLocation || null;
+          const stateNotes = location.state.notes || null;
           setOrderData({
             orderId: walletOrderId,
             amount: location.state.totalAmount,
@@ -92,6 +94,7 @@ export default function OrderSuccessPage() {
             deliveryInfo: stateDeliveryInfo,
             pickupLocation: statePickupLocation,
             walletBalance: location.state.walletBalance,
+            notes: stateNotes,
           });
           if (walletOrderId) {
             try {
@@ -105,6 +108,7 @@ export default function OrderSuccessPage() {
                   deliveryInfo: (order as any).deliveryInfo || stateDeliveryInfo,
                   pickupLocation: (order as any).pickupLocation || statePickupLocation,
                   walletBalance: location.state.walletBalance,
+                  notes: order.notes || stateNotes,
                 });
               }
             } catch {
@@ -129,12 +133,14 @@ export default function OrderSuccessPage() {
           // Seed immediately from navigate state so the page renders right away
           const stateDeliveryInfo = location.state.deliveryInfo || null;
           const statePickupLocation = location.state.pickupLocation || null;
+          const stateNotes = location.state.notes || null;
           setOrderData({
             orderId: codOrderId,
             amount: location.state.totalAmount,
             paymentMethod: "COD",
             deliveryInfo: stateDeliveryInfo,
             pickupLocation: statePickupLocation,
+            notes: stateNotes,
           });
 
           // Also fetch full order from DB to confirm and fill any missing fields
@@ -151,6 +157,7 @@ export default function OrderSuccessPage() {
                   paymentMethod: "COD",
                   deliveryInfo: dbDeliveryInfo,
                   pickupLocation: (order as any).pickupLocation || statePickupLocation,
+                  notes: order.notes || stateNotes,
                 });
               }
             } catch {
@@ -580,6 +587,15 @@ export default function OrderSuccessPage() {
                             </div>
                           </div>
                         )}
+                        {orderData?.notes && (
+                          <div className="flex items-start gap-3">
+                            <MessageSquare className="w-5 h-5 text-primary flex-shrink-0 mt-0.5" />
+                            <div>
+                              <div className="text-muted-foreground">Order Notes</div>
+                              <div className="text-foreground font-medium">{orderData.notes}</div>
+                            </div>
+                          </div>
+                        )}
                       </div>
                     </div>
                   )}
@@ -609,15 +625,7 @@ export default function OrderSuccessPage() {
                     </div>
                   </div>
 
-                  {/* Notes */}
-                  {orderData?.notes && (
-                    <div className="pt-4 border-t border-border">
-                      <h3 className="font-semibold text-foreground mb-2">Notes</h3>
-                      <p className="text-muted-foreground text-sm italic">
-                        {orderData.notes}
-                      </p>
-                    </div>
-                  )}
+
                 </div>
               </div>
             </motion.div>

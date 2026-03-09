@@ -624,6 +624,7 @@ export default function CheckoutPage() {
               orderId: result?._id || result?.data?._id,
               paymentMethod: "COD",
               totalAmount: total,
+              notes: formData.notes || null,
               isRecurring: isRecurringOrder,
               subscriptionConfig: isRecurringOrder ? buildSubscriptionPayload() : null,
               deliveryType,
@@ -710,6 +711,7 @@ export default function CheckoutPage() {
             paymentMethod: "Wallet",
             walletBalance: newBalance,
             totalAmount: total,
+            notes: formData.notes || null,
             deliveryType,
             pickupLocation:
               deliveryType === "pickup" && selectedStore
