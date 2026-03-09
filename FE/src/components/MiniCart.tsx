@@ -74,7 +74,6 @@ export default function MiniCart() {
     if (e.key === 'Escape') { setEditingQtyId(null); setEditingQtyValue(''); return; }
   };
   // ─────────────────────────────────────────────────────────────────────
-  const { cart, isCartOpen, closeCart, updateQuantity, removeFromCart, getTotalPrice, getTotalItems } = useCart();
   const fmt = (n: number) => n.toLocaleString('vi-VN') + ' ₫';
 
   return (
