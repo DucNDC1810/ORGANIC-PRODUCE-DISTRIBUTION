@@ -8,7 +8,6 @@ import {
   Check,
   Share2,
   ShoppingCart,
-  Clock,
   ChevronRight,
   Trash2,
   Plus,
