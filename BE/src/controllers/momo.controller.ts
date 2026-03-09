@@ -52,10 +52,10 @@ export class MoMoController {
           for (const item of orderItems) {
             const product = products.find(p => p._id.toString() === item.productId?.toString());
             if (!product) {
-              throw new AppError(`Sản phẩm không tồn tại: ${item.productId}`, 404);
+              throw new AppError(`Product not found: ${item.productId}`, 404);
             }
             if (product.stock < item.quantity) {
-              throw new AppError(`Sản phẩm "${product.name}" không đủ hàng. Tồn kho: ${product.stock}, Yêu cầu: ${item.quantity}`, 400);
+              throw new AppError(`Product "${product.name}" has insufficient stock. Available: ${product.stock}, Requested: ${item.quantity}`, 400);
             }
           }
           const stockDeductOps = orderItems.map((item: any) => ({

@@ -60,12 +60,12 @@ export class GroupController {
       const groupId = req.params.id;
       const userId = req.user?.id;
 
-      if (!userId) throw new AppError('Unauthorized – vui lòng đăng nhập', 401);
+      if (!userId) throw new AppError('Unauthorized – Please log in', 401);
 
       // Kiểm tra nhóm tồn tại
       const group = await groupService.getGroupById(groupId);
-      if (!group) throw new AppError('Không tìm thấy nhóm', 404);
-      if (group.status !== 'active') throw new AppError('Nhóm đã đóng', 400);
+      if (!group) throw new AppError('Group not found', 404);
+      if (group.status !== 'active') throw new AppError('Group is closed', 400);
 
       const member = await groupService.joinGroup(groupId, userId);
 
