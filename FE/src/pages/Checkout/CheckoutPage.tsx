@@ -76,6 +76,53 @@ export default function CheckoutPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
+  // ── Click-to-edit quantity ─────────────────────────────────────────────
+  const QTY_MAX = 99;
+  const [editingQtyId, setEditingQtyId] = useState<string | null>(null);
+  const [editingQtyValue, setEditingQtyValue] = useState<string>("");
+
+  const commitQtyEdit = async (itemId: string) => {
+    const parsed = parseInt(editingQtyValue, 10);
+    // Empty / 0 / negative → clamp to 1; above max → clamp to QTY_MAX
+    const newQty = isNaN(parsed) || parsed < 1 ? 1 : Math.min(parsed, QTY_MAX);
+    setEditingQtyId(null);
+    setEditingQtyValue("");
+    await handleUpdateQuantity(itemId, newQty);
+  };
+
+  const handleQtyKeyDown = (e: React.KeyboardEvent<HTMLInputElement>, _itemId: string) => {
+    // Hard-block non-integer characters
+    if (["e", "E", "+", "-", "."].includes(e.key)) {
+      e.preventDefault();
+      return;
+    }
+    if (e.key === "Enter") {
+      (e.target as HTMLInputElement).blur();
+      return;
+    }
+    if (e.key === "Escape") {
+      setEditingQtyId(null);
+      setEditingQtyValue("");
+      return;
+    }
+  };
+
+  const handleQtyPaste = (e: React.ClipboardEvent<HTMLInputElement>) => {
+    const pasted = e.clipboardData.getData("text");
+    // Only allow strings that are purely digits (no letters, decimals, signs)
+    if (!/^\d+$/.test(pasted)) {
+      e.preventDefault();
+    }
+  };
+
+  const handleQtyChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const raw = e.target.value;
+    // Strip any non-digit characters that might slip through
+    const digitsOnly = raw.replace(/\D/g, "");
+    setEditingQtyValue(digitsOnly);
+  };
+  // ──────────────────────────────────────────────────────────────────────
+
   // Auto-dismiss toast after 4 seconds
   useEffect(() => {
     if (!error) return;
@@ -1364,9 +1411,33 @@ export default function CheckoutPage() {
                             >
                               <Minus className="w-3 h-3" />
                             </button>
-                            <span className="text-xs font-medium px-2">
-                              {item.quantity}
-                            </span>
+                            {editingQtyId === item.id ? (
+                              <input
+                                type="text"
+                                inputMode="numeric"
+                                pattern="[0-9]*"
+                                maxLength={2}
+                                value={editingQtyValue}
+                                autoFocus
+                                onFocus={(e) => e.target.select()}
+                                onChange={handleQtyChange}
+                                onBlur={() => commitQtyEdit(item.id)}
+                                onKeyDown={(e) => handleQtyKeyDown(e, item.id)}
+                                onPaste={handleQtyPaste}
+                                className="w-8 text-xs font-medium text-center bg-transparent outline-none border-none"
+                              />
+                            ) : (
+                              <span
+                                className="text-xs font-medium px-2 hover:bg-gray-100 cursor-text rounded"
+                                onClick={() => {
+                                  setEditingQtyId(item.id);
+                                  setEditingQtyValue(String(item.quantity));
+                                }}
+                                title="Click to edit quantity"
+                              >
+                                {item.quantity}
+                              </span>
+                            )}
                             <button 
                               onClick={() => handleUpdateQuantity(item.id, item.quantity + 1)}
                               className="w-6 h-6 flex items-center justify-center hover:bg-gray-50 transition-colors"
