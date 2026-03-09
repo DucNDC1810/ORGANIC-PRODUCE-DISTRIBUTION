@@ -253,7 +253,7 @@ export class MoMoController {
                   amount: FIRST_TOPUP_BONUS,
                   type: 'bonus',
                   status: 'success',
-                  description: 'Thưởng nạp tiền lần đầu +10.000₫'
+                  description: 'First top-up bonus (+10,000₫)'
                 }],
                 { session }
               );
