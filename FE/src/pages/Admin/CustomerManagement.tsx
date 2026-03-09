@@ -261,9 +261,6 @@ export default function CustomerManagement() {
     if (!/[A-Z]/.test(password)) {
       return 'Password must contain at least one uppercase letter';
     }
-    if (!/[a-z]/.test(password)) {
-      return 'Password must contain at least one lowercase letter';
-    }
     if (!/[0-9]/.test(password)) {
       return 'Password must contain at least one number';
     }
@@ -806,7 +803,7 @@ export default function CustomerManagement() {
                         setPasswordStrength(calculatePasswordStrength(e.target.value));
                       }} 
                       className="pl-10 pr-10 border-gray-300 focus:border-green-500 focus:ring-green-500 transition-all"
-                      placeholder="Min 6 chars, 1 uppercase, 1 number"
+                      placeholder="Min 6 chars, 1 UPPERCASE, 1 number"
                       type={showCreatePassword ? 'text' : 'password'}
                       required
                     />
@@ -836,7 +833,7 @@ export default function CustomerManagement() {
                           {passwordStrength.text}
                         </span>
                       </div>
-                      <p className="text-xs text-gray-500">Use uppercase, lowercase, numbers & symbols</p>
+                      <p className="text-xs text-gray-500">Use UPPERCASE letters, numbers & symbols for stronger password</p>
                     </div>
                   )}
                 </div>

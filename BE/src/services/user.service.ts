@@ -129,7 +129,14 @@ export class UserService {
       throw new AppError('Email already exists', 400);
     }
     
-    const user = await User.create(userData);
+    // When admin creates user, automatically verify email and activate account
+    const userDataWithDefaults = {
+      ...userData,
+      isEmailVerified: true,
+      isActive: true,
+    };
+    
+    const user = await User.create(userDataWithDefaults);
     return user;
   }
 
