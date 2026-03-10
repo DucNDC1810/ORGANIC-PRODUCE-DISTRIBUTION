@@ -1,12 +1,11 @@
 import { useState, useEffect } from 'react';
-import { Search, Filter, ChevronDown, X, ShoppingBag } from 'lucide-react';
-import { useSearchParams, useNavigate } from 'react-router-dom';
+import { Search, Filter, ChevronDown, X } from 'lucide-react';
+import { useSearchParams } from 'react-router-dom';
 import Header from '../../components/Header';
 import ProductCard from '../../components/ProductCard';
 import { useProducts } from '../../hooks/useProducts';
 import { Input } from '../../components/ui/input';
 import { Button } from '../../components/ui/button';
-import { useGroup } from '../../context/GroupContext';
 import {
   Select,
   SelectContent,
@@ -17,9 +16,7 @@ import {
 
 export default function ProductsPage() {
   const [searchParams, setSearchParams] = useSearchParams();
-  const navigate = useNavigate();
   const { products, loading, error, fetchProducts, pagination } = useProducts();
-  const { groupSession, clearGroupSession } = useGroup();
   
   // Initialize state from URL params
   const [searchTerm, setSearchTerm] = useState(searchParams.get('search') || '');
