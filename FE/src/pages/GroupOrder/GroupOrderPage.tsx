@@ -57,10 +57,14 @@ export default function GroupOrderPage() {
         paymentOption: paymentMode,
         timeLimit: null,
       });
+      // Fetch owner's GroupMember record to get memberId (needed for Add to Group on product pages)
+      const members = await groupService.getMembers(group._id);
+      const ownerMember = members.find((m) => m.role === 'owner');
       setGroupSession({
         groupId: group._id,
         groupName,
         role: 'owner',
+        memberId: ownerMember?._id,
       });
       navigate("/group-order/active", {
         state: { groupName, cartItems: passedCartItems, groupId: group._id, paymentOption: paymentMode },
