@@ -226,7 +226,7 @@ function getMemberAvatar(idx: number): string {
 export default function GroupOrderActivePage() {
   const navigate  = useNavigate();
   const location  = useLocation();
-  const { groupSession } = useGroup();
+  const { groupSession, clearGroupSession } = useGroup();
   const groupName = (location.state as any)?.groupName ?? groupSession?.groupName ?? "Group Order";
   const groupId   = ((location.state as any)?.groupId as string | undefined) ?? groupSession?.groupId;
 
@@ -487,6 +487,7 @@ export default function GroupOrderActivePage() {
           ownerCart:           cart.map((i) => ({ name: i.name, price: i.price, qty: i.qty, image: i.image })),
         },
       });
+      clearGroupSession();
     } catch (err: any) {
       const msg = err?.response?.data?.message || "Failed to place order. Please try again."; 
       toast.error(msg);
@@ -506,6 +507,7 @@ export default function GroupOrderActivePage() {
         ? "Group order deleted successfully."
         : "Group order cancelled. Deposits have been refunded to all members."; 
       toast.success(msg, { duration: 6000 });
+      clearGroupSession();
       navigate("/checkout");
     } catch (err: any) {
       const msg = err?.response?.data?.message || "Cancellation failed. Please try again."; 
