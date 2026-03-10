@@ -226,7 +226,7 @@ function getMemberAvatar(idx: number): string {
 export default function GroupOrderActivePage() {
   const navigate  = useNavigate();
   const location  = useLocation();
-  const { groupSession } = useGroup();
+  const { groupSession, setGroupSession, clearGroupSession } = useGroup();
   const groupName = (location.state as any)?.groupName ?? groupSession?.groupName ?? "Group Order";
   const groupId   = ((location.state as any)?.groupId as string | undefined) ?? groupSession?.groupId;
 
@@ -265,6 +265,8 @@ export default function GroupOrderActivePage() {
 
   // Owner's member ID in DB – for syncing cart items to server
   const ownerMemberIdRef = useRef<string | null>(null);
+  // True for exactly one sync cycle after we hydrate cart from DB (skip that write-back)
+  const isLoadingCartFromDB = useRef(false);
 
   // Place order / cancel state
   const [placeOrderLoading,  setPlaceOrderLoading]  = useState(false);
@@ -289,7 +291,40 @@ export default function GroupOrderActivePage() {
         if (g.paymentOption) setPaymentOption(g.paymentOption);
         // Lưu lại memberId của Owner để dùng cho việc đồng bộ giỏ hàng
         const ownerMember = ms.find((m) => m.role === 'owner');
-        if (ownerMember) ownerMemberIdRef.current = ownerMember._id;
+        if (ownerMember) {
+          ownerMemberIdRef.current = ownerMember._id;
+          // Safety net: if session is missing memberId (e.g. older session or sticky bar return),
+          // patch it in so Add-to-Group works on product pages
+          if (groupSession && !groupSession.memberId) {
+            setGroupSession({ ...groupSession, memberId: ownerMember._id });
+          }
+          if (initialCart.length > 0) {
+            // Came from checkout: push checkout cart to DB right away
+            const payload = initialCart.map((i) => ({
+              productId: i.productId || String(i.id),
+              name:      i.name,
+              price:     i.price,
+              image:     i.image,
+              qty:       i.qty,
+            }));
+            groupService.syncGroupItems(groupId!, ownerMember._id, payload).catch(() => {});
+          } else {
+            // Came back via Sticky Bar (no location.state): restore cart from DB
+            const dbCart: CartItem[] = (ownerMember.cartItems ?? []).map((item, idx) => ({
+              id:        idx + 1,
+              productId: item.productId,
+              name:      item.name,
+              price:     item.price,
+              qty:       item.qty,
+              image:     item.image || '🛒',
+              unit:      'serving',
+            }));
+            if (dbCart.length > 0) {
+              isLoadingCartFromDB.current = true; // skip the write-back sync
+              setCart(dbCart);
+            }
+          }
+        }
       })
       .catch(console.error)
       .finally(() => setMembersLoading(false));
@@ -323,6 +358,11 @@ export default function GroupOrderActivePage() {
 
   const syncTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => {
+    // Skip sync for the one render triggered by loading cart from DB (avoid write-back)
+    if (isLoadingCartFromDB.current) {
+      isLoadingCartFromDB.current = false;
+      return;
+    }
     if (syncTimerRef.current) clearTimeout(syncTimerRef.current);
     syncTimerRef.current = setTimeout(() => syncOwnerCart(cart), 800);
     return () => { if (syncTimerRef.current) clearTimeout(syncTimerRef.current); };
@@ -487,6 +527,7 @@ export default function GroupOrderActivePage() {
           ownerCart:           cart.map((i) => ({ name: i.name, price: i.price, qty: i.qty, image: i.image })),
         },
       });
+      clearGroupSession();
     } catch (err: any) {
       const msg = err?.response?.data?.message || "Failed to place order. Please try again."; 
       toast.error(msg);
@@ -506,6 +547,7 @@ export default function GroupOrderActivePage() {
         ? "Group order deleted successfully."
         : "Group order cancelled. Deposits have been refunded to all members."; 
       toast.success(msg, { duration: 6000 });
+      clearGroupSession();
       navigate("/checkout");
     } catch (err: any) {
       const msg = err?.response?.data?.message || "Cancellation failed. Please try again."; 

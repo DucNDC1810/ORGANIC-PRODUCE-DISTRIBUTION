@@ -54,7 +54,7 @@ export default function CartPage() {
     await updateQuantity(id, newQty);
   };
 
-  const handleQtyKeyDown = (e: React.KeyboardEvent<HTMLInputElement>, _id: string) => {
+  const handleQtyKeyDown = (e: React.KeyboardEvent<HTMLInputElement>, id: string) => {
     if (['e', 'E', '+', '-', '.'].includes(e.key)) { e.preventDefault(); return; }
     if (e.key === 'Enter') { (e.target as HTMLInputElement).blur(); return; }
     if (e.key === 'Escape') { setEditingQtyId(null); setEditingQtyValue(''); return; }
