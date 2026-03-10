@@ -24,6 +24,7 @@ import ManagerDashboard from './pages/Manager/ManagerDashboard';
 import ProductsPage from './pages/HomePage/ProductsPage';
 import ProductDetailPage from './pages/HomePage/ProductDetailPage';
 import ChatWidget from './components/ChatWidget';
+import GroupSessionBar from './components/GroupSessionBar';
 import GroupOrderPage from './pages/GroupOrder/GroupOrderPage';
 import GroupOrderActivePage from './pages/GroupOrder/GroupOrderActivePage';
 import JoinGroupPage from './pages/GroupOrder/JoinGroupPage';
@@ -85,6 +86,7 @@ export default function App() {
             <Route path="/manager" element={<ManagerRoute><ManagerDashboard /></ManagerRoute>} />
           </Routes>
           <ChatWidget />
+          <GroupSessionBar />
           </BrowserRouter>
         </GroupProvider>
       </CartProvider>

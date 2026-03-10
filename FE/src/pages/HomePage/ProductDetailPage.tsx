@@ -12,12 +12,16 @@ import {
   Shield,
   RotateCcw,
   Check,
-  Leaf
+  Leaf,
+  Users
 } from 'lucide-react';
+import { toast } from 'sonner';
 import Header from '../../components/Header';
 import ProductCard from '../../components/ProductCard';
 import { useProducts } from '../../hooks/useProducts';
 import { useCart } from '../../context/CartContext';
+import { useGroup } from '../../context/GroupContext';
+import { groupService } from '../../services/groupService';
 import { Button } from '../../components/ui/button';
 import { Badge } from '../../components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../components/ui/tabs';
@@ -30,6 +34,9 @@ export default function ProductDetailPage() {
   const navigate = useNavigate();
   const { selectedProduct, fetchProductById, products, fetchProducts, loading } = useProducts();
   const { addToCart } = useCart();
+  const { groupSession } = useGroup();
+  const isGroupMode = !!(groupSession?.groupId && groupSession?.memberId);
+  const [addingToGroup, setAddingToGroup] = useState(false);
   
   const [selectedImageIndex, setSelectedImageIndex] = useState(0);
   const [quantity, setQuantity] = useState(1);
@@ -78,17 +85,43 @@ export default function ProductDetailPage() {
   }, [id, fetchProductById, fetchProducts]);
 
   const handleAddToCart = async (openCart = true) => {
-    if (selectedProduct) {
-      const cartProduct = {
-        id: selectedProduct._id,
-        name: selectedProduct.name,
-        description: selectedProduct.description,
-        price: selectedProduct.price,
-        image: selectedProduct.images?.[0] || selectedProduct.thumbnail || '',
-        category: selectedProduct.category
-      };
-      await addToCart(cartProduct, quantity, !openCart);
+    if (!selectedProduct) return;
+
+    if (isGroupMode) {
+      setAddingToGroup(true);
+      try {
+        await groupService.addGroupItem(
+          groupSession!.groupId,
+          groupSession!.memberId!,
+          {
+            productId: selectedProduct._id,
+            name:      selectedProduct.name,
+            price:     selectedProduct.price,
+            image:     selectedProduct.images?.[0] || selectedProduct.thumbnail || '',
+            qty:       quantity,
+          }
+        );
+        toast.success('Đã thêm vào giỏ hàng của nhóm!', {
+          description: `${selectedProduct.name} x${quantity}`,
+          icon: '🛒',
+        });
+      } catch {
+        toast.error('Không thể thêm món. Vui lòng thử lại.');
+      } finally {
+        setAddingToGroup(false);
+      }
+      return;
     }
+
+    const cartProduct = {
+      id: selectedProduct._id,
+      name: selectedProduct.name,
+      description: selectedProduct.description,
+      price: selectedProduct.price,
+      image: selectedProduct.images?.[0] || selectedProduct.thumbnail || '',
+      category: selectedProduct.category
+    };
+    await addToCart(cartProduct, quantity, !openCart);
   };
 
   const handleBuyNow = async () => {
@@ -370,23 +403,32 @@ export default function ProductDetailPage() {
               {/* Action Buttons */}
               <div className="flex gap-4">
                 <Button
-                  onClick={handleAddToCart}
-                  variant="outline"
+                  onClick={() => handleAddToCart()}
+                  variant={isGroupMode ? 'default' : 'outline'}
                   size="lg"
-                  className="flex-1 border-emerald-500 text-emerald-600 hover:bg-emerald-50"
-                  disabled={selectedProduct.stock <= 0}
+                  className={`flex-1 ${
+                    isGroupMode
+                      ? 'bg-orange-500 hover:bg-orange-600 text-white border-orange-500'
+                      : 'border-emerald-500 text-emerald-600 hover:bg-emerald-50'
+                  }`}
+                  disabled={selectedProduct.stock <= 0 || addingToGroup}
                 >
-                  <ShoppingCart className="w-5 h-5 mr-2" />
-                  Add to Cart
+                  {isGroupMode
+                    ? <Users className="w-5 h-5 mr-2" />
+                    : <ShoppingCart className="w-5 h-5 mr-2" />
+                  }
+                  {addingToGroup ? 'Đang thêm…' : isGroupMode ? 'Add to Group' : 'Add to Cart'}
                 </Button>
-                <Button
-                  onClick={handleBuyNow}
-                  size="lg"
-                  className="flex-1 bg-emerald-600 hover:bg-emerald-700"
-                  disabled={selectedProduct.stock <= 0}
-                >
-                  Buy Now
-                </Button>
+                {!isGroupMode && (
+                  <Button
+                    onClick={handleBuyNow}
+                    size="lg"
+                    className="flex-1 bg-emerald-600 hover:bg-emerald-700"
+                    disabled={selectedProduct.stock <= 0}
+                  >
+                    Buy Now
+                  </Button>
+                )}
               </div>
 
               {/* Share */}
