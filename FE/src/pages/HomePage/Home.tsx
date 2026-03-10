@@ -1,9 +1,10 @@
 import { Leaf, Truck, Shield, Clock, ChevronLeft, ChevronRight, Users } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import ProductCard from '../../components/ProductCard';
 import Header from '../../components/Header';
 import { useProducts } from '../../hooks/useProducts';
+import BookProductSection from '../../components/BookProductSection';
 
 // External banner image URLs (replace with your actual CDN/hosting URLs)
 const banner1 = 'https://res.cloudinary.com/dbtjki0vq/image/upload/v1769863222/banner_oywsgi.png';
@@ -41,9 +42,26 @@ const banners = [
 export default function HomePage() {
   const [currentSlide, setCurrentSlide] = useState(0);
   const [productScrollIndex, setProductScrollIndex] = useState(0);
+  const videoRef = useRef<HTMLVideoElement>(null);
+
+  // Restart the video from the beginning every time the page is visited
+  useEffect(() => {
+    const v = videoRef.current;
+    if (!v) return;
+    v.currentTime = 0;
+    v.play().catch(() => {});
+  }, []);
   
-  // Use products hook to fetch real data
+  // Featured products for horizontal scroll
   const { products, loading, error, fetchProducts } = useProducts();
+
+  // All products for the book-flip section
+  const {
+    products: allProducts,
+    loading: allLoading,
+    error: allError,
+    fetchProducts: fetchAllProducts,
+  } = useProducts();
   
   // Filter only featured products for display
   const featuredProducts = products.filter(product => product.isFeatured);
@@ -55,6 +73,11 @@ export default function HomePage() {
     // Fetch featured products when component mounts
     fetchProducts({ isFeatured: true });
   }, [fetchProducts]);
+
+  useEffect(() => {
+    // Fetch all products for the book-flip catalog
+    fetchAllProducts({ limit: 24 });
+  }, [fetchAllProducts]);
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -88,12 +111,12 @@ export default function HomePage() {
       {/* Hero Video */}
       <section className="relative w-full overflow-hidden">
         <video
+          ref={videoRef}
           src="/freecompress-Yêu_cầu_Video_Quảng_Cáo_Nông_Sản_FreshMarket.mp4"
           className="w-full block"
           style={{ marginTop: '-6%', marginBottom: '-6%' }}
           autoPlay
           muted
-          loop
           playsInline
           preload="metadata"
         />
@@ -230,14 +253,17 @@ export default function HomePage() {
             )}
           </div>
           
-          <div className="text-center mt-8">
-            <div className="w-full h-px bg-gradient-to-r from-transparent via-gray-300 to-transparent mb-8"></div>
-            <Link to="/products" className="inline-block px-8 py-3 bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-lg font-medium hover:from-green-600 hover:to-emerald-700 hover:shadow-lg transition-all duration-300">
-              View All Products →
-            </Link>
-          </div>
         </div>
       </section>
+
+      {/* Book-Flip Product Catalog */}
+      <BookProductSection
+        products={allProducts}
+        loading={allLoading}
+        error={allError}
+        onRetry={() => fetchAllProducts({ limit: 24 })}
+      />
+
       {/* Hero Banner Carousel */}
       <section className="relative overflow-hidden">
         <div className="relative w-full">
@@ -368,13 +394,13 @@ export default function HomePage() {
               <div className="w-14 h-14 bg-gradient-to-br from-purple-400 to-violet-500 rounded-xl flex items-center justify-center mb-5 group-hover:scale-110 transition-transform duration-300">
                 <Users className="w-7 h-7 text-white" />
               </div>
-              <div className="text-3xl font-bold text-purple-500 mb-1">-30%</div>
+              <div className="text-3xl font-bold text-purple-500 mb-1">-10%</div>
               <h3 className="text-lg font-semibold text-foreground mb-2">Group Buying Deals</h3>
               <p className="text-muted-foreground text-sm leading-relaxed mb-4">
                 Join group purchases with the community and unlock exclusive discounts every day.
               </p>
               <ul className="space-y-1.5 text-sm text-muted-foreground">
-                <li className="flex items-center gap-2"><span className="w-1.5 h-1.5 bg-purple-400 rounded-full flex-shrink-0"></span>Up to 30% off with group buys</li>
+                <li className="flex items-center gap-2"><span className="w-1.5 h-1.5 bg-purple-400 rounded-full flex-shrink-0"></span>Up to 10% off with group buys</li>
                 <li className="flex items-center gap-2"><span className="w-1.5 h-1.5 bg-purple-400 rounded-full flex-shrink-0"></span>Connect with buyer communities</li>
                 <li className="flex items-center gap-2"><span className="w-1.5 h-1.5 bg-purple-400 rounded-full flex-shrink-0"></span>Weekly flash deals</li>
               </ul>
