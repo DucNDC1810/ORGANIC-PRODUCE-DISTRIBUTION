@@ -10,6 +10,7 @@ import BookProductSection from '../../components/BookProductSection';
 const banner1 = 'https://res.cloudinary.com/dbtjki0vq/image/upload/v1769863222/banner_oywsgi.png';
 const banner2 = 'https://res.cloudinary.com/dbtjki0vq/image/upload/v1769863219/Broccoli_qewlkz.png';
 const banner3 = 'https://res.cloudinary.com/dbtjki0vq/image/upload/v1769863218/Banner2_tlwsht.png';
+const banner4 = '/image/banner sc.jpg';
 
 const banners = [
   {
@@ -35,6 +36,13 @@ const banners = [
     image: banner3,
     title: 'RAU XANH SẠCH',
     subtitle: 'An toàn cho sức khỏe',
+    buttons: []
+  },
+  {
+    id: 4,
+    image: banner4,
+    title: '',
+    subtitle: '',
     buttons: []
   }
 ];
