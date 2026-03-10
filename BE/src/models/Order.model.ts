@@ -6,6 +6,10 @@ export interface IOrder extends Document {
   voucherId?: mongoose.Types.ObjectId;
   groupBuyId?: mongoose.Types.ObjectId;
   subscriptionId?: mongoose.Types.ObjectId;
+  shipperId?: mongoose.Types.ObjectId;
+  cancelledByShipperId?: mongoose.Types.ObjectId;
+  rejectedByShippers?: mongoose.Types.ObjectId[];
+  reopenedForShipping?: boolean;
   orderDate: Date;
   totalAmount: number;
   status: 'pending' | 'confirmed' | 'processing' | 'shipped' | 'delivered' | 'cancelled' | 'refunded';
@@ -34,9 +38,11 @@ export interface IOrder extends Document {
   notes?: string;
   cancelReason?: string;
   cancelledAt?: Date;
+  shipperCancelledAt?: Date;
   confirmedAt?: Date;
   confirmedBy?: mongoose.Types.ObjectId;
   deliveredAt?: Date;
+  shippingAcceptedAt?: Date;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -67,6 +73,24 @@ const orderSchema = new Schema<IOrder>(
       type: Schema.Types.ObjectId,
       ref: 'Subscription',
       default: null
+    },
+    shipperId: {
+      type: Schema.Types.ObjectId,
+      ref: 'User',
+      default: null
+    },
+    cancelledByShipperId: {
+      type: Schema.Types.ObjectId,
+      ref: 'User',
+      default: null
+    },
+    rejectedByShippers: [{
+      type: Schema.Types.ObjectId,
+      ref: 'User'
+    }],
+    reopenedForShipping: {
+      type: Boolean,
+      default: false
     },
     orderDate: {
       type: Date,
@@ -175,6 +199,9 @@ const orderSchema = new Schema<IOrder>(
     cancelledAt: {
       type: Date
     },
+    shipperCancelledAt: {
+      type: Date
+    },
     confirmedAt: {
       type: Date
     },
@@ -184,6 +211,9 @@ const orderSchema = new Schema<IOrder>(
       default: null
     },
     deliveredAt: {
+      type: Date
+    },
+    shippingAcceptedAt: {
       type: Date
     }
   },
@@ -197,5 +227,6 @@ orderSchema.index({ userId: 1, createdAt: -1 });
 orderSchema.index({ status: 1 });
 orderSchema.index({ orderDate: -1 });
 orderSchema.index({ 'items.productId': 1 });
+orderSchema.index({ shipperId: 1, status: 1 });
 
 export const Order = mongoose.model<IOrder>('Order', orderSchema);

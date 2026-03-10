@@ -26,6 +26,7 @@ import groupRoutes from './routes/group.routes';
 import walletRoutes from './routes/wallet.routes';
 import notificationRoutes from './routes/notification.routes';
 import dashboardRoutes from './routes/dashboard.routes';
+import shipperRoutes from './routes/shipper.routes';
 // import exampleRoutes from './routes/example.routes'; // Uncomment để test
 import { configurePassport } from './config/passport';
 // Register models that are referenced via populate but may not be auto-imported
@@ -37,8 +38,12 @@ const app: Application = express();
 configurePassport();
 
 // Middlewares
+const corsOrigins = process.env.CORS_ORIGIN 
+  ? process.env.CORS_ORIGIN.split(',').map(origin => origin.trim())
+  : ['http://localhost:5173'];
+
 app.use(cors({
-  origin: process.env.CORS_ORIGIN || 'http://localhost:5173',
+  origin: corsOrigins,
   credentials: true
 }));
 // Increase payload limit for base64 images 
@@ -71,6 +76,7 @@ app.use('/api/groups', groupRoutes);
 app.use('/api/wallet', walletRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/dashboard', dashboardRoutes);
+app.use('/api/shipper', shipperRoutes);
 // app.use('/api/example', exampleRoutes); // Uncomment để test authentication
 
 // 404 Handler - Must be after all routes

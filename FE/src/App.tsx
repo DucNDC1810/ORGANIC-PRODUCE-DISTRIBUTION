@@ -3,7 +3,7 @@ import { Toaster } from 'sonner';
 import { CartProvider } from './context/CartContext';
 import { AuthProvider } from './context/AuthContext';
 import { GroupProvider } from './context/GroupContext';
-import { ProtectedRoute, AdminRoute, ManagerRoute } from './components/ProtectedRoute';
+import { ProtectedRoute, AdminRoute, ManagerRoute, ShipperRoute } from './components/ProtectedRoute';
 import MiniCart from './components/MiniCart';
 import HomePage from './pages/HomePage/Home';
 import CartPage from './pages/HomePage/CartPage';
@@ -21,6 +21,7 @@ import AboutUs from './pages/HomePage/AboutUs';
 import Profile from './pages/Customer/Profile';
 import AdminDashboard from './pages/Admin/AdminDashboard';
 import ManagerDashboard from './pages/Manager/ManagerDashboard';
+import ShipperDashboard from './pages/Shipper/ShipperDashboard';
 import ProductsPage from './pages/HomePage/ProductsPage';
 import ProductDetailPage from './pages/HomePage/ProductDetailPage';
 import ChatWidget from './components/ChatWidget';
@@ -83,6 +84,8 @@ export default function App() {
             {/* Admin-only routes */}
             <Route path="/admin" element={<AdminRoute><AdminDashboard /></AdminRoute>} />
             {/* Manager-only routes */}
+            {/* Shipper-only routes */}
+            <Route path="/shipper/*" element={<ShipperRoute><ShipperDashboard /></ShipperRoute>} />
             <Route path="/manager" element={<ManagerRoute><ManagerDashboard /></ManagerRoute>} />
           </Routes>
           <ChatWidget />
