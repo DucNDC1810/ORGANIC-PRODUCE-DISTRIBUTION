@@ -1,4 +1,4 @@
-import { Leaf, Truck, Shield, Clock, ChevronLeft, ChevronRight, Users } from 'lucide-react';
+import { Leaf, Truck, Shield, ChevronLeft, ChevronRight, Users } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useState, useEffect, useRef } from 'react';
 import ProductCard from '../../components/ProductCard';
