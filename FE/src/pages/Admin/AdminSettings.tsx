@@ -188,391 +188,441 @@ export default function AdminSettings() {
   return (
     <div className="space-y-6">
       {/* Page Header */}
-      <div>
-        <h2 className="text-2xl font-bold text-gray-900">Account Settings</h2>
-        <p className="text-sm text-gray-500 mt-1">Manage your admin profile and personal information</p>
+      <div className="flex items-start justify-between">
+        <div>
+          <h2 className="text-3xl font-bold text-gray-900">Account Settings</h2>
+          <p className="text-sm text-gray-500 mt-1">Manage your admin profile, security and preferences</p>
+        </div>
+        {!isEditing ? (
+          <button
+            onClick={handleEditToggle}
+            className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 text-white rounded-xl text-sm font-medium hover:from-emerald-700 hover:to-teal-700 transition-all shadow-md hover:shadow-lg"
+          >
+            <Edit2 className="w-4 h-4" />
+            Edit Profile
+          </button>
+        ) : (
+          <div className="flex gap-2">
+            <button
+              onClick={handleSave}
+              disabled={loading}
+              className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 text-white rounded-xl text-sm font-medium hover:from-emerald-700 hover:to-teal-700 transition-all shadow-md hover:shadow-lg disabled:opacity-50"
+            >
+              <Save className="w-4 h-4" />
+              {loading ? 'Saving...' : 'Save Changes'}
+            </button>
+            <button
+              onClick={handleEditToggle}
+              disabled={loading}
+              className="flex items-center gap-2 px-5 py-2.5 bg-gray-100 text-gray-700 rounded-xl text-sm font-medium hover:bg-gray-200 transition-colors disabled:opacity-50"
+            >
+              <X className="w-4 h-4" />
+              Cancel
+            </button>
+          </div>
+        )}
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Left: Role Badge */}
-        <div className="lg:col-span-1">
-          <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6 flex flex-col items-center text-center gap-4">
-            <div className="relative">
-              <div
-                onClick={handleAvatarClick}
-                className={`relative ${isEditing ? 'cursor-pointer group' : ''}`}
-              >
-                <input ref={fileInputRef} type="file" accept="image/*" onChange={handleAvatarChange} className="hidden" />
-                {formData.avatar || user?.avatar ? (
-                  <img
-                    src={formData.avatar || user?.avatar}
-                    alt="Avatar"
-                    className="w-24 h-24 rounded-full object-cover border-4 border-white shadow-lg"
-                    onError={(e) => {
-                      e.currentTarget.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(user?.name || 'Admin')}&background=10b981&color=fff&size=200`;
-                    }}
-                  />
-                ) : (
-                  <div className="w-24 h-24 rounded-full bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center border-4 border-white shadow-lg">
-                    <span className="text-3xl font-bold text-white">{user?.name?.charAt(0).toUpperCase() || 'A'}</span>
-                  </div>
-                )}
-                {isEditing && (
-                  <>
-                    <div className="absolute inset-0 rounded-full bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                      <Camera className="w-8 h-8 text-white" />
-                    </div>
-                    <div className="absolute -bottom-2 -right-2 w-8 h-8 bg-emerald-500 rounded-full flex items-center justify-center shadow-md">
-                      <Edit2 className="w-4 h-4 text-white" />
-                    </div>
-                  </>
-                )}
-              </div>
+      {/* ═══════════════════════════════════════════════════════════════ */}
+      {/* SECTION 1: PROFILE INFORMATION */}
+      {/* ═══════════════════════════════════════════════════════════════ */}
+      <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+        {/* Section Header */}
+        <div className="px-6 py-4 bg-gradient-to-r from-emerald-50 to-teal-50 border-b border-gray-200">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-xl flex items-center justify-center shadow-md">
+              <User className="w-5 h-5 text-white" />
             </div>
             <div>
-              <h3 className="text-lg font-bold text-gray-900">{user?.name || 'Admin'}</h3>
-              <p className="text-sm text-gray-500">{user?.email}</p>
+              <h3 className="text-lg font-bold text-gray-900">Profile Information</h3>
+              <p className="text-xs text-gray-600">Your personal details and contact information</p>
             </div>
-            <div className="flex items-center gap-2 px-4 py-2 bg-emerald-50 rounded-full border border-emerald-200">
-              <Shield className="w-4 h-4 text-emerald-600" />
-              <span className="text-sm font-semibold text-emerald-700 capitalize">{user?.role || 'Admin'}</span>
-            </div>
-            {isEditing && (
-              <p className="text-xs text-gray-400">
-                <Camera className="w-3 h-3 inline mr-1" />
-                Click avatar to change photo (max 2MB)
-              </p>
-            )}
           </div>
         </div>
 
-        {/* Right: Profile Form */}
-        <div className="lg:col-span-2">
-          <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
-            {/* Card Header */}
-            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
-              <h3 className="text-base font-semibold text-gray-900">Personal Information</h3>
-              {!isEditing ? (
-                <button
-                  onClick={handleEditToggle}
-                  className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700 transition-colors"
+        <div className="p-6">
+          <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+            {/* Avatar Section */}
+            <div className="lg:col-span-1 flex flex-col items-center">
+              <div className="relative w-full max-w-[200px]">
+                <div
+                  onClick={handleAvatarClick}
+                  className={`relative ${isEditing ? 'cursor-pointer group' : ''}`}
                 >
-                  <Edit2 className="w-4 h-4" />
-                  Edit Profile
-                </button>
-              ) : (
-                <div className="flex gap-2">
-                  <button
-                    onClick={handleSave}
-                    disabled={loading}
-                    className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700 transition-colors disabled:opacity-50"
-                  >
-                    <Save className="w-4 h-4" />
-                    {loading ? 'Saving...' : 'Save Changes'}
-                  </button>
-                  <button
-                    onClick={handleEditToggle}
-                    disabled={loading}
-                    className="flex items-center gap-2 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-200 transition-colors disabled:opacity-50"
-                  >
-                    <X className="w-4 h-4" />
-                    Cancel
-                  </button>
+                  <input ref={fileInputRef} type="file" accept="image/*" onChange={handleAvatarChange} className="hidden" />
+                  {formData.avatar || user?.avatar ? (
+                    <img
+                      src={formData.avatar || user?.avatar}
+                      alt="Avatar"
+                      className="w-full aspect-square rounded-2xl object-cover border-4 border-white shadow-xl"
+                      onError={(e) => {
+                        e.currentTarget.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(user?.name || 'Admin')}&background=10b981&color=fff&size=400`;
+                      }}
+                    />
+                  ) : (
+                    <div className="w-full aspect-square rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center border-4 border-white shadow-xl">
+                      <span className="text-5xl font-bold text-white">{user?.name?.charAt(0).toUpperCase() || 'A'}</span>
+                    </div>
+                  )}
+                  {isEditing && (
+                    <>
+                      <div className="absolute inset-0 rounded-2xl bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-2">
+                        <Camera className="w-10 h-10 text-white" />
+                        <span className="text-sm text-white font-medium">Change Photo</span>
+                      </div>
+                      <div className="absolute -bottom-3 -right-3 w-12 h-12 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-full flex items-center justify-center shadow-lg border-4 border-white">
+                        <Edit2 className="w-5 h-5 text-white" />
+                      </div>
+                    </>
+                  )}
                 </div>
-              )}
+                {isEditing && (
+                  <p className="text-xs text-center text-gray-400 mt-3">
+                    <Camera className="w-3 h-3 inline mr-1" />
+                    Max 2MB, JPG/PNG
+                  </p>
+                )}
+              </div>
+              
+              {/* Role Badge */}
+              <div className="mt-6 w-full max-w-[200px]">
+                <div className="flex items-center justify-center gap-2 px-4 py-3 bg-gradient-to-r from-emerald-50 to-teal-50 rounded-xl border-2 border-emerald-200">
+                  <Shield className="w-5 h-5 text-emerald-600" />
+                  <span className="text-sm font-bold text-emerald-700 uppercase tracking-wide">
+                    {user?.role || 'Admin'}
+                  </span>
+                </div>
+              </div>
             </div>
 
             {/* Form Fields */}
-            <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-5">
-              {/* Full Name */}
-              <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1.5 uppercase tracking-wide">Full Name</label>
-                {isEditing ? (
-                  <input
-                    type="text"
-                    value={formData.name}
-                    onChange={(e) => handleInputChange('name', e.target.value)}
-                    className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-colors"
-                    placeholder="Enter your name"
-                  />
-                ) : (
-                  <div className="flex items-center gap-3 px-4 py-2.5 bg-gray-50 rounded-lg border border-gray-100">
-                    <User className="w-4 h-4 text-emerald-500 flex-shrink-0" />
-                    <span className="text-sm font-medium text-gray-800">{user?.name || 'Not set'}</span>
-                  </div>
-                )}
-              </div>
-
-              {/* Email */}
-              <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1.5 uppercase tracking-wide">Email Address</label>
-                <div className="flex items-center gap-3 px-4 py-2.5 bg-gray-50 rounded-lg border border-gray-100">
-                  <Mail className="w-4 h-4 text-emerald-500 flex-shrink-0" />
-                  <span className="text-sm font-medium text-gray-800">{user?.email || 'Not set'}</span>
+            <div className="lg:col-span-3">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                {/* Full Name */}
+                <div>
+                  <label className="block text-xs font-semibold text-gray-600 mb-2 uppercase tracking-wider">Full Name</label>
+                  {isEditing ? (
+                    <input
+                      type="text"
+                      value={formData.name}
+                      onChange={(e) => handleInputChange('name', e.target.value)}
+                      className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl text-sm font-medium focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 transition-all"
+                      placeholder="Enter your name"
+                    />
+                  ) : (
+                    <div className="flex items-center gap-3 px-4 py-3 bg-gradient-to-r from-gray-50 to-gray-100 rounded-xl border border-gray-200">
+                      <User className="w-4 h-4 text-emerald-600 flex-shrink-0" />
+                      <span className="text-sm font-semibold text-gray-800">{user?.name || 'Not set'}</span>
+                    </div>
+                  )}
                 </div>
-                {isEditing && <p className="text-xs text-gray-400 mt-1">Email cannot be changed</p>}
-              </div>
 
-              {/* Phone */}
-              <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1.5 uppercase tracking-wide">Phone Number</label>
-                {isEditing ? (
-                  <input
-                    type="tel"
-                    value={formData.phone}
-                    onChange={(e) => handleInputChange('phone', e.target.value)}
-                    className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-colors"
-                    placeholder="Enter phone number"
-                  />
-                ) : (
-                  <div className="flex items-center gap-3 px-4 py-2.5 bg-gray-50 rounded-lg border border-gray-100">
-                    <Phone className="w-4 h-4 text-emerald-500 flex-shrink-0" />
-                    <span className="text-sm font-medium text-gray-800">{user?.phone || 'Not set'}</span>
+                {/* Email */}
+                <div>
+                  <label className="block text-xs font-semibold text-gray-600 mb-2 uppercase tracking-wider">Email Address</label>
+                  <div className="flex items-center gap-3 px-4 py-3 bg-gradient-to-r from-gray-50 to-gray-100 rounded-xl border border-gray-200">
+                    <Mail className="w-4 h-4 text-emerald-600 flex-shrink-0" />
+                    <span className="text-sm font-semibold text-gray-800">{user?.email || 'Not set'}</span>
                   </div>
-                )}
-              </div>
+                  {isEditing && <p className="text-xs text-gray-500 mt-1.5 ml-1">Email cannot be changed</p>}
+                </div>
 
-              {/* Gender */}
-              <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1.5 uppercase tracking-wide">Gender</label>
-                {isEditing ? (
-                  <select
-                    value={formData.gender}
-                    onChange={(e) => handleInputChange('gender', e.target.value)}
-                    className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-colors"
-                  >
-                    <option value="">Select gender</option>
-                    <option value="male">Male</option>
-                    <option value="female">Female</option>
-                    <option value="other">Other</option>
-                  </select>
-                ) : (
-                  <div className="flex items-center gap-3 px-4 py-2.5 bg-gray-50 rounded-lg border border-gray-100">
-                    <User className="w-4 h-4 text-emerald-500 flex-shrink-0" />
-                    <span className="text-sm font-medium text-gray-800">
-                      {user?.gender ? user.gender.charAt(0).toUpperCase() + user.gender.slice(1) : 'Not set'}
-                    </span>
-                  </div>
-                )}
-              </div>
+                {/* Phone */}
+                <div>
+                  <label className="block text-xs font-semibold text-gray-600 mb-2 uppercase tracking-wider">Phone Number</label>
+                  {isEditing ? (
+                    <input
+                      type="tel"
+                      value={formData.phone}
+                      onChange={(e) => handleInputChange('phone', e.target.value)}
+                      className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl text-sm font-medium focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 transition-all"
+                      placeholder="Enter phone number"
+                    />
+                  ) : (
+                    <div className="flex items-center gap-3 px-4 py-3 bg-gradient-to-r from-gray-50 to-gray-100 rounded-xl border border-gray-200">
+                      <Phone className="w-4 h-4 text-emerald-600 flex-shrink-0" />
+                      <span className="text-sm font-semibold text-gray-800">{user?.phone || 'Not set'}</span>
+                    </div>
+                  )}
+                </div>
 
-              {/* Date of Birth */}
-              <div className="md:col-span-2">
-                <label className="block text-xs font-medium text-gray-500 mb-1.5 uppercase tracking-wide">Date of Birth</label>
-                {isEditing ? (
-                  <input
-                    type="date"
-                    value={formData.dateOfBirth}
-                    onChange={(e) => handleInputChange('dateOfBirth', e.target.value)}
-                    max={new Date(new Date().setFullYear(new Date().getFullYear() - 10)).toISOString().split('T')[0]}
-                    className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-colors"
-                  />
-                ) : (
-                  <div className="flex items-center gap-3 px-4 py-2.5 bg-gray-50 rounded-lg border border-gray-100">
-                    <User className="w-4 h-4 text-emerald-500 flex-shrink-0" />
-                    <span className="text-sm font-medium text-gray-800">
-                      {user?.dateOfBirth
-                        ? new Date(user.dateOfBirth).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
-                        : 'Not set'}
-                    </span>
-                  </div>
-                )}
-              </div>
+                {/* Gender */}
+                <div>
+                  <label className="block text-xs font-semibold text-gray-600 mb-2 uppercase tracking-wider">Gender</label>
+                  {isEditing ? (
+                    <select
+                      value={formData.gender}
+                      onChange={(e) => handleInputChange('gender', e.target.value)}
+                      className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl text-sm font-medium focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 transition-all bg-white"
+                    >
+                      <option value="">Select gender</option>
+                      <option value="male">Male</option>
+                      <option value="female">Female</option>
+                      <option value="other">Other</option>
+                    </select>
+                  ) : (
+                    <div className="flex items-center gap-3 px-4 py-3 bg-gradient-to-r from-gray-50 to-gray-100 rounded-xl border border-gray-200">
+                      <User className="w-4 h-4 text-emerald-600 flex-shrink-0" />
+                      <span className="text-sm font-semibold text-gray-800">
+                        {user?.gender ? user.gender.charAt(0).toUpperCase() + user.gender.slice(1) : 'Not set'}
+                      </span>
+                    </div>
+                  )}
+                </div>
 
-              {/* Address */}
-              <div className="md:col-span-2">
-                <label className="block text-xs font-medium text-gray-500 mb-1.5 uppercase tracking-wide">Address</label>
-                {isEditing ? (
-                  <textarea
-                    value={formData.address}
-                    onChange={(e) => handleInputChange('address', e.target.value)}
-                    className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-colors resize-none"
-                    placeholder="Enter your address"
-                    rows={3}
-                  />
-                ) : (
-                  <div className="flex items-start gap-3 px-4 py-2.5 bg-gray-50 rounded-lg border border-gray-100">
-                    <Home className="w-4 h-4 text-emerald-500 flex-shrink-0 mt-0.5" />
-                    <span className="text-sm font-medium text-gray-800">{user?.address || 'Not set'}</span>
-                  </div>
-                )}
+                {/* Date of Birth */}
+                <div className="md:col-span-2">
+                  <label className="block text-xs font-semibold text-gray-600 mb-2 uppercase tracking-wider">Date of Birth</label>
+                  {isEditing ? (
+                    <input
+                      type="date"
+                      value={formData.dateOfBirth}
+                      onChange={(e) => handleInputChange('dateOfBirth', e.target.value)}
+                      max={new Date(new Date().setFullYear(new Date().getFullYear() - 10)).toISOString().split('T')[0]}
+                      className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl text-sm font-medium focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 transition-all"
+                    />
+                  ) : (
+                    <div className="flex items-center gap-3 px-4 py-3 bg-gradient-to-r from-gray-50 to-gray-100 rounded-xl border border-gray-200">
+                      <User className="w-4 h-4 text-emerald-600 flex-shrink-0" />
+                      <span className="text-sm font-semibold text-gray-800">
+                        {user?.dateOfBirth
+                          ? new Date(user.dateOfBirth).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
+                          : 'Not set'}
+                      </span>
+                    </div>
+                  )}
+                </div>
+
+                {/* Address */}
+                <div className="md:col-span-2">
+                  <label className="block text-xs font-semibold text-gray-600 mb-2 uppercase tracking-wider">Address</label>
+                  {isEditing ? (
+                    <textarea
+                      value={formData.address}
+                      onChange={(e) => handleInputChange('address', e.target.value)}
+                      className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl text-sm font-medium focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 transition-all resize-none"
+                      placeholder="Enter your address"
+                      rows={3}
+                    />
+                  ) : (
+                    <div className="flex items-start gap-3 px-4 py-3 bg-gradient-to-r from-gray-50 to-gray-100 rounded-xl border border-gray-200">
+                      <Home className="w-4 h-4 text-emerald-600 flex-shrink-0 mt-0.5" />
+                      <span className="text-sm font-semibold text-gray-800">{user?.address || 'Not set'}</span>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Security Settings */}
-      {/* Login Attempt Limits */}
+      {/* ═══════════════════════════════════════════════════════════════ */}
+      {/* SECTION 2: SECURITY & SYSTEM SETTINGS */}
+      {/* ═══════════════════════════════════════════════════════════════ */}
       <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
-        <div className="flex items-center gap-3 px-6 py-4 border-b border-gray-100">
-          <div className="w-8 h-8 bg-red-100 rounded-lg flex items-center justify-center">
-            <Shield className="w-4 h-4 text-red-600" />
-          </div>
-          <div>
-            <h3 className="text-base font-semibold text-gray-900">Login Attempt Limits</h3>
-            <p className="text-xs text-gray-500">Configure failed-login lockout policy</p>
-          </div>
-          <span className="ml-auto text-xs text-gray-400">
-            Current: <span className="font-semibold text-red-500">{maxAttempts}</span> attempts before lockout
-          </span>
-        </div>
-        <div className="p-6 space-y-4">
-          <p className="text-sm text-gray-600">
-            Account will be <span className="font-semibold text-red-600">permanently locked</span> after reaching the limit and must be <span className="font-semibold">manually unlocked by admin</span>.
-          </p>
-          <div className="space-y-3">
-            <label className="block text-sm font-medium text-gray-700">Max failed attempts before lockout</label>
-            <div className="flex items-center gap-3">
-              <input
-                type="number"
-                min={1}
-                max={20}
-                value={maxAttemptsDraft}
-                onChange={(e) => setMaxAttemptsDraft(Number(e.target.value))}
-                className="w-24 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-red-400 focus:ring-1 focus:ring-red-400"
-              />
-              <span className="text-sm text-gray-500">attempts</span>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              {[3, 5, 10].map(val => (
-                <button
-                  key={val}
-                  onClick={() => setMaxAttemptsDraft(val)}
-                  className={`px-3 py-1 rounded-full text-xs font-medium transition-colors border ${
-                    maxAttemptsDraft === val
-                      ? 'bg-red-500 text-white border-red-500'
-                      : 'bg-gray-50 text-gray-600 border-gray-200 hover:border-red-300'
-                  }`}
-                >
-                  {val}x
-                </button>
-              ))}
-            </div>
-            <p className="text-xs text-gray-400">Range: 1–20. Locked accounts appear in "Locked Accounts" below.</p>
-          </div>
-        </div>
-        <div className="px-6 pb-6 flex justify-end">
-          <button
-            onClick={handleSaveSecurityConfig}
-            disabled={savingSecConfig}
-            className="flex items-center gap-2 px-5 py-2 bg-red-500 text-white rounded-lg text-sm font-medium hover:bg-red-600 transition-colors disabled:opacity-50"
-          >
-            <Save className="w-4 h-4" />
-            {savingSecConfig ? 'Saving...' : 'Save Security Config'}
-          </button>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Session Timeout */}
-        <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
-          <div className="flex items-center gap-3 px-6 py-4 border-b border-gray-100">
-            <div className="w-8 h-8 bg-orange-100 rounded-lg flex items-center justify-center">
-              <Clock className="w-4 h-4 text-orange-600" />
+        {/* Section Header */}
+        <div className="px-6 py-4 bg-gradient-to-r from-red-50 to-orange-50 border-b border-gray-200">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-gradient-to-br from-red-500 to-orange-600 rounded-xl flex items-center justify-center shadow-md">
+              <Shield className="w-5 h-5 text-white" />
             </div>
             <div>
-              <h3 className="text-base font-semibold text-gray-900">Session Timeout</h3>
-              <p className="text-xs text-gray-500">Auto-logout after inactivity</p>
+              <h3 className="text-lg font-bold text-gray-900">Security & System Settings</h3>
+              <p className="text-xs text-gray-600">Manage login security, session timeout and locked accounts</p>
             </div>
-          </div>
-          <div className="p-6 space-y-4">
-            <p className="text-sm text-gray-600">
-              Current timeout: <span className="font-semibold text-orange-600">{sessionTimeout} minutes</span>
-            </p>
-            <div className="flex items-center gap-3">
-              <input
-                type="number"
-                min={1}
-                max={1440}
-                value={timeoutDraft}
-                onChange={(e) => setTimeoutDraft(Number(e.target.value))}
-                className="w-28 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-orange-400 focus:ring-1 focus:ring-orange-400"
-              />
-              <span className="text-sm text-gray-500">minutes</span>
-              <button
-                onClick={handleSaveTimeout}
-                className="ml-auto flex items-center gap-2 px-4 py-2 bg-orange-500 text-white rounded-lg text-sm font-medium hover:bg-orange-600 transition-colors"
-              >
-                <Save className="w-4 h-4" />
-                Save
-              </button>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              {[15, 30, 60, 120].map(val => (
-                <button
-                  key={val}
-                  onClick={() => setTimeoutDraft(val)}
-                  className={`px-3 py-1 rounded-full text-xs font-medium transition-colors border ${
-                    timeoutDraft === val
-                      ? 'bg-orange-500 text-white border-orange-500'
-                      : 'bg-gray-50 text-gray-600 border-gray-200 hover:border-orange-300'
-                  }`}
-                >
-                  {val}m
-                </button>
-              ))}
-            </div>
-            <p className="text-xs text-gray-400">Range: 1–1440 minutes (24 hours). This setting is stored locally and applies on next login.</p>
           </div>
         </div>
 
-        {/* Locked Users */}
-        <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
-          <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
-            <div className="flex items-center gap-3">
-              <div className="w-8 h-8 bg-red-100 rounded-lg flex items-center justify-center">
-                <Lock className="w-4 h-4 text-red-600" />
+        <div className="p-6">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">{/* Login Attempt Limits */}
+            <div className="lg:col-span-1 space-y-4">
+              <div className="flex items-center gap-2 mb-3">
+                <div className="w-8 h-8 bg-red-100 rounded-lg flex items-center justify-center">
+                  <AlertTriangle className="w-4 h-4 text-red-600" />
+                </div>
+                <div>
+                  <h4 className="text-sm font-bold text-gray-900">Login Attempts</h4>
+                  <p className="text-xs text-gray-500">Max failed logins</p>
+                </div>
               </div>
-              <div>
-                <h3 className="text-base font-semibold text-gray-900">Locked Accounts</h3>
-                <p className="text-xs text-gray-500">Users locked after failed logins</p>
+              
+              <div className="p-4 bg-red-50 border-2 border-red-200 rounded-xl">
+                <div className="text-center mb-3">
+                  <div className="text-3xl font-bold text-red-600">{maxAttempts}</div>
+                  <p className="text-xs text-gray-600 mt-1">attempts before lockout</p>
+                </div>
+                
+                {/* Input */}
+                <div className="space-y-2 mb-3">
+                  <input
+                    type="number"
+                    min={1}
+                    max={20}
+                    value={maxAttemptsDraft}
+                    onChange={(e) => setMaxAttemptsDraft(Number(e.target.value))}
+                    className="w-full px-3 py-2 border-2 border-red-200 rounded-lg text-sm font-semibold text-center focus:outline-none focus:border-red-400 focus:ring-2 focus:ring-red-400/20"
+                  />
+                  <div className="flex flex-wrap gap-1.5 justify-center">
+                    {[3, 5, 10, 15].map(val => (
+                      <button
+                        key={val}
+                        onClick={() => setMaxAttemptsDraft(val)}
+                        className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all border-2 ${
+                          maxAttemptsDraft === val
+                            ? 'bg-red-500 text-white border-red-500 shadow-md'
+                            : 'bg-white text-gray-600 border-gray-200 hover:border-red-300'
+                        }`}
+                      >
+                        {val}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <button
+                  onClick={handleSaveSecurityConfig}
+                  disabled={savingSecConfig}
+                  className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-gradient-to-r from-red-500 to-orange-600 text-white rounded-lg text-sm font-bold hover:from-red-600 hover:to-orange-700 transition-all shadow-md disabled:opacity-50"
+                >
+                  <Save className="w-4 h-4" />
+                  {savingSecConfig ? 'Saving...' : 'Save Config'}
+                </button>
+              </div>
+              
+              <p className="text-xs text-gray-500 leading-relaxed">
+                Accounts are <span className="font-semibold text-red-600">permanently locked</span> after reaching the limit and must be manually unlocked by admin.
+              </p>
+            </div>
+
+            {/* Session Timeout */}
+            <div className="lg:col-span-1 space-y-4">
+              <div className="flex items-center gap-2 mb-3">
+                <div className="w-8 h-8 bg-orange-100 rounded-lg flex items-center justify-center">
+                  <Clock className="w-4 h-4 text-orange-600" />
+                </div>
+                <div>
+                  <h4 className="text-sm font-bold text-gray-900">Session Timeout</h4>
+                  <p className="text-xs text-gray-500">Auto-logout timer</p>
+                </div>
+              </div>
+              
+              <div className="p-4 bg-orange-50 border-2 border-orange-200 rounded-xl">
+                <div className="text-center mb-3">
+                  <div className="text-3xl font-bold text-orange-600">{sessionTimeout}</div>
+                  <p className="text-xs text-gray-600 mt-1">minutes until logout</p>
+                </div>
+                
+                {/* Input */}
+                <div className="space-y-2 mb-3">
+                  <input
+                    type="number"
+                    min={1}
+                    max={1440}
+                    value={timeoutDraft}
+                    onChange={(e) => setTimeoutDraft(Number(e.target.value))}
+                    className="w-full px-3 py-2 border-2 border-orange-200 rounded-lg text-sm font-semibold text-center focus:outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-400/20"
+                  />
+                  <div className="flex flex-wrap gap-1.5 justify-center">
+                    {[15, 30, 60, 120].map(val => (
+                      <button
+                        key={val}
+                        onClick={() => setTimeoutDraft(val)}
+                        className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all border-2 ${
+                          timeoutDraft === val
+                            ? 'bg-orange-500 text-white border-orange-500 shadow-md'
+                            : 'bg-white text-gray-600 border-gray-200 hover:border-orange-300'
+                        }`}
+                      >
+                        {val}m
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <button
+                  onClick={handleSaveTimeout}
+                  className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-gradient-to-r from-orange-500 to-amber-600 text-white rounded-lg text-sm font-bold hover:from-orange-600 hover:to-amber-700 transition-all shadow-md"
+                >
+                  <Save className="w-4 h-4" />
+                  Save Timeout
+                </button>
+              </div>
+              
+              <p className="text-xs text-gray-500 leading-relaxed">
+                Session timeout is stored <span className="font-semibold">locally</span> and applies on next login. Range: 1–1440 minutes.
+              </p>
+            </div>
+
+            {/* Locked Accounts */}
+            <div className="lg:col-span-1 space-y-4">
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 bg-gray-100 rounded-lg flex items-center justify-center">
+                    <Lock className="w-4 h-4 text-gray-600" />
+                  </div>
+                  <div>
+                    <h4 className="text-sm font-bold text-gray-900">Locked Accounts</h4>
+                    <p className="text-xs text-gray-500">Failed login users</p>
+                  </div>
+                </div>
+                <button
+                  onClick={fetchLockedUsers}
+                  className="text-xs text-emerald-600 hover:text-emerald-700 font-bold underline underline-offset-2"
+                >
+                  Refresh
+                </button>
+              </div>
+
+              <div className="border-2 border-gray-200 rounded-xl overflow-hidden bg-gray-50">
+                {loadingLocked ? (
+                  <div className="py-12 text-center text-sm text-gray-400">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-400 mx-auto mb-2"></div>
+                    Loading...
+                  </div>
+                ) : lockedUsers.length === 0 ? (
+                  <div className="py-12 text-center">
+                    <Shield className="w-12 h-12 text-green-400 mx-auto mb-3" />
+                    <p className="text-sm font-semibold text-gray-700">No locked accounts</p>
+                    <p className="text-xs text-gray-500 mt-1">All users have clean records</p>
+                  </div>
+                ) : (
+                  <div className="max-h-[320px] overflow-y-auto">
+                    <div className="divide-y divide-gray-200">
+                      {lockedUsers.map(u => (
+                        <div key={u._id} className="p-3 bg-white hover:bg-red-50 transition-colors">
+                          <div className="flex items-start gap-3">
+                            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-red-400 to-red-600 flex items-center justify-center flex-shrink-0 shadow-md">
+                              <span className="text-sm font-bold text-white">
+                                {u.name.charAt(0).toUpperCase()}
+                              </span>
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-bold text-gray-800 truncate">{u.name}</p>
+                              <p className="text-xs text-gray-500 truncate">{u.email}</p>
+                              <div className="flex items-center gap-1 mt-1">
+                                <AlertTriangle className="w-3 h-3 text-red-500" />
+                                <p className="text-xs text-red-600 font-semibold">
+                                  {u.failedLoginAttempts} failed attempts
+                                </p>
+                              </div>
+                            </div>
+                            <button
+                              onClick={() => handleUnlockUser(u._id)}
+                              disabled={unlockingId === u._id}
+                              className="flex items-center gap-1 px-3 py-1.5 bg-gradient-to-r from-emerald-500 to-teal-600 text-white rounded-lg text-xs font-bold hover:from-emerald-600 hover:to-teal-700 transition-all shadow-sm disabled:opacity-50 flex-shrink-0"
+                            >
+                              <Unlock className="w-3.5 h-3.5" />
+                              {unlockingId === u._id ? '...' : 'Unlock'}
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
-            <button
-              onClick={fetchLockedUsers}
-              className="text-xs text-emerald-600 hover:text-emerald-700 font-medium underline underline-offset-2"
-            >
-              Refresh
-            </button>
-          </div>
-          <div className="p-4">
-            {loadingLocked ? (
-              <div className="py-8 text-center text-sm text-gray-400">Loading...</div>
-            ) : lockedUsers.length === 0 ? (
-              <div className="py-8 text-center">
-                <Shield className="w-10 h-10 text-green-400 mx-auto mb-2" />
-                <p className="text-sm text-gray-500">No locked accounts</p>
-              </div>
-            ) : (
-              <div className="space-y-2 max-h-72 overflow-y-auto">
-                {lockedUsers.map(u => (
-                  <div key={u._id} className="flex items-center gap-3 p-3 bg-red-50 border border-red-100 rounded-xl">
-                    <div className="w-9 h-9 rounded-full bg-red-200 flex items-center justify-center flex-shrink-0">
-                      <AlertTriangle className="w-4 h-4 text-red-600" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-semibold text-gray-800 truncate">{u.name}</p>
-                      <p className="text-xs text-gray-500 truncate">{u.email}</p>
-                      <p className="text-xs text-red-500 mt-0.5">
-                        {u.failedLoginAttempts} failed attempt(s)
-                        {u.lockedUntil && (
-                          <> · locked until {new Date(u.lockedUntil).toLocaleString('vi-VN')}</>
-                        )}
-                      </p>
-                    </div>
-                    <button
-                      onClick={() => handleUnlockUser(u._id)}
-                      disabled={unlockingId === u._id}
-                      className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-500 text-white rounded-lg text-xs font-medium hover:bg-emerald-600 transition-colors disabled:opacity-50 flex-shrink-0"
-                    >
-                      <Unlock className="w-3.5 h-3.5" />
-                      {unlockingId === u._id ? '...' : 'Unlock'}
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
           </div>
         </div>
       </div>

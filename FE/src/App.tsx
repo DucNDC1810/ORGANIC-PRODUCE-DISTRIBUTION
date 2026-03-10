@@ -89,6 +89,7 @@ export default function App() {
           </Routes>
           </Suspense>
           <ChatWidget />
+          <GroupSessionBar />
           </BrowserRouter>
         </GroupProvider>
       </CartProvider>
