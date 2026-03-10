@@ -13,6 +13,12 @@ export interface IAddress extends Document {
   country?: string;
   postalCode?: string;
   isDefault?: boolean;
+  deliveryZoneId?: mongoose.Types.ObjectId;
+  shipperId?: mongoose.Types.ObjectId;
+  coordinates?: {
+    latitude: number;
+    longitude: number;
+  };
   createdAt: Date;
   updatedAt: Date;
 }
@@ -34,11 +40,35 @@ const addressSchema = new Schema<IAddress>(
     province: { type: String },
     country: { type: String, default: 'Vietnam' },
     postalCode: { type: String },
-    isDefault: { type: Boolean, default: false }
+    isDefault: { type: Boolean, default: false },
+    deliveryZoneId: {
+      type: Schema.Types.ObjectId,
+      ref: 'DeliveryZone'
+    },
+    shipperId: {
+      type: Schema.Types.ObjectId,
+      ref: 'Shipper'
+    },
+    coordinates: {
+      latitude: {
+        type: Number,
+        min: -90,
+        max: 90
+      },
+      longitude: {
+        type: Number,
+        min: -180,
+        max: 180
+      }
+    }
   },
   {
     timestamps: true
   }
 );
+
+// Indexes for shipper queries
+addressSchema.index({ shipperId: 1 });
+addressSchema.index({ deliveryZoneId: 1 });
 
 export const Address = mongoose.model<IAddress>('Address', addressSchema);
