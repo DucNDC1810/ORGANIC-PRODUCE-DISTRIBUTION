@@ -68,22 +68,6 @@ const productSchema = new Schema<IProduct>(
       type: String,
       required: [true, 'Category is required'],
       trim: true,
-      enum: {
-        values: [
-          'vegetables',      // Rau củ
-          'fruits',          // Trái cây
-          'grains',          // Ngũ cốc
-          'dairy',           // Sữa và sản phẩm từ sữa
-          'meat',            // Thịt
-          'seafood',         // Hải sản
-          'herbs',           // Thảo mộc
-          'nuts',            // Hạt
-          'beverages',       // Đồ uống
-          'processed',       // Thực phẩm chế biến
-          'other'            // Khác
-        ],
-        message: '{VALUE} is not a valid category'
-      }
     },
     subcategory: {
       type: String,
@@ -108,7 +92,7 @@ const productSchema = new Schema<IProduct>(
       type: String,
       required: [true, 'Unit is required'],
       enum: {
-        values: ['kg', 'g', 'piece', 'bunch', 'pack', 'box', 'bottle', 'liter', 'ml'],
+        values: ['kg', 'g', 'lb', 'piece', 'bunch', 'pack', 'box', 'bottle', 'liter', 'ml'],
         message: '{VALUE} is not a valid unit'
       },
       default: 'kg'

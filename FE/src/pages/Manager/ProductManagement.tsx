@@ -171,12 +171,14 @@ export default function AdminProductManagement() {
 
     setIsSubmitting(true);
     try {
-      const productData = {
+      const productData: any = {
         ...formData,
         price: parseFloat(formData.price),
         stock: parseInt(formData.stock),
         images: [formData.thumbnail],
       };
+      if (!productData.expiryDate) delete productData.expiryDate;
+      if (!productData.harvestDate) delete productData.harvestDate;
       
       const result = await createProduct(productData);
       if (result) {
@@ -204,12 +206,14 @@ export default function AdminProductManagement() {
 
     setIsSubmitting(true);
     try {
-      const updateData = {
+      const updateData: any = {
         ...formData,
         price: parseFloat(formData.price),
         stock: parseInt(formData.stock),
         images: [formData.thumbnail],
       };
+      if (!updateData.expiryDate) delete updateData.expiryDate;
+      if (!updateData.harvestDate) delete updateData.harvestDate;
       
       const result = await updateProduct(selectedProduct._id, updateData);
       if (result) {
@@ -381,7 +385,7 @@ export default function AdminProductManagement() {
                       </SelectTrigger>
                       <SelectContent>
                         {categories.map(cat => (
-                          <SelectItem key={cat._id} value={cat._id}>
+                          <SelectItem key={cat._id} value={cat.slug}>
                             {cat.name}
                           </SelectItem>
                         ))}
@@ -654,7 +658,7 @@ export default function AdminProductManagement() {
               <SelectContent>
                 <SelectItem value="all">All Categories</SelectItem>
                 {categories.map(cat => (
-                  <SelectItem key={cat._id} value={cat._id}>{cat.name}</SelectItem>
+                  <SelectItem key={cat._id} value={cat.slug}>{cat.name}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -939,7 +943,7 @@ export default function AdminProductManagement() {
                   </SelectTrigger>
                   <SelectContent>
                     {categories.map(cat => (
-                      <SelectItem key={cat._id} value={cat._id}>
+                      <SelectItem key={cat._id} value={cat.slug}>
                         {cat.name}
                       </SelectItem>
                     ))}

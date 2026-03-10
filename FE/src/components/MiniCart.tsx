@@ -60,17 +60,6 @@ export default function MiniCart() {
     await updateQuantity(itemId, newQty);
   };
 
-  const handleQtyChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const val = e.target.value.replace(/[^0-9]/g, '');
-    setEditingQtyValue(val);
-  };
-
-  const handleQtyPaste = (e: React.ClipboardEvent<HTMLInputElement>) => {
-    e.preventDefault();
-    const pasted = e.clipboardData.getData('text').replace(/[^0-9]/g, '');
-    if (pasted) setEditingQtyValue(pasted);
-  };
-
   const handleQtyKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (['e', 'E', '+', '-', '.'].includes(e.key)) {
       e.preventDefault();
@@ -79,6 +68,15 @@ export default function MiniCart() {
     if (e.key === 'Enter') { (e.target as HTMLInputElement).blur(); return; }
     if (e.key === 'Escape') { setEditingQtyId(null); setEditingQtyValue(''); }
   };
+
+  const handleQtyPaste = (e: React.ClipboardEvent<HTMLInputElement>) => {
+    if (!/^\d+$/.test(e.clipboardData.getData('text'))) e.preventDefault();
+  };
+
+  const handleQtyChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setEditingQtyValue(e.target.value.replace(/\D/g, ''));
+  };
+  // ──────────────────────────────────────────────────────────────────────
 
   return (
     <AnimatePresence>
@@ -113,41 +111,27 @@ export default function MiniCart() {
                   <p className="text-sm text-muted-foreground">{cart.length} items</p>
                 </div>
               </div>
-              <button
-                onClick={closeCart}
-                className="p-2 hover:bg-muted rounded-lg transition-colors"
-              >
-                <X className="w-5 h-5 text-muted-foreground" />
-              </button>
-            </div>
-
-            {/* Selection toolbar */}
-            {cart.length > 0 && (
-              <div className="flex items-center justify-between px-6 py-2 border-b border-border/50 bg-muted/30">
-                <label className="flex items-center gap-2 cursor-pointer select-none">
-                  <input
-                    type="checkbox"
-                    checked={allSelected}
-                    ref={(el) => { if (el) el.indeterminate = !allSelected && someSelected; }}
-                    onChange={toggleSelectAll}
-                    className="w-4 h-4 rounded accent-primary cursor-pointer"
-                  />
-                  <span className="text-xs font-medium text-muted-foreground">
-                    {allSelected
-                      ? 'clear all'
-                      : someSelected
-                        ? `selected ${selectedItems.length}/${cart.length}`
-                        : 'delete all'}
-                  </span>
-                </label>
+              <div className="flex items-center gap-3">
+                {cart.length > 0 && (
+                  <label className="flex items-center gap-1.5 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={allSelected}
+                      ref={(el) => { if (el) el.indeterminate = !allSelected && someSelected; }}
+                      onChange={toggleSelectAll}
+                      className="w-4 h-4 rounded accent-primary cursor-pointer"
+                    />
+                    <span className="text-xs font-medium text-muted-foreground">All</span>
+                  </label>
+                )}
                 <button
-                  onClick={() => clearCart()}
-                  className="text-xs text-destructive hover:text-destructive/80 font-medium transition-colors"
+                  onClick={closeCart}
+                  className="p-2 hover:bg-muted rounded-lg transition-colors"
                 >
-                  Clear all
+                  <X className="w-5 h-5 text-muted-foreground" />
                 </button>
               </div>
-            )}
+            </div>
 
             {/* Cart Items */}
             <div className="flex-1 overflow-y-auto p-6 space-y-4">
@@ -268,7 +252,7 @@ export default function MiniCart() {
                             </div>
                             {item.quantity > 1 && (
                               <div className="text-xs text-muted-foreground">
-                                {fmt(item.price)} / product
+                                {fmt(item.price)} / sản phẩm
                               </div>
                             )}
                           </div>
@@ -286,7 +270,7 @@ export default function MiniCart() {
                 {/* Subtotal */}
                 <div className="flex items-center justify-between text-lg">
                   <span className="text-muted-foreground">Subtotal</span>
-                  <span className="font-bold text-foreground">{fmt(subtotal)}</span>
+                  <span className="font-bold text-foreground">${subtotal.toFixed(2)}</span>
                 </div>
                 {selectedItems.length > 0 && selectedItems.length < cart.length && (
                   <p className="text-xs text-muted-foreground -mt-2">{selectedItems.length} of {cart.length} items selected</p>
@@ -299,13 +283,22 @@ export default function MiniCart() {
 
                 {/* Actions */}
                 <div className="space-y-3">
-                  <Link
-                    to="/cart"
-                    onClick={closeCart}
-                    className="block w-full px-4 py-3 bg-white border-2 border-primary text-primary rounded-xl font-semibold text-center hover:bg-primary/5 transition-colors text-sm"
-                  >
-                    View Cart
-                  </Link>
+                  <div className="flex gap-2">
+                    <Link
+                      to="/cart"
+                      onClick={closeCart}
+                      className="flex-1 px-4 py-3 bg-white border-2 border-primary text-primary rounded-xl font-semibold text-center hover:bg-primary/5 transition-colors text-sm"
+                    >
+                      View Cart
+                    </Link>
+                    <button
+                      onClick={() => clearCart()}
+                      className="px-4 py-3 bg-white border-2 border-destructive text-destructive rounded-xl font-semibold hover:bg-destructive/5 transition-colors text-sm"
+                      title="Clear all items"
+                    >
+                      Clear
+                    </button>
+                  </div>
                   <button
                     onClick={handleCheckout}
                     disabled={selectedItems.length === 0}
