@@ -97,12 +97,7 @@ function MemberQuickTopupModal({ shortfall, groupId, onClose }: MemberTopupModal
       });
       const payUrl: string | undefined = (res as any)?.data?.payUrl ?? (res as any)?.payUrl;
       if (payUrl) {
-        window.open(payUrl, "_blank", "noopener,noreferrer");
-        onClose();
-        toast.info("MoMo window opened. Once topped up, your wallet will update automatically!", {
-          duration: 10000,
-          icon: "💜",
-        });
+        window.location.href = payUrl;
       } else {
         toast.error("Did not receive payment link from MoMo.");
         setLoading(false);
