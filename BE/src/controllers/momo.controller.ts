@@ -70,6 +70,7 @@ export class MoMoController {
 
         const newOrder = await Order.create({
           userId,
+          orderType: 'regular',
           deliveryInfo,
           ...(pickupLocation ? { pickupLocation } : {}),
           paymentMethod: 'momo',

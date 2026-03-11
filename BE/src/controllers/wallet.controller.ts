@@ -208,6 +208,7 @@ export class WalletController {
         [
           {
             userId,
+            orderType: 'regular',
             addressId: addressId || null,
             deliveryInfo: deliveryInfo || {},
             pickupLocation: pickupLocation || null,

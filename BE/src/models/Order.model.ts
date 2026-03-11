@@ -2,9 +2,10 @@ import mongoose, { Document, Schema } from 'mongoose';
 
 export interface IOrder extends Document {
   userId: mongoose.Types.ObjectId;
+  orderType: 'regular' | 'group_buy' | 'subscription';
   addressId?: mongoose.Types.ObjectId;
   voucherId?: mongoose.Types.ObjectId;
-  groupBuyId?: mongoose.Types.ObjectId;
+  groupId?: mongoose.Types.ObjectId;
   subscriptionId?: mongoose.Types.ObjectId;
   shipperId?: mongoose.Types.ObjectId;
   cancelledByShipperId?: mongoose.Types.ObjectId;
@@ -54,6 +55,12 @@ const orderSchema = new Schema<IOrder>(
       ref: 'User',
       required: [true, 'User ID is required']
     },
+    orderType: {
+      type: String,
+      enum: ['regular', 'group_buy', 'subscription'],
+      default: 'regular',
+      required: true
+    },
     addressId: {
       type: Schema.Types.ObjectId,
       ref: 'Address',
@@ -64,9 +71,9 @@ const orderSchema = new Schema<IOrder>(
       ref: 'Voucher',
       default: null
     },
-    groupBuyId: {
+    groupId: {
       type: Schema.Types.ObjectId,
-      ref: 'GroupBuy',
+      ref: 'Group',
       default: null
     },
     subscriptionId: {
@@ -228,5 +235,8 @@ orderSchema.index({ status: 1 });
 orderSchema.index({ orderDate: -1 });
 orderSchema.index({ 'items.productId': 1 });
 orderSchema.index({ shipperId: 1, status: 1 });
+orderSchema.index({ orderType: 1 });
+orderSchema.index({ groupId: 1 });
+orderSchema.index({ subscriptionId: 1 });
 
 export const Order = mongoose.model<IOrder>('Order', orderSchema);
