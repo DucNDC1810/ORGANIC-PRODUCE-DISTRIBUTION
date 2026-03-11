@@ -579,7 +579,6 @@ export default function SubscriptionTab() {
   };
 
   // ── compute summary stats ─────────────────────────────────────
-  
 
   // Sort by nextDeliveryDate ascending
   const sorted = [...subscriptions].sort(

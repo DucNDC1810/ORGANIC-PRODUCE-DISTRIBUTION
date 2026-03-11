@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { Search, ShoppingCart, Leaf, Apple, Carrot, Wheat, Milk, Lightbulb, Gift, LogOut, Settings, X, Bell, ChevronDown, LayoutDashboard } from 'lucide-react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
 import { cn } from './ui/utils';
@@ -59,6 +59,7 @@ export default function Header() {
   const { getTotalItems, openCart, clearLocalCart } = useCart();
   const { user, isAuthenticated, logout } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const [productsOpen, setProductsOpen] = useState(false);
   const [blogsOpen, setBlogsOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
@@ -137,7 +138,7 @@ export default function Header() {
   const handleLogout = () => {
     clearLocalCart();
     logout();
-    navigate('/');
+    // don't navigate automatically – stay on current page after logging out
   };
 
   const getInitials = (name: string) => {
@@ -204,7 +205,11 @@ export default function Header() {
           <div className="flex items-center gap-4">
             {!isAuthenticated ? (
               <Link 
-                to="/login"
+                to={{
+                  pathname: '/login',
+                  search: `?redirect=${encodeURIComponent(location.pathname + location.search)}`
+                }}
+                state={{ from: location.pathname + location.search }}
                 className="px-5 py-2 bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-lg font-medium hover:from-green-600 hover:to-emerald-700 transition-all shadow-sm hover:shadow-md"
               >
                 Login

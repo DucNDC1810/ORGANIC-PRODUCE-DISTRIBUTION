@@ -25,7 +25,6 @@ export default function MiniCart() {
   }, [cart]);
 
 
-
  
 
   const toggleItem = (id: string) => {

@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams, useLocation } from 'react-router-dom';
 import { Leaf, Eye, EyeOff, Lock, Send } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { toast } from 'sonner';
@@ -8,6 +8,7 @@ import api from '../../services/api';
 export default function LoginPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  const location = useLocation();
   const { login } = useAuth();
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
@@ -60,10 +61,17 @@ export default function LoginPage() {
         
         toast.success('Login successful! Welcome back!');
 
-        // Priority 1: ?redirect= URL param (e.g. from email link via Profile guard)
+        // Priority 1: ?redirect= URL param (e.g. from header or email link)
         const redirectParam = searchParams.get('redirect');
         if (redirectParam && (user.role === 'customer' || !user.role)) {
           navigate(decodeURIComponent(redirectParam), { replace: true });
+          return;
+        }
+
+        // Priority 1b: location.state.from (header link using state)
+        const stateFrom = (location.state as any)?.from as string | undefined;
+        if (stateFrom && (user.role === 'customer' || !user.role)) {
+          navigate(stateFrom, { replace: true });
           return;
         }
 
