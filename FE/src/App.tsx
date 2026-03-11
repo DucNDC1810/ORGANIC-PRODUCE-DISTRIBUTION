@@ -1,4 +1,4 @@
-﻿import { lazy } from 'react';
+﻿import { lazy, Suspense } from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { Toaster } from 'sonner';
 import { CartProvider } from './context/CartContext';
@@ -44,6 +44,7 @@ export default function App() {
           <BrowserRouter>
             <Toaster position="bottom-right" richColors />
             <MiniCart />
+            <Suspense fallback={<div className="min-h-screen flex items-center justify-center"><div className="w-8 h-8 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin" /></div>}>
             <Routes>
               {/* Public routes */}
               <Route path="/" element={<HomePage />} />
@@ -90,6 +91,7 @@ export default function App() {
               <Route path="/shipper/*" element={<ShipperRoute><ShipperDashboard /></ShipperRoute>} />
               <Route path="/manager" element={<ManagerRoute><ManagerDashboard /></ManagerRoute>} />
             </Routes>
+            </Suspense>
             <ChatWidget />
             <GroupSessionBar />
           </BrowserRouter>
