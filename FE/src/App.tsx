@@ -25,6 +25,7 @@ const AboutUs              = lazy(() => import('./pages/HomePage/AboutUs'));
 const Profile              = lazy(() => import('./pages/Customer/Profile'));
 const AdminDashboard       = lazy(() => import('./pages/Admin/AdminDashboard'));
 const ManagerDashboard     = lazy(() => import('./pages/Manager/ManagerDashboard'));
+const ShipperDashboard     = lazy(() => import('./pages/Shipper/ShipperDashboard'));
 const ProductsPage         = lazy(() => import('./pages/HomePage/ProductsPage'));
 const ProductDetailPage    = lazy(() => import('./pages/HomePage/ProductDetailPage'));
 const GroupOrderPage       = lazy(() => import('./pages/GroupOrder/GroupOrderPage'));
