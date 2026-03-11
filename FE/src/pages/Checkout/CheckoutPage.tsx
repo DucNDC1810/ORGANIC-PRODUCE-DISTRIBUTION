@@ -455,6 +455,9 @@ export default function CheckoutPage() {
           ...(deliveryType === 'pickup' && selectedStore
             ? { pickupLocation: { name: selectedStore.name, address: selectedStore.address } }
             : {}),
+          isRecurring: isRecurringOrder,
+          subscriptionFrequency: isRecurringOrder ? (recurringData?.recurringFrequency ?? undefined) : undefined,
+          discountAmount: recurringDiscount > 0 ? recurringDiscount : undefined,
         });
 
         const momoResponse = response as any;
@@ -526,6 +529,9 @@ export default function CheckoutPage() {
           notes: formData.notes,
           paymentMethod: "cod",
           totalAmount: total,
+          isRecurring: isRecurringOrder,
+          subscriptionFrequency: isRecurringOrder ? (recurringData?.recurringFrequency ?? undefined) : undefined,
+          discountAmount: recurringDiscount > 0 ? recurringDiscount : undefined,
           ...(activeGroupId
             ? {
                 groupId: activeGroupId,

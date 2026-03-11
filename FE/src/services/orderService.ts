@@ -16,6 +16,9 @@ export interface Order {
   voucherId?: string;
   groupBuyId?: string;
   subscriptionId?: string;
+  orderType?: 'regular' | 'group_buy' | 'subscription';
+  isRecurring?: boolean;
+  subscriptionFrequency?: 'weekly' | 'bi-weekly' | 'monthly';
   orderDate: string;
   totalAmount: number;
   status: 'pending' | 'confirmed' | 'processing' | 'shipped' | 'delivered' | 'cancelled' | 'refunded';
@@ -39,6 +42,8 @@ export interface CreateOrderPayload {
   items: OrderItem[];
   paymentMethod?: string;
   notes?: string;
+  isRecurring?: boolean;
+  subscriptionFrequency?: string;
 }
 
 export interface OrdersResponse {

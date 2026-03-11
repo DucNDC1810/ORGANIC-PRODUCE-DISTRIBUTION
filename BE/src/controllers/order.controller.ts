@@ -15,7 +15,7 @@ export class OrderController {
    */
   createOrder = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
     try {
-      const { addressId, deliveryInfo, voucherId, items, paymentMethod, notes, pickupLocation } = req.body;
+      const { addressId, deliveryInfo, voucherId, items, paymentMethod, notes, pickupLocation, isRecurring, subscriptionFrequency, discountAmount } = req.body;
       const userId = req.user?.id;
 
       if (!userId) {
@@ -52,6 +52,9 @@ export class OrderController {
         subtotal += item.subtotal;
       });
 
+      const discountAmountVal = Math.max(0, parseFloat(discountAmount) || 0);
+      const finalTotal = Math.max(0, subtotal - discountAmountVal);
+
       const isCOD = paymentMethod === 'cod';
 
       const order = await Order.create({
@@ -64,10 +67,13 @@ export class OrderController {
         items,
         paymentMethod: paymentMethod || 'credit_card',
         paymentStatus: isCOD ? 'unpaid' : 'pending',
-        totalAmount: subtotal,
+        totalAmount: finalTotal,
+        discountAmount: discountAmountVal,
         notes,
         status: 'pending',
-        orderDate: new Date()
+        orderDate: new Date(),
+        isRecurring: isRecurring === true || isRecurring === 'true',
+        subscriptionFrequency: subscriptionFrequency || null
       });
 
       await order.populate('userId', 'name email phone');

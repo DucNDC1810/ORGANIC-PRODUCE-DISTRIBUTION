@@ -8,6 +8,7 @@ import { useNavigate } from 'react-router-dom';
 import { useCart } from '../../context/CartContext';
 import { cartService } from '../../services/cartService';
 import { orderService, Order } from '../../services/orderService';
+import { subscriptionService } from '../../services/subscriptionService';
 import momoService from '../../services/momoService';
 import { toast } from 'sonner';
 
@@ -57,6 +58,12 @@ const PAYMENT_LABELS: Record<string, string> = {
   vnpay:   'VNPay',
   stripe:  'Credit Card',
   cash:    'Cash',
+};
+
+const FREQUENCY_LABEL: Record<string, string> = {
+  weekly:      'Weekly',
+  'bi-weekly': 'Bi‑Weekly',
+  monthly:     'Monthly',
 };
 
 // ─── Utility helpers ────────────────────────────────────────────
@@ -188,6 +195,7 @@ function OrderCard({
   onCancel: (order: ExtendedOrder) => void;
   reordering: boolean;
 }) {
+  const navigate = useNavigate();
   const hasItems = order.items && order.items.length > 0;
   const firstItem = hasItems ? (order.items as any[])[0] : null;
   const extraCount = hasItems ? Math.max(0, (order.items ?? []).length - 1) : 0;
@@ -197,11 +205,28 @@ function OrderCard({
   return (
     <div className="bg-white rounded-2xl border border-[#E5E7EB] shadow-sm hover:shadow-md transition-all duration-200 overflow-hidden group">
 
+      {/* ── Recurring Order Banner (manual first order) ── */}
+      {order.isRecurring && (
+        <div className="px-5 py-2 bg-gradient-to-r from-[#00B207] to-[#16a34a] flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <span className="text-base leading-none">🔄</span>
+            <span className="text-xs font-bold text-white tracking-wide">Recurring Order</span>
+          </div>
+          {order.subscriptionFrequency && (
+            <span className="text-[10px] font-bold text-white/90 bg-white/20 px-2 py-0.5 rounded-full">
+              {FREQUENCY_LABEL[order.subscriptionFrequency] ?? order.subscriptionFrequency}
+            </span>
+          )}
+        </div>
+      )}
+
       {/* ── Row 1: ID + Date + Status ── */}
       <div className="flex items-center justify-between px-5 py-4 border-b border-[#F3F4F6] bg-[#FAFAFA]">
         <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-lg bg-[#EDF2EE] flex items-center justify-center flex-shrink-0">
-            <Package className="w-4 h-4 text-[#00B207]" />
+          <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${order.isRecurring ? 'bg-[#EDF2EE]' : 'bg-[#EDF2EE]'}`}>
+            {order.isRecurring
+              ? <Repeat2 className="w-4 h-4 text-[#00B207]" />
+              : <Package className="w-4 h-4 text-[#00B207]" />}
           </div>
           <div>
             <div className="flex items-center gap-1.5">
@@ -320,6 +345,15 @@ function OrderCard({
               )}
               Reorder
             </button>
+            {order.isRecurring && (
+              <button
+                onClick={() => navigate('/profile?tab=subscriptions')}
+                className="flex items-center gap-1 px-3.5 py-2 text-xs font-bold text-[#00B207] border-2 border-[#00B207]/40 bg-[#EDF2EE] rounded-xl hover:bg-[#00B207] hover:text-white active:scale-95 transition-all"
+              >
+                <CalendarClock className="w-3.5 h-3.5" />
+                Manage Plan
+              </button>
+            )}
             {order.status === 'pending' && (
               <button
                 onClick={() => onCancel(order)}
@@ -346,6 +380,9 @@ function OrderDetailModal({
 }) {
   const [fullOrder, setFullOrder] = useState<ExtendedOrder>(order);
   const [loadingDetail, setLoadingDetail] = useState(true);
+  const [subscription, setSubscription] = useState<any>(null);
+  const [loadingSub, setLoadingSub] = useState(false);
+  const navigate = useNavigate();
 
   useEffect(() => {
     let cancelled = false;
@@ -362,6 +399,30 @@ function OrderDetailModal({
     fetchFull();
     return () => { cancelled = true; };
   }, [order._id]);
+
+  // Fetch the linked subscription for isRecurring orders
+  useEffect(() => {
+    if (!order.isRecurring) return;
+    let cancelled = false;
+    const fetchSub = async () => {
+      setLoadingSub(true);
+      try {
+        const res: any = await subscriptionService.getMySubscriptions(1, 5);
+        if (!cancelled) {
+          const list: any[] = res?.data?.data ?? res?.data ?? [];
+          // Pick the most recently created active/paused subscription
+          const found = list.find((s: any) => s.status !== 'cancelled') ?? list[0] ?? null;
+          setSubscription(found);
+        }
+      } catch {
+        // non-fatal
+      } finally {
+        if (!cancelled) setLoadingSub(false);
+      }
+    };
+    fetchSub();
+    return () => { cancelled = true; };
+  }, [order._id, order.isRecurring]);
 
   const delivery = fullOrder.deliveryInfo as any;
   const isPickup = delivery?.type === 'pickup';
@@ -520,6 +581,50 @@ function OrderDetailModal({
                       </div>
                     </div>
                   )}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ── Subscription Summary (for isRecurring manual orders) ── */}
+          {!loadingDetail && fullOrder.isRecurring && (
+            <div className="px-6 py-5">
+              <h4 className="text-sm font-bold text-[#364153] flex items-center gap-2 mb-4">
+                <div className="w-6 h-6 rounded-lg bg-green-50 flex items-center justify-center">
+                  <RefreshCw className="w-3.5 h-3.5 text-[#00B207]" />
+                </div>
+                Subscription Summary
+              </h4>
+              {loadingSub ? (
+                <div className="h-28 bg-[#F3F4F6] rounded-xl animate-pulse" />
+              ) : subscription ? (
+                <div className="bg-green-50 border border-green-200 rounded-xl overflow-hidden">
+                  <div className="px-4 py-3 space-y-2.5">
+                    <InfoRow
+                      label="Frequency"
+                      value={FREQUENCY_LABEL[subscription.frequency] ?? subscription.frequency}
+                      bold
+                    />
+                    <InfoRow label="Start Date"    value={formatDate(subscription.startDate)} />
+                    <InfoRow label="Next Delivery" value={formatDate(subscription.nextDeliveryDate)} />
+                    <InfoRow
+                      label="Plan Status"
+                      value={subscription.status.charAt(0).toUpperCase() + subscription.status.slice(1)}
+                    />
+                  </div>
+                  <div className="flex justify-end px-4 py-2.5 border-t border-green-100">
+                    <button
+                      onClick={() => { onClose(); navigate('/profile?tab=subscriptions'); }}
+                      className="flex items-center gap-1.5 text-xs font-bold text-[#00B207] hover:underline"
+                    >
+                      <CalendarClock className="w-3.5 h-3.5" />
+                      Manage this plan →
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="bg-[#F9FAFB] border border-[#E5E7EB] rounded-xl px-4 py-3 text-sm text-[#9CA3AF] text-center">
+                  No subscription plan found.
                 </div>
               )}
             </div>
