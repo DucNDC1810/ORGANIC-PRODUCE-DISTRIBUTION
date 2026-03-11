@@ -309,6 +309,55 @@ const OrderDetailModal = ({
             </div>
           )}
 
+          {/* Order Type */}
+          {(order.orderType || order.deliveryInfo?.type) && (
+            <div className="rounded-xl border bg-gray-50 p-4">
+              <h4 className="text-sm font-semibold text-gray-700 flex items-center gap-1.5 mb-3">
+                <Truck className="w-4 h-4 text-gray-500" />
+                Order Type
+              </h4>
+              <div className="flex flex-wrap items-center gap-3">
+                {/* Order type badge */}
+                {order.orderType && (() => {
+                  const typeConfig: Record<string, { label: string; className: string }> = {
+                    regular:      { label: 'Regular Order',    className: 'bg-gray-100 text-gray-800 border-gray-300' },
+                    group_buy:    { label: 'Group Buy',        className: 'bg-purple-100 text-purple-800 border-purple-200' },
+                    subscription: { label: 'Subscription',     className: 'bg-amber-100 text-amber-800 border-amber-200' },
+                  };
+                  const cfg = typeConfig[order.orderType] ?? { label: order.orderType, className: 'bg-gray-100 text-gray-700 border-gray-200' };
+                  return (
+                    <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-semibold border ${cfg.className}`}>
+                      <Package className="w-3.5 h-3.5" />
+                      {cfg.label}
+                    </span>
+                  );
+                })()}
+                {/* Delivery method badge */}
+                {order.deliveryInfo?.type === 'delivery' ? (
+                  <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-blue-100 text-blue-800 text-sm font-semibold border border-blue-200">
+                    <Truck className="w-3.5 h-3.5" />
+                    Delivery
+                  </span>
+                ) : order.deliveryInfo?.type === 'pickup' ? (
+                  <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-100 text-emerald-800 text-sm font-semibold border border-emerald-200">
+                    <Package className="w-3.5 h-3.5" />
+                    Pickup
+                  </span>
+                ) : null}
+                {order.deliveryInfo?.type === 'pickup' && order.pickupLocation && (
+                  <div className="flex items-center gap-1.5 text-sm text-gray-700">
+                    <MapPin className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
+                    <span>
+                      {order.pickupLocation.name && <strong>{order.pickupLocation.name}</strong>}
+                      {order.pickupLocation.name && order.pickupLocation.address && ' — '}
+                      {order.pickupLocation.address}
+                    </span>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
           {/* Order items */}
           <div>
             <h4 className="text-sm font-semibold text-gray-700 mb-2 flex items-center gap-1.5">
