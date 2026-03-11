@@ -199,7 +199,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
     // Respect stock limits before optimistic update
     const existingItem = cart.find((i) => i.id === productId);
-    const maxStock = existingItem ? ((existingItem as any).stock ?? Number.MAX_SAFE_INTEGER) : Number.MAX_SAFE_INTEGER;
+   
     if (existingItem && (existingItem as any).stock !== undefined && quantity > (existingItem as any).stock) {
       toast.error('Cannot exceed available stock');
       return;
