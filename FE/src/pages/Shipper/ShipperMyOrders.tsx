@@ -350,11 +350,6 @@ export default function ShipperMyOrders() {
                                         <p className="text-2xl font-bold text-emerald-600">
                                             {order.totalAmount.toLocaleString('vi-VN')}₫
                                         </p>
-                                        {order.shippingCost && (
-                                            <p className="text-xs text-gray-500 mt-1">
-                                                Your fee: {order.shippingCost.toLocaleString('vi-VN')}₫
-                                            </p>
-                                        )}
                                     </div>
 
                                     {order.status === 'shipped' && (
@@ -379,14 +374,7 @@ export default function ShipperMyOrders() {
                                         </>
                                     )}
 
-                                    {order.status === 'delivered' && (
-                                        <div className="text-center p-4 bg-emerald-50 rounded-lg">
-                                            <CheckCircle className="w-8 h-8 text-emerald-600 mx-auto mb-2" />
-                                            <p className="text-sm font-medium text-emerald-700">Successfully Delivered</p>
-                                        </div>
-                                    )}
-
-                                    {order.cancelledByShipperId && (
+                                    {order.cancelledByShipperId ? (
                                         <div className="text-center p-4 bg-red-50 rounded-lg">
                                             <XCircle className="w-8 h-8 text-red-600 mx-auto mb-2" />
                                             <p className="text-sm font-medium text-red-700">Order Cancelled</p>
@@ -395,6 +383,11 @@ export default function ShipperMyOrders() {
                                                     {formatDate(order.shipperCancelledAt)}
                                                 </p>
                                             )}
+                                        </div>
+                                    ) : order.status === 'delivered' && (
+                                        <div className="text-center p-4 bg-emerald-50 rounded-lg">
+                                            <CheckCircle className="w-8 h-8 text-emerald-600 mx-auto mb-2" />
+                                            <p className="text-sm font-medium text-emerald-700">Successfully Delivered</p>
                                         </div>
                                     )}
                                 </div>

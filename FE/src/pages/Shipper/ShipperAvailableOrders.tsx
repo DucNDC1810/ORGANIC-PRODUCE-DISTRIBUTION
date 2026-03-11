@@ -273,11 +273,6 @@ export default function ShipperAvailableOrders() {
                                         <p className="text-2xl font-bold text-emerald-600">
                                             {order.totalAmount.toLocaleString('vi-VN')}₫
                                         </p>
-                                        {order.shippingCost && (
-                                            <p className="text-xs text-gray-500 mt-1">
-                                                Shipping: {order.shippingCost.toLocaleString('vi-VN')}₫
-                                            </p>
-                                        )}
                                     </div>
 
                                     <button
