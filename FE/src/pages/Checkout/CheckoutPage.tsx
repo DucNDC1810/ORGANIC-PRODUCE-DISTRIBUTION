@@ -31,7 +31,7 @@ import RecurringDeliveryModal, {
 } from "../../components/RecurringDeliveryModal";
 
 export default function CheckoutPage() {
-  const { cart, removeFromCart, clearCart } = useCart();
+  const { cart, removeFromCart } = useCart();
   const { user } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();

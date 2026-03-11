@@ -209,7 +209,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
           return prev;
         });
       }
-    } catch {
+    } catch (error: any) {
       // Revert silently — UI already prevents exceeding stock
       setCart(prevCart);
       console.error('Error updating quantity:', error);

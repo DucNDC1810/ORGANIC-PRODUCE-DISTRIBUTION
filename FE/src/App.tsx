@@ -1,4 +1,4 @@
-﻿import { lazy, Suspense } from 'react';
+﻿import { lazy } from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { Toaster } from 'sonner';
 import { CartProvider } from './context/CartContext';
