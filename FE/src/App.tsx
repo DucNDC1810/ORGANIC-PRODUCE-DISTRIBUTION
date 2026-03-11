@@ -1,4 +1,4 @@
-import { lazy, Suspense } from 'react';
+﻿import { lazy, Suspense } from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { Toaster } from 'sonner';
 import { CartProvider } from './context/CartContext';
@@ -7,6 +7,7 @@ import { GroupProvider } from './context/GroupContext';
 import { ProtectedRoute, AdminRoute, ManagerRoute } from './components/ProtectedRoute';
 import MiniCart from './components/MiniCart';
 import ChatWidget from './components/ChatWidget';
+import GroupSessionBar from './components/GroupSessionBar';
 
 const HomePage             = lazy(() => import('./pages/HomePage/Home'));
 const CartPage             = lazy(() => import('./pages/HomePage/CartPage'));
@@ -89,6 +90,7 @@ export default function App() {
           </Routes>
           </Suspense>
           <ChatWidget />
+          <GroupSessionBar />
           </BrowserRouter>
         </GroupProvider>
       </CartProvider>
