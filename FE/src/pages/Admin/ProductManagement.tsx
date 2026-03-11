@@ -36,6 +36,7 @@ const validateProductForm = (data: any) => {
   const errors: Record<string, string> = {};
   
   if (!data.name?.trim()) errors.name = 'Product name is required';
+  if (!data.description?.trim()) errors.description = 'Description is required';
   if (!data.category) errors.category = 'Category is required';
   if (!data.price || data.price <= 0) errors.price = 'Valid price is required';
   if (!data.stock || data.stock < 0) errors.stock = 'Valid stock quantity is required';

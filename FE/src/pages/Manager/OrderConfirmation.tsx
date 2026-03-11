@@ -16,6 +16,9 @@ import {
   CreditCard,
   User,
   CalendarDays,
+  Phone,
+  Mail,
+  Truck,
   CircleDollarSign,
   StickyNote,
   Filter,
@@ -222,7 +225,7 @@ const OrderDetailModal = ({
                 </p>
               </div>
             </div>
-            <div className="flex items-start gap-3 p-3 rounded-lg border bg-white">
+            {/* <div className="flex items-start gap-3 p-3 rounded-lg border bg-white">
               <User className="w-4 h-4 text-emerald-600 mt-0.5 flex-shrink-0" />
               <div>
                 <p className="text-xs text-gray-500 font-medium">Customer</p>
@@ -235,31 +238,76 @@ const OrderDetailModal = ({
                   <p className="text-sm text-gray-900 font-mono">{order.userId as string}</p>
                 )}
               </div>
-            </div>
-            <div className="flex items-start gap-3 p-3 rounded-lg border bg-white">
-              <MapPin className="w-4 h-4 text-emerald-600 mt-0.5 flex-shrink-0" />
-              <div>
-                <p className="text-xs text-gray-500 font-medium">Shipping Address</p>
-                {typeof order.addressId === 'object' && order.addressId !== null ? (
-                  <>
-                    {(order.addressId as any).street && (
-                      <p className="text-sm text-gray-900 font-semibold">{(order.addressId as any).street}</p>
-                    )}
-                    {(order.addressId as any).city && (
-                      <p className="text-xs text-gray-500">
-                        {(order.addressId as any).city}{(order.addressId as any).province ? `, ${(order.addressId as any).province}` : ''}
-                      </p>
-                    )}
-                    {!(order.addressId as any).street && (
-                      <p className="text-sm text-gray-900 font-mono">{(order.addressId as any)._id}</p>
-                    )}
-                  </>
-                ) : (
-                  <p className="text-sm text-gray-900 font-mono">{order.addressId as string ?? '—'}</p>
-                )}
-              </div>
-            </div>
+            </div> */}
           </div>
+
+          {/* Delivery Info */}
+          {(order.deliveryInfo || order.notes) && (
+            <div className="rounded-xl border bg-blue-50 border-blue-100 p-4 space-y-3">
+              <h4 className="text-sm font-semibold text-blue-800 flex items-center gap-1.5">
+                <Truck className="w-4 h-4" />
+                Delivery Info
+              </h4>
+              {order.deliveryInfo && (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  {order.deliveryInfo.fullName && (
+                    <div className="flex items-center gap-2">
+                      <User className="w-3.5 h-3.5 text-blue-500 flex-shrink-0" />
+                      <div>
+                        <p className="text-[10px] text-blue-500 font-medium uppercase tracking-wide">Recipient</p>
+                        <p className="text-sm text-gray-900 font-semibold">{order.deliveryInfo.fullName}</p>
+                      </div>
+                    </div>
+                  )}
+                  {order.deliveryInfo.phone && (
+                    <div className="flex items-center gap-2">
+                      <Phone className="w-3.5 h-3.5 text-blue-500 flex-shrink-0" />
+                      <div>
+                        <p className="text-[10px] text-blue-500 font-medium uppercase tracking-wide">Phone</p>
+                        <p className="text-sm text-gray-900 font-semibold">{order.deliveryInfo.phone}</p>
+                      </div>
+                    </div>
+                  )}
+                  {order.deliveryInfo.email && (
+                    <div className="flex items-center gap-2">
+                      <Mail className="w-3.5 h-3.5 text-blue-500 flex-shrink-0" />
+                      <div>
+                        <p className="text-[10px] text-blue-500 font-medium uppercase tracking-wide">Email</p>
+                        <p className="text-sm text-gray-900 font-semibold">{order.deliveryInfo.email}</p>
+                      </div>
+                    </div>
+                  )}
+                  {order.deliveryInfo.type && (
+                    <div className="flex items-center gap-2">
+                      <Truck className="w-3.5 h-3.5 text-blue-500 flex-shrink-0" />
+                      <div>
+                        <p className="text-[10px] text-blue-500 font-medium uppercase tracking-wide">Type</p>
+                        <p className="text-sm text-gray-900 font-semibold capitalize">{order.deliveryInfo.type}</p>
+                      </div>
+                    </div>
+                  )}
+                  {order.deliveryInfo.address && (
+                    <div className="flex items-start gap-2 sm:col-span-2">
+                      <MapPin className="w-3.5 h-3.5 text-blue-500 flex-shrink-0 mt-0.5" />
+                      <div>
+                        <p className="text-[10px] text-blue-500 font-medium uppercase tracking-wide">Address</p>
+                        <p className="text-sm text-gray-900">{order.deliveryInfo.address}</p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+              {order.notes && (
+                <div className="flex items-start gap-2 pt-2 border-t border-blue-200">
+                  <StickyNote className="w-3.5 h-3.5 text-blue-500 flex-shrink-0 mt-0.5" />
+                  <div>
+                    <p className="text-[10px] text-blue-500 font-medium uppercase tracking-wide">Notes</p>
+                    <p className="text-sm text-gray-700 italic">{order.notes}</p>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Order items */}
           <div>
