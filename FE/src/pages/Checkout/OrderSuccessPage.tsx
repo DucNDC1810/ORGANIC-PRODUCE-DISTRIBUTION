@@ -43,7 +43,7 @@ function getDeliveryScheduleLabel(config: any): string {
 
 export default function OrderSuccessPage() {
   const location = useLocation();
-  const { refreshCart } = useCart();
+  const { refreshCart, clearCart } = useCart();
   const [orderData, setOrderData] = useState<any>(null);
   const [subscriptionConfig, setSubscriptionConfig] = useState<any>(null);
   const [verificationStatus, setVerificationStatus] = useState<"idle" | "verifying" | "verified">("idle");
@@ -117,6 +117,8 @@ export default function OrderSuccessPage() {
               // Non-fatal — already seeded from state above
             }
           }
+          // Clear cart after successful wallet payment
+          await clearCart(true);
           setLoading(false);
           return;
         }
@@ -169,6 +171,8 @@ export default function OrderSuccessPage() {
               // Non-fatal — already seeded from state above
             }
           }
+          // Clear cart after successful COD order
+          await clearCart(true);
           setLoading(false);
           return;
         }
@@ -284,6 +288,11 @@ export default function OrderSuccessPage() {
               setVerificationStatus("verified");
             }
           }
+
+          // Clear cart after MoMo payment verification
+          await clearCart(true);
+          // Also refresh from server to ensure sync (backend callback may have cleared it)
+          setTimeout(() => refreshCart(), 2000);
           
           setLoading(false);
           return;
@@ -300,12 +309,7 @@ export default function OrderSuccessPage() {
       }
     };
 
-    verifyAndLoadOrder().then(() => {
-      // Sync FE cart with server after successful payment
-      // Delay to allow MoMo callback to finish clearing cart on BE first
-      refreshCart();
-      setTimeout(() => refreshCart(), 3000);
-    });
+    verifyAndLoadOrder();
   }, []);
 
   const isPickup = orderData?.deliveryInfo?.type === 'pickup';
