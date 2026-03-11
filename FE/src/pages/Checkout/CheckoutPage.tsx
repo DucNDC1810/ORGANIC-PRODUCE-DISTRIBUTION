@@ -752,9 +752,10 @@ export default function CheckoutPage() {
     }
   };
 
-  const handleUpdateQuantity = (productId: string, newQuantity: number) => {
+  const handleUpdateQuantity = (productId: string, newQuantity: number, stock?: number) => {
     if (newQuantity < 1) return;
-    setLocalQty((prev) => ({ ...prev, [productId]: newQuantity }));
+    const max = stock ?? 999;
+    setLocalQty((prev) => ({ ...prev, [productId]: Math.min(newQuantity, max) }));
   };
 
   if (!user) {
@@ -778,7 +779,7 @@ export default function CheckoutPage() {
     );
   }
 
-  if (cart.length === 0) {
+  if (cart.length === 0 && !buyNowItem) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
@@ -1392,7 +1393,7 @@ export default function CheckoutPage() {
                           </p>
                           <div className="flex items-center gap-1 border border-gray-300 rounded">
                             <button 
-                              onClick={() => handleUpdateQuantity(item.id, (localQty[item.id] ?? item.quantity) - 1)}
+                              onClick={() => handleUpdateQuantity(item.id, (localQty[item.id] ?? item.quantity) - 1, (item as any).stock)}
                               className="w-6 h-6 flex items-center justify-center hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                               title="Decrease quantity"
                               disabled={(localQty[item.id] ?? item.quantity) <= 1}
@@ -1402,18 +1403,20 @@ export default function CheckoutPage() {
                             <input
                               type="number"
                               min={1}
+                              max={(item as any).stock ?? 999}
                               value={localQty[item.id] ?? item.quantity}
                               onChange={(e) => {
                                 const val = parseInt(e.target.value);
-                                if (!isNaN(val)) handleUpdateQuantity(item.id, val);
+                                if (!isNaN(val)) handleUpdateQuantity(item.id, val, (item as any).stock);
                               }}
                               className={`w-10 text-xs font-medium text-center border-x border-gray-300 focus:outline-none py-0.5 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none ${
                                 (() => { const q = localQty[item.id] ?? item.quantity; const s = (item as any).stock; return s !== undefined && q > s ? 'bg-red-50 text-red-600' : 'focus:bg-gray-50'; })()
                               }`}
                             />
                             <button 
-                              onClick={() => handleUpdateQuantity(item.id, (localQty[item.id] ?? item.quantity) + 1)}
-                              className="w-6 h-6 flex items-center justify-center hover:bg-gray-50 transition-colors"
+                              onClick={() => handleUpdateQuantity(item.id, (localQty[item.id] ?? item.quantity) + 1, (item as any).stock)}
+                              disabled={(localQty[item.id] ?? item.quantity) >= ((item as any).stock ?? 999)}
+                              className="w-6 h-6 flex items-center justify-center hover:bg-gray-50 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                               title="Increase quantity"
                             >
                               <Plus className="w-3 h-3" />

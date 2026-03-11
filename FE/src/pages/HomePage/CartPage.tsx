@@ -48,7 +48,9 @@ export default function CartPage() {
 
   const commitEdit = async (id: string) => {
     const parsed = parseInt(editingQtyValue, 10);
-    const newQty = isNaN(parsed) || parsed < 1 ? 1 : Math.min(parsed, QTY_MAX);
+    const item = cart.find((i) => i.id === id);
+    const max = (item as any)?.stock ?? QTY_MAX;
+    const newQty = isNaN(parsed) || parsed < 1 ? 1 : Math.min(parsed, max);
     setEditingQtyId(null);
     setEditingQtyValue('');
     await updateQuantity(id, newQty);

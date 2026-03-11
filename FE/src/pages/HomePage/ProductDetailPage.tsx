@@ -135,6 +135,7 @@ export default function ProductDetailPage() {
           image: selectedProduct.images?.[0] || selectedProduct.thumbnail || '',
           category: selectedProduct.category,
           quantity,
+          stock: selectedProduct.stock,
         },
       },
     });
