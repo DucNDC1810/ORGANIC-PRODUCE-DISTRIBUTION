@@ -54,7 +54,9 @@ export default function MiniCart() {
 
   const commitQtyEdit = async (itemId: string) => {
     const parsed = parseInt(editingQtyValue, 10);
-    const newQty = isNaN(parsed) || parsed < 1 ? 1 : Math.min(parsed, QTY_MAX);
+    const item = cart.find((i) => i.id === itemId);
+    const max = (item as any)?.stock ?? QTY_MAX;
+    const newQty = isNaN(parsed) || parsed < 1 ? 1 : Math.min(parsed, max);
     setEditingQtyId(null);
     setEditingQtyValue('');
     await updateQuantity(itemId, newQty);
@@ -125,20 +127,8 @@ export default function MiniCart() {
             {cart.length > 0 && (
               <div className="flex items-center justify-between px-6 py-2 border-b border-border/50 bg-muted/30">
                 <label className="flex items-center gap-2 cursor-pointer select-none">
-                  <input
-                    type="checkbox"
-                    checked={allSelected}
-                    ref={(el) => { if (el) el.indeterminate = !allSelected && someSelected; }}
-                    onChange={toggleSelectAll}
-                    className="w-4 h-4 rounded accent-primary cursor-pointer"
-                  />
-                  <span className="text-xs font-medium text-muted-foreground">
-                    {allSelected
-                      ? 'clear all'
-                      : someSelected
-                        ? `selected ${selectedItems.length}/${cart.length}`
-                        : 'delete all'}
-                  </span>
+                  
+                  
                 </label>
                 <button
                   onClick={() => clearCart()}
