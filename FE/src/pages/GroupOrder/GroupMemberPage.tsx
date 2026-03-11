@@ -77,15 +77,15 @@ interface MemberTopupModalProps {
 }
 
 function MemberQuickTopupModal({ shortfall, groupId, onClose }: MemberTopupModalProps) {
+  const exactShortfall = Math.max(shortfall, 10000);
   const presets = (() => {
-    const exact  = Math.max(shortfall, 10000);
     const buffer = roundUpTo(shortfall + 50000, 50000);
-    const candidates = [exact, buffer, 100000, 200000, 500000];
+    const candidates = [exactShortfall, buffer, 100000, 200000, 500000];
     const uniq = Array.from(new Set(candidates)).filter((v) => v >= 10000).sort((a, b) => a - b);
     return uniq.slice(0, 4);
   })();
 
-  const [selected, setSelected] = useState<number>(presets[0]);
+  const [selected, setSelected] = useState<number>(exactShortfall);
   const [loading,  setLoading]  = useState(false);
 
   const handleTopup = async () => {
@@ -151,7 +151,7 @@ function MemberQuickTopupModal({ shortfall, groupId, onClose }: MemberTopupModal
                       : "border-gray-200 bg-white text-gray-700 hover:border-pink-300"
                   }`}
                 >
-                  {amt === presets[0] && shortfall > 0 ? (
+                  {amt === exactShortfall && shortfall > 0 ? (
                     <span>
                       {fmtVND(amt)}
                       <span className="block text-xs font-normal text-pink-500">exact shortfall</span>

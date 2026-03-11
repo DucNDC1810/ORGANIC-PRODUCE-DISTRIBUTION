@@ -45,15 +45,15 @@ function roundUpTo(amount: number, step: number): number {
 }
 
 function QuickTopupModal({ shortfall, groupId, cartSnapshot, groupName, onClose }: QuickTopupModalProps) {
+  const exactShortfall = Math.max(shortfall, 10000);
   const presets = (() => {
-    const exact  = Math.max(shortfall, 10000);
     const buffer = roundUpTo(shortfall + 50000, 50000);
-    const candidates = [exact, buffer, 100000, 200000, 500000];
+    const candidates = [exactShortfall, buffer, 100000, 200000, 500000];
     const uniq = Array.from(new Set(candidates)).filter((v) => v >= 10000).sort((a, b) => a - b);
     return uniq.slice(0, 4);
   })();
 
-  const [selected, setSelected] = useState<number>(presets[0]);
+  const [selected, setSelected] = useState<number>(exactShortfall);
   const [loading,  setLoading]  = useState(false);
 
   const handleTopup = async () => {
@@ -131,7 +131,7 @@ function QuickTopupModal({ shortfall, groupId, cartSnapshot, groupName, onClose 
                       : "border-gray-200 bg-white text-gray-700 hover:border-pink-300"
                   }`}
                 >
-                  {amt === presets[0] && shortfall > 0 ? (
+                  {amt === exactShortfall && shortfall > 0 ? (
                     <span>
                       {fmtVND(amt)}
                       <span className="block text-xs font-normal text-pink-500">exact shortfall</span>
@@ -1128,8 +1128,8 @@ export default function GroupOrderActivePage() {
             );
           })()}
 
-          {/* ── Wallet balance indicator (non-owner_only modes) ── */}
-          {paymentOption !== 'owner_only' && ownerRemaining > 0 && (
+          {/* ── Wallet balance indicator ── */}
+          {ownerRemaining > 0 && (
             <div className={`flex items-center justify-between px-4 py-2.5 rounded-xl text-xs font-medium ${
               walletBalance >= ownerRemaining
                 ? "bg-green-50 border border-green-200 text-green-700"
@@ -1144,7 +1144,7 @@ export default function GroupOrderActivePage() {
           )}
 
           {/* ── Chốt đơn / Nạp thêm button ── */}
-          {paymentOption !== 'owner_only' && walletBalance < ownerRemaining && ownerRemaining > 0 ? (
+          {walletBalance < ownerRemaining && ownerRemaining > 0 ? (
             <button
               onClick={() => setShowTopupModal(true)}
               disabled={cart.length === 0}
