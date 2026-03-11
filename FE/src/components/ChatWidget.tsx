@@ -37,6 +37,15 @@ export default function ChatWidget() {
   const chatButtonRef = useRef<HTMLButtonElement>(null);
   const nextId = useRef(1);
 
+  // Draggable position (left, top in px)
+  const [pos, setPos] = useState(() => ({
+    x: window.innerWidth - 76,
+    y: Math.max(0, window.innerHeight / 2 - 28),
+  }));
+  const isDragging = useRef(false);
+  const hasMoved = useRef(false);
+  const dragOrigin = useRef({ mouseX: 0, mouseY: 0, posX: 0, posY: 0 });
+
   // Close chat panel when navigating to a non-allowed page
   useEffect(() => {
     if (!isVisible) setIsOpen(false);
@@ -70,6 +79,68 @@ export default function ChatWidget() {
       setHasNewMessage(false);
     }
   }, [isOpen]);
+
+  // Mouse drag
+  useEffect(() => {
+    const onMouseMove = (e: MouseEvent) => {
+      if (!isDragging.current) return;
+      const dx = e.clientX - dragOrigin.current.mouseX;
+      const dy = e.clientY - dragOrigin.current.mouseY;
+      if (Math.abs(dx) > 3 || Math.abs(dy) > 3) hasMoved.current = true;
+      setPos({
+        x: Math.max(0, Math.min(window.innerWidth - 56, dragOrigin.current.posX + dx)),
+        y: Math.max(0, Math.min(window.innerHeight - 56, dragOrigin.current.posY + dy)),
+      });
+    };
+    const onMouseUp = () => { isDragging.current = false; };
+    document.addEventListener('mousemove', onMouseMove);
+    document.addEventListener('mouseup', onMouseUp);
+    return () => {
+      document.removeEventListener('mousemove', onMouseMove);
+      document.removeEventListener('mouseup', onMouseUp);
+    };
+  }, []);
+
+  // Touch drag
+  useEffect(() => {
+    const onTouchMove = (e: TouchEvent) => {
+      if (!isDragging.current) return;
+      const t = e.touches[0];
+      const dx = t.clientX - dragOrigin.current.mouseX;
+      const dy = t.clientY - dragOrigin.current.mouseY;
+      if (Math.abs(dx) > 3 || Math.abs(dy) > 3) hasMoved.current = true;
+      e.preventDefault();
+      setPos({
+        x: Math.max(0, Math.min(window.innerWidth - 56, dragOrigin.current.posX + dx)),
+        y: Math.max(0, Math.min(window.innerHeight - 56, dragOrigin.current.posY + dy)),
+      });
+    };
+    const onTouchEnd = () => { isDragging.current = false; };
+    document.addEventListener('touchmove', onTouchMove, { passive: false });
+    document.addEventListener('touchend', onTouchEnd);
+    return () => {
+      document.removeEventListener('touchmove', onTouchMove);
+      document.removeEventListener('touchend', onTouchEnd);
+    };
+  }, []);
+
+  const handleButtonMouseDown = (e: React.MouseEvent) => {
+    isDragging.current = true;
+    hasMoved.current = false;
+    dragOrigin.current = { mouseX: e.clientX, mouseY: e.clientY, posX: pos.x, posY: pos.y };
+    e.preventDefault();
+  };
+
+  const handleButtonTouchStart = (e: React.TouchEvent) => {
+    const t = e.touches[0];
+    isDragging.current = true;
+    hasMoved.current = false;
+    dragOrigin.current = { mouseX: t.clientX, mouseY: t.clientY, posX: pos.x, posY: pos.y };
+  };
+
+  const handleButtonClick = () => {
+    if (!hasMoved.current) setIsOpen(prev => !prev);
+  };
 
   const sendMessage = async () => {
     const text = input.trim();
@@ -128,8 +199,20 @@ export default function ChatWidget() {
   return (
     <>
       {/* ─── Chat Panel ─────────────────────────────────────── */}
-      {isOpen && (
-        <div ref={chatPanelRef} className="fixed right-24 top-1/2 -translate-y-1/2 z-[9999] w-[380px] max-w-[calc(100vw-120px)] h-[520px] max-h-[calc(100vh-120px)] flex flex-col bg-white rounded-2xl shadow-2xl border border-gray-100 overflow-hidden animate-in slide-in-from-right-4 fade-in duration-300">
+      {isOpen && (() => {
+        const PANEL_W = 380;
+        const PANEL_H = 520;
+        const isRightSide = pos.x + 28 > window.innerWidth / 2;
+        const panelLeft = isRightSide
+          ? Math.max(8, pos.x - PANEL_W - 16)
+          : pos.x + 56 + 16;
+        const panelTop = Math.max(8, Math.min(window.innerHeight - PANEL_H - 8, pos.y + 28 - PANEL_H / 2));
+        return (
+        <div
+          ref={chatPanelRef}
+          style={{ left: panelLeft, top: panelTop, width: PANEL_W, height: PANEL_H }}
+          className="fixed z-[9999] max-w-[calc(100vw-120px)] max-h-[calc(100vh-120px)] flex flex-col bg-white rounded-2xl shadow-2xl border border-gray-100 overflow-hidden animate-in slide-in-from-right-4 fade-in duration-300"
+        >
           {/* Header */}
           <div className="flex items-center justify-between px-4 py-3 bg-gradient-to-r from-[#00B207] to-[#2DC071] text-white">
             <div className="flex items-center gap-2.5">
@@ -233,15 +316,19 @@ export default function ChatWidget() {
             </p>
           </div>
         </div>
-      )}
+        );
+      })()}
 
       {/* ─── Floating Button ────────────────────────────────── */}
       <button
         ref={chatButtonRef}
-        onClick={() => setIsOpen(prev => !prev)}
-        className={`fixed right-5 top-1/2 -translate-y-1/2 z-[9999] w-14 h-14 rounded-full shadow-lg flex items-center justify-center transition-all duration-300 hover:scale-110 active:scale-95 ${
+        onMouseDown={handleButtonMouseDown}
+        onTouchStart={handleButtonTouchStart}
+        onClick={handleButtonClick}
+        style={{ left: pos.x, top: pos.y }}
+        className={`fixed z-[9999] w-14 h-14 rounded-full shadow-lg flex items-center justify-center transition-colors duration-300 hover:scale-110 active:scale-95 cursor-grab active:cursor-grabbing select-none ${
           isOpen
-            ? 'bg-[#364153] rotate-0'
+            ? 'bg-[#364153]'
             : 'bg-gradient-to-br from-[#00B207] to-[#2DC071]'
         }`}
       >

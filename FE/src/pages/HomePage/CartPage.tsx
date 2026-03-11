@@ -48,7 +48,9 @@ export default function CartPage() {
 
   const commitEdit = async (id: string) => {
     const parsed = parseInt(editingQtyValue, 10);
-    const newQty = isNaN(parsed) || parsed < 1 ? 1 : Math.min(parsed, QTY_MAX);
+    const item = cart.find((i) => i.id === id);
+    const max = (item as any)?.stock ?? QTY_MAX;
+    const newQty = isNaN(parsed) || parsed < 1 ? 1 : Math.min(parsed, max);
     setEditingQtyId(null);
     setEditingQtyValue('');
     await updateQuantity(id, newQty);
@@ -214,7 +216,8 @@ export default function CartPage() {
                               )}
                               <button
                                 onClick={() => updateQuantity(item.id, item.quantity + 1)}
-                                className="p-2 hover:bg-white rounded-lg transition-colors"
+                                disabled={item.quantity >= ((item as any).stock ?? QTY_MAX)}
+                                className="p-2 hover:bg-white rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                               >
                                 <Plus className="w-4 h-4 text-muted-foreground" />
                               </button>
@@ -296,7 +299,7 @@ export default function CartPage() {
                   {/* Checkout Button */}
                   <button
                     onClick={handleCheckout}
-                    disabled={selectedItems.length === 0}
+                    disabled={selectedItems.length === 0 || selectedItems.some((i) => (i as any).stock !== undefined && i.quantity > (i as any).stock)}
                     className="block w-full px-6 py-4 bg-primary text-white rounded-xl font-semibold text-center hover:bg-primary-dark hover:shadow-lg hover:-translate-y-0.5 transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0 disabled:hover:shadow-none"
                   >
                     Proceed to Checkout ({selectedItems.length}) →

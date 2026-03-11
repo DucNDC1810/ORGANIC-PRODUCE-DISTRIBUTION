@@ -31,11 +31,40 @@ import RecurringDeliveryModal, {
 } from "../../components/RecurringDeliveryModal";
 
 export default function CheckoutPage() {
-  const { cart, getTotalPrice, removeFromCart, updateQuantity, clearCart } = useCart();
+  const { cart, removeFromCart,  } = useCart();
   const { user } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const { groupSession } = useGroup();
+
+  // Buy Now: single item passed directly from ProductDetailPage (does not touch cart)
+  const buyNowItem = (location.state as any)?.buyNowItem as {
+    id: string; name: string; price: number; image: string; category: string; quantity: number;
+  } | undefined;
+
+  // Items selected in CartPage (undefined = all items)
+  const selectedItemIds = (location.state as any)?.selectedItemIds as string[] | undefined;
+  const checkoutItems = buyNowItem
+    ? [{ ...buyNowItem }]
+    : selectedItemIds
+    ? cart.filter((i) => selectedItemIds.includes(i.id))
+    : cart;
+
+  // Local quantity state — isolated from CartContext so minicart is unaffected
+  const [localQty, setLocalQty] = useState<Record<string, number>>(() =>
+    Object.fromEntries(checkoutItems.map((i) => [i.id, i.quantity]))
+  );
+  // Sync when checkoutItems first loads (e.g. after cart fetch)
+  useEffect(() => {
+    setLocalQty(Object.fromEntries(checkoutItems.map((i) => [i.id, i.quantity])));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cart]);
+
+  const overStock = checkoutItems.some((i) => {
+    const q = localQty[i.id] ?? i.quantity;
+    const s = (i as any).stock;
+    return q < 1 || (s !== undefined && q > s);
+  });
 
   // ── Group checkout detection ─────────────────────────────────────────────
   // Populated when navigating from the Active Group page
@@ -265,7 +294,7 @@ export default function CheckoutPage() {
   };
   // ----------------------------------------------------------------
 
-  const baseSubtotal = getTotalPrice();
+  const baseSubtotal = checkoutItems.reduce((sum, i) => sum + i.price * (localQty[i.id] ?? i.quantity), 0);
   // For group orders, honour the subtotal/shipping/discount from the Active Group page
   const subtotal = isGroupOrder && navGroupData ? navGroupData.subtotal : baseSubtotal;
   const shipping = isGroupOrder
@@ -382,9 +411,9 @@ export default function CheckoutPage() {
       frequency: frequencyMap[recurringData.recurringFrequency],
       deliveryDay,
       nextDeliveryDate: nextDelivery.toISOString(),
-      items: cart.map((item) => ({
+      items: checkoutItems.map((item) => ({
         productId: item.id,
-        quantity: item.quantity,
+        quantity: localQty[item.id] ?? item.quantity,
         priceAtSubscription: item.price,
       })),
       discountRate: 0.05,
@@ -419,11 +448,11 @@ export default function CheckoutPage() {
           ...(deliveryType === 'pickup' && selectedStore
             ? { pickupLocation: { name: selectedStore.name, address: selectedStore.address } }
             : {}),
-          items: cart.map((item) => ({
+          items: checkoutItems.map((item) => ({
             productId: item.id,
-            quantity: item.quantity,
+            quantity: localQty[item.id] ?? item.quantity,
             price: item.price,
-            subtotal: item.price * item.quantity,
+            subtotal: item.price * (localQty[item.id] ?? item.quantity),
           })),
           notes: formData.notes,
           paymentMethod: "momo",
@@ -445,11 +474,11 @@ export default function CheckoutPage() {
             address: momoBuiltAddress,
             type: deliveryType,
           },
-          items: cart.map((item) => ({
+          items: checkoutItems.map((item) => ({
             productId: item.id,
-            quantity: item.quantity,
+            quantity: localQty[item.id] ?? item.quantity,
             price: item.price,
-            subtotal: item.price * item.quantity,
+            subtotal: item.price * (localQty[item.id] ?? item.quantity),
           })),
           notes: formData.notes || undefined,
           ...(deliveryType === 'pickup' && selectedStore
@@ -520,11 +549,11 @@ export default function CheckoutPage() {
           ...(deliveryType === 'pickup' && selectedStore
             ? { pickupLocation: { name: selectedStore.name, address: selectedStore.address } }
             : {}),
-          items: cart.map((item) => ({
+          items: checkoutItems.map((item) => ({
             productId: item.id,
-            quantity: item.quantity,
+            quantity: localQty[item.id] ?? item.quantity,
             price: item.price,
-            subtotal: item.price * item.quantity,
+            subtotal: item.price * (localQty[item.id] ?? item.quantity),
           })),
           notes: formData.notes,
           paymentMethod: "cod",
@@ -559,15 +588,19 @@ export default function CheckoutPage() {
             }
           }
           // Snapshot cart items before clearing (for display on success page)
-          const cartItemsSnapshot = cart.map((item) => ({
+          const cartItemsSnapshot = checkoutItems.map((item) => ({
             productId: { _id: item.id, name: item.name, thumbnail: item.image },
-            quantity: item.quantity,
+            quantity: localQty[item.id] ?? item.quantity,
             price: item.price,
-            subtotal: item.price * item.quantity,
+            subtotal: item.price * (localQty[item.id] ?? item.quantity),
           }));
 
-          // Xoá giỏ hàng sau khi đặt hàng thành công
-          await clearCart(true);
+          // Xoá các sản phẩm đã đặt hàng khỏi giỏ
+          if (!buyNowItem) {
+            for (const item of checkoutItems) {
+              await removeFromCart(item.id);
+            }
+          }
 
           navigate("/order-success", {
             state: {
@@ -637,11 +670,11 @@ export default function CheckoutPage() {
           ...(deliveryType === "pickup" && selectedStore
             ? { pickupLocation: { name: selectedStore.name, address: selectedStore.address } }
             : {}),
-          items: cart.map((item) => ({
+          items: checkoutItems.map((item) => ({
             productId: item.id,
-            quantity: item.quantity,
+            quantity: localQty[item.id] ?? item.quantity,
             price: item.price,
-            subtotal: item.price * item.quantity,
+            subtotal: item.price * (localQty[item.id] ?? item.quantity),
           })),
           totalAmount: total,
           notes: formData.notes || undefined,
@@ -654,15 +687,19 @@ export default function CheckoutPage() {
         setWalletBalance(newBalance);
 
         // Snapshot cart items before clearing (for display on success page)
-        const cartItemsSnapshot = cart.map((item) => ({
+        const cartItemsSnapshot = checkoutItems.map((item) => ({
           productId: { _id: item.id, name: item.name, thumbnail: item.image },
-          quantity: item.quantity,
+          quantity: localQty[item.id] ?? item.quantity,
           price: item.price,
-          subtotal: item.price * item.quantity,
+          subtotal: item.price * (localQty[item.id] ?? item.quantity),
         }));
 
-        // Xoá giỏ hàng sau khi thanh toán thành công
-        await clearCart(true);
+        // Xoá các sản phẩm đã đặt hàng khỏi giỏ
+        if (!buyNowItem) {
+          for (const item of checkoutItems) {
+            await removeFromCart(item.id);
+          }
+        }
 
         navigate("/order-success", {
           state: {
@@ -721,12 +758,10 @@ export default function CheckoutPage() {
     }
   };
 
-  const handleUpdateQuantity = async (productId: string, newQuantity: number) => {
-    try {
-      await updateQuantity(productId, newQuantity);
-    } catch (error) {
-      console.error('Error updating quantity:', error);
-    }
+  const handleUpdateQuantity = (productId: string, newQuantity: number, stock?: number) => {
+    if (newQuantity < 1) return;
+    const max = stock ?? 999;
+    setLocalQty((prev) => ({ ...prev, [productId]: Math.min(newQuantity, max) }));
   };
 
   if (!user) {
@@ -740,7 +775,11 @@ export default function CheckoutPage() {
             You need to log in to continue placing an order
           </p>
           <Link
-            to="/login"
+            to={{
+              pathname: '/login',
+              search: `?redirect=${encodeURIComponent(location.pathname + location.search)}`
+            }}
+            state={{ from: location.pathname + location.search }}
             className="inline-block px-6 py-3 bg-primary text-white rounded-lg font-semibold hover:bg-primary-dark transition-colors"
           >
             Log in now
@@ -750,7 +789,7 @@ export default function CheckoutPage() {
     );
   }
 
-  if (cart.length === 0) {
+  if (cart.length === 0 && !buyNowItem) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
@@ -1334,7 +1373,7 @@ export default function CheckoutPage() {
                 </h3>
 
                 <div className="space-y-4">
-                  {cart.map((item) => (
+                  {checkoutItems.map((item) => (
                     <div key={item.id} className="flex gap-3">
                       <div className="w-14 h-14 bg-gray-100 rounded-lg overflow-hidden flex-shrink-0">
                         <img
@@ -1364,19 +1403,30 @@ export default function CheckoutPage() {
                           </p>
                           <div className="flex items-center gap-1 border border-gray-300 rounded">
                             <button 
-                              onClick={() => handleUpdateQuantity(item.id, item.quantity - 1)}
+                              onClick={() => handleUpdateQuantity(item.id, (localQty[item.id] ?? item.quantity) - 1, (item as any).stock)}
                               className="w-6 h-6 flex items-center justify-center hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                               title="Decrease quantity"
-                              disabled={item.quantity <= 1}
+                              disabled={(localQty[item.id] ?? item.quantity) <= 1}
                             >
                               <Minus className="w-3 h-3" />
                             </button>
-                            <span className="text-xs font-medium px-2">
-                              {item.quantity}
-                            </span>
+                            <input
+                              type="number"
+                              min={1}
+                              max={(item as any).stock ?? 999}
+                              value={localQty[item.id] ?? item.quantity}
+                              onChange={(e) => {
+                                const val = parseInt(e.target.value);
+                                if (!isNaN(val)) handleUpdateQuantity(item.id, val, (item as any).stock);
+                              }}
+                              className={`w-10 text-xs font-medium text-center border-x border-gray-300 focus:outline-none py-0.5 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none ${
+                                (() => { const q = localQty[item.id] ?? item.quantity; const s = (item as any).stock; return s !== undefined && q > s ? 'bg-red-50 text-red-600' : 'focus:bg-gray-50'; })()
+                              }`}
+                            />
                             <button 
-                              onClick={() => handleUpdateQuantity(item.id, item.quantity + 1)}
-                              className="w-6 h-6 flex items-center justify-center hover:bg-gray-50 transition-colors"
+                              onClick={() => handleUpdateQuantity(item.id, (localQty[item.id] ?? item.quantity) + 1, (item as any).stock)}
+                              disabled={(localQty[item.id] ?? item.quantity) >= ((item as any).stock ?? 999)}
+                              className="w-6 h-6 flex items-center justify-center hover:bg-gray-50 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                               title="Increase quantity"
                             >
                               <Plus className="w-3 h-3" />
@@ -1511,8 +1561,9 @@ export default function CheckoutPage() {
                   onClick={() => {
                     if (validateForm()) setShowConfirmModal(true);
                   }}
-                  disabled={loading}
-                  className="w-full px-5 py-3 bg-black text-white rounded-lg font-semibold hover:bg-gray-800 disabled:bg-gray-400 transition-colors text-sm flex items-center justify-center gap-2"
+                  disabled={loading || overStock}
+                  title={overStock ? 'Quantity exceeds available stock' : undefined}
+                  className="w-full px-5 py-3 bg-black text-white rounded-lg font-semibold hover:bg-gray-800 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors text-sm flex items-center justify-center gap-2"
                 >
                   {loading ? <Loader className="w-4 h-4 animate-spin" /> : null}
                   {loading ? "Processing..." : "Place order"}
@@ -1631,11 +1682,11 @@ export default function CheckoutPage() {
               <div className="rounded-xl border border-gray-100 overflow-hidden">
                 <div className="px-3 py-1.5 bg-gray-50 border-b border-gray-100">
                   <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
-                    Products ({cart.length})
+                    Products ({checkoutItems.length})
                   </p>
                 </div>
                 <div className="divide-y divide-gray-50">
-                  {cart.map((item) => (
+                  {checkoutItems.map((item) => (
                     <div key={item.id} className="flex items-center gap-2.5 px-3 py-2">
                       <div className="w-8 h-8 bg-gray-100 rounded-lg overflow-hidden flex-shrink-0">
                         <img src={item.image} alt={item.name} className="w-full h-full object-cover" />
