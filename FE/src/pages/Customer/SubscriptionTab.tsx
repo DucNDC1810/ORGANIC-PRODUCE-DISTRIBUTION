@@ -3,7 +3,7 @@ import {
   CalendarClock, Package, RefreshCw, PauseCircle, PlayCircle,
   XCircle, ShoppingBag, ChevronRight, Repeat2, AlertTriangle,
   CreditCard, Tag, Loader2, Clock, FlaskConical, ChevronDown,
-  Calendar, TrendingUp, CheckCircle2, PauseOctagon, Ban
+  Calendar, CheckCircle2, PauseOctagon, Ban
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { subscriptionService, Subscription } from '../../services/subscriptionService';
@@ -238,7 +238,6 @@ function ScheduleRow({
   const days = daysUntil(sub.nextDeliveryDate);
   const isLoading = actionLoading === sub._id;
   const isCancelled = sub.status === 'cancelled';
-  const cfg = STATUS_CONFIG[sub.status] ?? STATUS_CONFIG.active;
 
   const items = sub.items ?? [];
   const totalPerCycle = items.reduce((sum: number, item: any) =>
@@ -580,9 +579,6 @@ export default function SubscriptionTab() {
   };
 
   // ── compute summary stats ─────────────────────────────────────
-  const activeCount    = subscriptions.filter(s => s.status === 'active').length;
-  const pausedCount    = subscriptions.filter(s => s.status === 'paused').length;
-  const cancelledCount = subscriptions.filter(s => s.status === 'cancelled').length;
 
   // Sort by nextDeliveryDate ascending
   const sorted = [...subscriptions].sort(

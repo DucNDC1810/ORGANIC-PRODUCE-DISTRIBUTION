@@ -31,7 +31,7 @@ import RecurringDeliveryModal, {
 } from "../../components/RecurringDeliveryModal";
 
 export default function CheckoutPage() {
-  const { cart, removeFromCart, clearCart } = useCart();
+  const { cart, removeFromCart,  } = useCart();
   const { user } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
@@ -769,7 +769,11 @@ export default function CheckoutPage() {
             You need to log in to continue placing an order
           </p>
           <Link
-            to="/login"
+            to={{
+              pathname: '/login',
+              search: `?redirect=${encodeURIComponent(location.pathname + location.search)}`
+            }}
+            state={{ from: location.pathname + location.search }}
             className="inline-block px-6 py-3 bg-primary text-white rounded-lg font-semibold hover:bg-primary-dark transition-colors"
           >
             Log in now

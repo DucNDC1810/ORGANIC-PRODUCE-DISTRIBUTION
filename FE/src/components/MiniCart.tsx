@@ -24,13 +24,8 @@ export default function MiniCart() {
     });
   }, [cart]);
 
-  const allSelected = cart.length > 0 && cart.every((i) => selectedIds.has(i.id));
-  const someSelected = cart.some((i) => selectedIds.has(i.id));
 
-  const toggleSelectAll = () => {
-    if (allSelected) setSelectedIds(new Set());
-    else setSelectedIds(new Set(cart.map((i) => i.id)));
-  };
+ 
 
   const toggleItem = (id: string) => {
     setSelectedIds((prev) => {
