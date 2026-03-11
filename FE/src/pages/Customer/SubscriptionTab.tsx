@@ -342,24 +342,38 @@ function SubscriptionCard({
             })}
 
             {/* Price summary */}
-            {totalPerCycle > 0 && (
-              <div className="mt-3 pt-3 border-t border-[#F3F4F6] space-y-1">
-                <div className="flex justify-between text-xs text-[#6A7282]">
-                  <span>Subtotal / cycle</span>
-                  <span>{formatCurrency(totalPerCycle)}</span>
-                </div>
-                {discount > 0 && (
-                  <div className="flex justify-between text-xs text-green-600">
-                    <span>Recurring discount (-{Math.round(sub.discountRate * 100)}%)</span>
-                    <span>-{formatCurrency(discount)}</span>
+            {totalPerCycle > 0 && (() => {
+              const shipping = (sub as any).shippingCost ?? 25000;
+              const vatAmount = (afterDiscount + shipping) * 0.0476;
+              const total = afterDiscount + shipping + vatAmount;
+              return (
+                <div className="mt-3 pt-3 border-t border-[#F3F4F6] space-y-1">
+                  <div className="flex justify-between text-xs text-[#6A7282]">
+                    <span>Subtotal / cycle</span>
+                    <span>{formatCurrency(totalPerCycle)}</span>
                   </div>
-                )}
-                <div className="flex justify-between text-sm font-bold text-[#101828]">
-                  <span>Estimated / cycle</span>
-                  <span className="text-[#00B207]">{formatCurrency(afterDiscount)}</span>
+                  <div className="flex justify-between text-xs text-[#6A7282]">
+                    <span>Shipping</span>
+                    <span>{formatCurrency(shipping)}</span>
+                  </div>
+                  {discount > 0 && (
+                    <div className="flex justify-between text-xs text-green-600">
+                      <span>Recurring discount (-{Math.round(sub.discountRate * 100)}%)</span>
+                      <span>-{formatCurrency(discount)}</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between text-sm font-bold text-[#101828]">
+                    <span>Total</span>
+                    <span className="text-[#00B207]">{formatCurrency(total)}</span>
+                  </div>
+                  <div className="flex justify-end">
+                    <span className="text-[11px] text-[#B0B7C3]">
+                      Price includes VAT {formatCurrency(vatAmount)}
+                    </span>
+                  </div>
                 </div>
-              </div>
-            )}
+              );
+            })()}
           </div>
         )}
       </div>
