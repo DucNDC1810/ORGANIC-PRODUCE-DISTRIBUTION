@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import {
-  Clock, Truck, CheckCircle2, XCircle, Eye,
-  Search, ChevronLeft, ChevronRight, MapPin, AlertCircle,
+  Clock, Truck, XCircle, Eye, Package, PackageCheck,
+  Search, ChevronLeft, ChevronRight, MapPin, AlertCircle, ShieldCheck,
 } from 'lucide-react';
 import { Button } from '../../components/ui/button';
 import { Badge } from '../../components/ui/badge';
@@ -89,8 +89,10 @@ const buildStatsMap = (byStatus: { _id: string; count: number }[]) => {
   const map: Record<string, number> = {};
   byStatus.forEach(s => { map[s._id] = s.count; });
   return {
-    pending:    (map['pending'] ?? 0) + (map['confirmed'] ?? 0),
-    processing: (map['processing'] ?? 0) + (map['shipped'] ?? 0),
+    pending:    map['pending'] ?? 0,
+    confirmed:  map['confirmed'] ?? 0,
+    processing: map['processing'] ?? 0,
+    shipped:    map['shipped'] ?? 0,
     delivered:  map['delivered'] ?? 0,
     cancelled:  (map['cancelled'] ?? 0) + (map['refunded'] ?? 0),
   };
@@ -134,7 +136,14 @@ export default function OrderManagement() {
   const [updating, setUpdating]           = useState(false);
   const [updateMsg, setUpdateMsg]         = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
-  const [stats, setStats] = useState({ pending: 0, processing: 0, delivered: 0, cancelled: 0 });
+  const [stats, setStats] = useState({ 
+    pending: 0, 
+    confirmed: 0, 
+    processing: 0, 
+    shipped: 0, 
+    delivered: 0, 
+    cancelled: 0 
+  });
 
   // ── Stats ─────────────────────────────────────────────────────────────────
 
@@ -240,49 +249,100 @@ export default function OrderManagement() {
         <p className="text-muted-foreground">View and manage customer orders</p>
       </div>
 
-      {/* Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card className="border-l-4 border-l-yellow-500">
+      {/* Stats Cards - Order Workflow */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
+        {/* Pending - Awaiting Confirmation */}
+        <Card className="border-l-4 border-l-yellow-500 hover:shadow-md transition-shadow">
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">Pending / Confirmed</p>
-                <p className="text-2xl font-bold">{statsLoading ? <span className="animate-pulse">—</span> : stats.pending}</p>
+                <p className="text-xs text-muted-foreground uppercase tracking-wide">Pending</p>
+                <p className="text-2xl font-bold mt-1">
+                  {statsLoading ? <span className="animate-pulse">—</span> : stats.pending}
+                </p>
+                <p className="text-xs text-muted-foreground mt-1">Awaiting confirm</p>
               </div>
-              <Clock className="w-8 h-8 text-yellow-500" />
+              <Clock className="w-8 h-8 text-yellow-500 opacity-80" />
             </div>
           </CardContent>
         </Card>
-        <Card className="border-l-4 border-l-blue-500">
+
+        {/* Confirmed - Ready to Process */}
+        <Card className="border-l-4 border-l-blue-400 hover:shadow-md transition-shadow">
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">Processing / Shipped</p>
-                <p className="text-2xl font-bold">{statsLoading ? <span className="animate-pulse">—</span> : stats.processing}</p>
+                <p className="text-xs text-muted-foreground uppercase tracking-wide">Confirmed</p>
+                <p className="text-2xl font-bold mt-1">
+                  {statsLoading ? <span className="animate-pulse">—</span> : stats.confirmed}
+                </p>
+                <p className="text-xs text-muted-foreground mt-1">Ready to pack</p>
               </div>
-              <Truck className="w-8 h-8 text-blue-500" />
+              <ShieldCheck className="w-8 h-8 text-blue-400 opacity-80" />
             </div>
           </CardContent>
         </Card>
-        <Card className="border-l-4 border-l-green-500">
+
+        {/* Processing - Being Prepared */}
+        <Card className="border-l-4 border-l-orange-500 hover:shadow-md transition-shadow">
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">Delivered</p>
-                <p className="text-2xl font-bold">{statsLoading ? <span className="animate-pulse">—</span> : stats.delivered}</p>
+                <p className="text-xs text-muted-foreground uppercase tracking-wide">Processing</p>
+                <p className="text-2xl font-bold mt-1">
+                  {statsLoading ? <span className="animate-pulse">—</span> : stats.processing}
+                </p>
+                <p className="text-xs text-muted-foreground mt-1">Being prepared</p>
               </div>
-              <CheckCircle2 className="w-8 h-8 text-green-500" />
+              <Package className="w-8 h-8 text-orange-500 opacity-80" />
             </div>
           </CardContent>
         </Card>
-        <Card className="border-l-4 border-l-red-500">
+
+        {/* Shipped - On Delivery */}
+        <Card className="border-l-4 border-l-blue-600 hover:shadow-md transition-shadow">
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">Cancelled / Refunded</p>
-                <p className="text-2xl font-bold">{statsLoading ? <span className="animate-pulse">—</span> : stats.cancelled}</p>
+                <p className="text-xs text-muted-foreground uppercase tracking-wide">Shipped</p>
+                <p className="text-2xl font-bold mt-1">
+                  {statsLoading ? <span className="animate-pulse">—</span> : stats.shipped}
+                </p>
+                <p className="text-xs text-muted-foreground mt-1">On the way</p>
               </div>
-              <XCircle className="w-8 h-8 text-red-500" />
+              <Truck className="w-8 h-8 text-blue-600 opacity-80" />
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Delivered - Completed */}
+        <Card className="border-l-4 border-l-green-500 hover:shadow-md transition-shadow">
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs text-muted-foreground uppercase tracking-wide">Delivered</p>
+                <p className="text-2xl font-bold mt-1">
+                  {statsLoading ? <span className="animate-pulse">—</span> : stats.delivered}
+                </p>
+                <p className="text-xs text-muted-foreground mt-1">Completed</p>
+              </div>
+              <PackageCheck className="w-8 h-8 text-green-500 opacity-80" />
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Cancelled/Refunded - Failed Orders */}
+        <Card className="border-l-4 border-l-red-500 hover:shadow-md transition-shadow">
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs text-muted-foreground uppercase tracking-wide">Cancelled</p>
+                <p className="text-2xl font-bold mt-1">
+                  {statsLoading ? <span className="animate-pulse">—</span> : stats.cancelled}
+                </p>
+                <p className="text-xs text-muted-foreground mt-1">Failed orders</p>
+              </div>
+              <XCircle className="w-8 h-8 text-red-500 opacity-80" />
             </div>
           </CardContent>
         </Card>

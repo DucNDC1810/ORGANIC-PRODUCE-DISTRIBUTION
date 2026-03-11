@@ -1,14 +1,16 @@
-import { Leaf, Truck, Shield, Clock, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Leaf, Truck, Shield, ChevronLeft, ChevronRight, Users } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import ProductCard from '../../components/ProductCard';
 import Header from '../../components/Header';
 import { useProducts } from '../../hooks/useProducts';
+import BookProductSection from '../../components/BookProductSection';
 
 // External banner image URLs (replace with your actual CDN/hosting URLs)
 const banner1 = 'https://res.cloudinary.com/dbtjki0vq/image/upload/v1769863222/banner_oywsgi.png';
 const banner2 = 'https://res.cloudinary.com/dbtjki0vq/image/upload/v1769863219/Broccoli_qewlkz.png';
 const banner3 = 'https://res.cloudinary.com/dbtjki0vq/image/upload/v1769863218/Banner2_tlwsht.png';
+const banner4 = '/image/banner sc.jpg';
 
 const banners = [
   {
@@ -35,15 +37,39 @@ const banners = [
     title: 'RAU XANH SẠCH',
     subtitle: 'An toàn cho sức khỏe',
     buttons: []
+  },
+  {
+    id: 4,
+    image: banner4,
+    title: '',
+    subtitle: '',
+    buttons: []
   }
 ];
 
 export default function HomePage() {
   const [currentSlide, setCurrentSlide] = useState(0);
   const [productScrollIndex, setProductScrollIndex] = useState(0);
+  const videoRef = useRef<HTMLVideoElement>(null);
+
+  // Restart the video from the beginning every time the page is visited
+  useEffect(() => {
+    const v = videoRef.current;
+    if (!v) return;
+    v.currentTime = 0;
+    v.play().catch(() => {});
+  }, []);
   
-  // Use products hook to fetch real data
+  // Featured products for horizontal scroll
   const { products, loading, error, fetchProducts } = useProducts();
+
+  // All products for the book-flip section
+  const {
+    products: allProducts,
+    loading: allLoading,
+    error: allError,
+    fetchProducts: fetchAllProducts,
+  } = useProducts();
   
   // Filter only featured products for display
   const featuredProducts = products.filter(product => product.isFeatured);
@@ -55,6 +81,11 @@ export default function HomePage() {
     // Fetch featured products when component mounts
     fetchProducts({ isFeatured: true });
   }, [fetchProducts]);
+
+  useEffect(() => {
+    // Fetch all products for the book-flip catalog
+    fetchAllProducts({ limit: 24 });
+  }, [fetchAllProducts]);
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -84,53 +115,71 @@ export default function HomePage() {
     <div className="min-h-screen bg-background">
       {/* Header */}
       <Header />
-      
-      {/* Hero Banner Carousel */}
-      <section className="relative overflow-hidden">
-        <div className="relative h-[400px] md:h-[490px]">
-          {/* Banner Slides */}
-          {banners.map((banner, index) => (
-            <div
-              key={banner.id}
-              className={`absolute inset-0 transition-opacity duration-700 ${
-                index === currentSlide ? 'opacity-100' : 'opacity-0'
-              }`}
-            >
-              <img
-                src={banner.image}
-                alt={banner.title}
-                className="w-full h-full object-cover"
-              />
+
+      {/* Hero Video */}
+      <section className="relative w-full overflow-hidden">
+        <video
+          ref={videoRef}
+          src="/freecompress-Yêu_cầu_Video_Quảng_Cáo_Nông_Sản_FreshMarket.mp4"
+          className="w-full block"
+          style={{ marginTop: '-6%', marginBottom: '-6%' }}
+          autoPlay
+          muted
+          playsInline
+          preload="metadata"
+        />
+        {/* Gradient overlay */}
+        <div className="absolute inset-0 bg-gradient-to-r from-black/60 via-black/30 to-transparent pointer-events-none" />
+
+        {/* Hero Text */}
+        <div className="absolute inset-0 flex flex-col justify-center px-10 sm:px-16 lg:px-24">
+          <div className="max-w-xl">
+            {/* Badge */}
+            <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-emerald-500/90 rounded-full mb-5">
+              <Leaf className="w-3.5 h-3.5 text-white" />
+              <span className="text-xs font-semibold text-white tracking-wide uppercase">100% Organic</span>
             </div>
-          ))}
 
-          {/* Navigation Arrows */}
-          <button
-            onClick={prevSlide}
-            className="absolute left-4 top-1/2 -translate-y-1/2 w-12 h-12 bg-white/80 backdrop-blur-sm rounded-full flex items-center justify-center hover:bg-white transition-all duration-200 shadow-lg z-10"
-          >
-            <ChevronLeft className="w-6 h-6 text-gray-800" />
-          </button>
-          <button
-            onClick={nextSlide}
-            className="absolute right-4 top-1/2 -translate-y-1/2 w-12 h-12 bg-white/80 backdrop-blur-sm rounded-full flex items-center justify-center hover:bg-white transition-all duration-200 shadow-lg z-10"
-          >
-            <ChevronRight className="w-6 h-6 text-gray-800" />
-          </button>
+            {/* Headline */}
+            <h1 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold text-white leading-tight mb-4 drop-shadow-lg">
+              Fresh From<br />
+              <span className="text-emerald-400">Farm to Table</span>
+            </h1>
 
-          {/* Dots Indicator */}
-          <div className="absolute bottom-6 left-1/2 -translate-x-1/2 flex gap-2 z-10">
-            {banners.map((_, index) => (
-              <button
-                key={index}
-                onClick={() => setCurrentSlide(index)}
-                className={`w-3 h-3 rounded-full transition-all duration-300 ${
-                  index === currentSlide
-                    ? 'bg-white w-8'
-                    : 'bg-white/50 hover:bg-white/80'
-                }`}
-              />
-            ))}
+            {/* Subheadline */}
+            <p className="text-white/85 text-base sm:text-lg leading-relaxed mb-8 max-w-md drop-shadow">
+              Premium organic produce sourced directly from local farms — delivered fresh to your door within 2 hours.
+            </p>
+
+            {/* CTA Buttons */}
+            <div className="flex flex-wrap gap-3">
+              <Link
+                to="/products"
+                className="inline-flex items-center gap-2 px-6 py-3 bg-emerald-500 hover:bg-emerald-400 text-white font-semibold rounded-xl shadow-lg hover:shadow-emerald-500/30 transition-all duration-200"
+              >
+                Shop Now
+                <ChevronRight className="w-4 h-4" />
+              </Link>
+           
+            </div>
+
+            {/* Quick stats */}
+            <div className="flex gap-6 mt-8">
+              <div>
+                <div className="text-2xl font-bold text-white">500+</div>
+                <div className="text-xs text-white/70">Products</div>
+              </div>
+              <div className="w-px bg-white/20" />
+              <div>
+                <div className="text-2xl font-bold text-white">10k+</div>
+                <div className="text-xs text-white/70">Happy Customers</div>
+              </div>
+              <div className="w-px bg-white/20" />
+              <div>
+                <div className="text-2xl font-bold text-white">2h</div>
+                <div className="text-xs text-white/70">Express Delivery</div>
+              </div>
+            </div>
           </div>
         </div>
       </section>
@@ -212,76 +261,162 @@ export default function HomePage() {
             )}
           </div>
           
-          <div className="text-center mt-8">
-            <div className="w-full h-px bg-gradient-to-r from-transparent via-gray-300 to-transparent mb-8"></div>
-            <Link to="/products" className="inline-block px-8 py-3 bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-lg font-medium hover:from-green-600 hover:to-emerald-700 hover:shadow-lg transition-all duration-300">
-              View All Products →
-            </Link>
+        </div>
+      </section>
+
+      {/* Book-Flip Product Catalog */}
+      <BookProductSection
+        products={allProducts}
+        loading={allLoading}
+        error={allError}
+        onRetry={() => fetchAllProducts({ limit: 24 })}
+      />
+
+      {/* Hero Banner Carousel */}
+      <section className="relative overflow-hidden">
+        <div className="relative w-full">
+          {banners.map((banner, index) => (
+            <div
+              key={banner.id}
+              className={`absolute inset-0 transition-opacity duration-700 ${
+                index === currentSlide ? 'opacity-100' : 'opacity-0'
+              }`}
+            >
+              <img
+                src={banner.image}
+                alt={banner.title}
+                className="w-full h-full object-cover"
+              />
+            </div>
+          ))}
+          {/* Invisible img to drive natural height */}
+          <img
+            src={banners[currentSlide].image}
+            alt=""
+            className="w-full opacity-0 pointer-events-none select-none"
+          />
+
+          <button
+            onClick={prevSlide}
+            className="absolute left-4 top-1/2 -translate-y-1/2 w-12 h-12 bg-white/80 backdrop-blur-sm rounded-full flex items-center justify-center hover:bg-white transition-all duration-200 shadow-lg z-10"
+          >
+            <ChevronLeft className="w-6 h-6 text-gray-800" />
+          </button>
+          <button
+            onClick={nextSlide}
+            className="absolute right-4 top-1/2 -translate-y-1/2 w-12 h-12 bg-white/80 backdrop-blur-sm rounded-full flex items-center justify-center hover:bg-white transition-all duration-200 shadow-lg z-10"
+          >
+            <ChevronRight className="w-6 h-6 text-gray-800" />
+          </button>
+
+          <div className="absolute bottom-6 left-1/2 -translate-x-1/2 flex gap-2 z-10">
+            {banners.map((_, index) => (
+              <button
+                key={index}
+                onClick={() => setCurrentSlide(index)}
+                className={`w-3 h-3 rounded-full transition-all duration-300 ${
+                  index === currentSlide
+                    ? 'bg-white w-8'
+                    : 'bg-white/50 hover:bg-white/80'
+                }`}
+              />
+            ))}
           </div>
         </div>
       </section>
 
-      {/* Value Propositions */}
-      <section className="py-20 bg-muted">
+
+      {/* Why Choose Us */}
+      <section className="py-20 bg-gradient-to-b from-white to-emerald-50/50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid md:grid-cols-3 gap-8">
-            <div className="bg-white p-8 rounded-2xl shadow-sm hover:shadow-md transition-shadow">
-              <div className="w-14 h-14 bg-emerald-100 rounded-xl flex items-center justify-center mb-6">
-                <Leaf className="w-7 h-7 text-emerald-600" />
+          {/* Section Header */}
+          <div className="text-center mb-14">
+            <div className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-100 rounded-full mb-4">
+              <Shield className="w-4 h-4 text-emerald-600" />
+              <span className="text-sm font-medium text-emerald-700">Our Commitment</span>
+            </div>
+            <h2 className="text-3xl md:text-4xl font-bold text-foreground mb-4">
+              Why Choose FreshMarket?
+            </h2>
+            <p className="text-muted-foreground max-w-2xl mx-auto">
+              We're committed to bringing you the freshest certified organic produce — quality-verified and delivered right to your door every day.
+            </p>
+            <div className="w-24 h-1 bg-gradient-to-r from-green-500 to-emerald-500 mx-auto rounded-full mt-5"></div>
+          </div>
+
+          {/* Cards */}
+          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
+            {/* Card 1: Organic */}
+            <div className="group bg-white p-7 rounded-2xl shadow-sm border border-emerald-100 hover:shadow-xl hover:border-emerald-300 hover:-translate-y-1 transition-all duration-300">
+              <div className="w-14 h-14 bg-gradient-to-br from-emerald-400 to-green-500 rounded-xl flex items-center justify-center mb-5 group-hover:scale-110 transition-transform duration-300">
+                <Leaf className="w-7 h-7 text-white" />
               </div>
-              <h3 className="text-xl font-semibold text-foreground mb-3">Fresh Ingredients</h3>
-              <p className="text-muted-foreground leading-relaxed">
-                100% organic produce sourced directly from local farms. Quality you can trust.
+              <div className="text-3xl font-bold text-emerald-600 mb-1">500+</div>
+              <h3 className="text-lg font-semibold text-foreground mb-2">Organic Ingredients</h3>
+              <p className="text-muted-foreground text-sm leading-relaxed mb-4">
+                Traceable origins from certified organic farms — no pesticides, no compromise.
               </p>
+              <ul className="space-y-1.5 text-sm text-muted-foreground">
+                <li className="flex items-center gap-2"><span className="w-1.5 h-1.5 bg-emerald-400 rounded-full flex-shrink-0"></span>VietGAP & GlobalGAP certified</li>
+                <li className="flex items-center gap-2"><span className="w-1.5 h-1.5 bg-emerald-400 rounded-full flex-shrink-0"></span>Harvested at peak freshness</li>
+                <li className="flex items-center gap-2"><span className="w-1.5 h-1.5 bg-emerald-400 rounded-full flex-shrink-0"></span>Zero artificial preservatives</li>
+              </ul>
             </div>
 
-            <div className="bg-white p-8 rounded-2xl shadow-sm hover:shadow-md transition-shadow">
-              <div className="w-14 h-14 bg-emerald-100 rounded-xl flex items-center justify-center mb-6">
-                <Truck className="w-7 h-7 text-emerald-600" />
+            {/* Card 2: Delivery */}
+            <div className="group bg-white p-7 rounded-2xl shadow-sm border border-blue-100 hover:shadow-xl hover:border-blue-300 hover:-translate-y-1 transition-all duration-300">
+              <div className="w-14 h-14 bg-gradient-to-br from-blue-400 to-cyan-500 rounded-xl flex items-center justify-center mb-5 group-hover:scale-110 transition-transform duration-300">
+                <Truck className="w-7 h-7 text-white" />
               </div>
-              <h3 className="text-xl font-semibold text-foreground mb-3">Fast Delivery</h3>
-              <p className="text-muted-foreground leading-relaxed">
-                Same-day delivery available. Your fresh groceries delivered within hours.
+              <div className="text-3xl font-bold text-blue-500 mb-1">2h</div>
+              <h3 className="text-lg font-semibold text-foreground mb-2">Express Delivery</h3>
+              <p className="text-muted-foreground text-sm leading-relaxed mb-4">
+                Same-day delivery guaranteed — your groceries arrive fresh and on time.
               </p>
+              <ul className="space-y-1.5 text-sm text-muted-foreground">
+                <li className="flex items-center gap-2"><span className="w-1.5 h-1.5 bg-blue-400 rounded-full flex-shrink-0"></span>2-hour delivery in city areas</li>
+                <li className="flex items-center gap-2"><span className="w-1.5 h-1.5 bg-blue-400 rounded-full flex-shrink-0"></span>Real-time order tracking</li>
+                <li className="flex items-center gap-2"><span className="w-1.5 h-1.5 bg-blue-400 rounded-full flex-shrink-0"></span>Free shipping on orders 300k+</li>
+              </ul>
             </div>
 
-            <div className="bg-white p-8 rounded-2xl shadow-sm hover:shadow-md transition-shadow">
-              <div className="w-14 h-14 bg-emerald-100 rounded-xl flex items-center justify-center mb-6">
-                <Shield className="w-7 h-7 text-emerald-600" />
+            {/* Card 3: Quality */}
+            <div className="group bg-white p-7 rounded-2xl shadow-sm border border-amber-100 hover:shadow-xl hover:border-amber-300 hover:-translate-y-1 transition-all duration-300">
+              <div className="w-14 h-14 bg-gradient-to-br from-amber-400 to-orange-500 rounded-xl flex items-center justify-center mb-5 group-hover:scale-110 transition-transform duration-300">
+                <Shield className="w-7 h-7 text-white" />
               </div>
-              <h3 className="text-xl font-semibold text-foreground mb-3">Trusted Quality</h3>
-              <p className="text-muted-foreground leading-relaxed">
-                Every product is carefully selected and quality-checked before delivery.
+              <div className="text-3xl font-bold text-amber-500 mb-1">100%</div>
+              <h3 className="text-lg font-semibold text-foreground mb-2">Quality Assured</h3>
+              <p className="text-muted-foreground text-sm leading-relaxed mb-4">
+                Every item is rigorously inspected before delivery. Not satisfied? Full refund.
               </p>
+              <ul className="space-y-1.5 text-sm text-muted-foreground">
+                <li className="flex items-center gap-2"><span className="w-1.5 h-1.5 bg-amber-400 rounded-full flex-shrink-0"></span>3-layer quality inspection</li>
+                <li className="flex items-center gap-2"><span className="w-1.5 h-1.5 bg-amber-400 rounded-full flex-shrink-0"></span>100% money-back guarantee</li>
+                <li className="flex items-center gap-2"><span className="w-1.5 h-1.5 bg-amber-400 rounded-full flex-shrink-0"></span>Verified customer reviews</li>
+              </ul>
+            </div>
+
+            {/* Card 4: Group Buy */}
+            <div className="group bg-white p-7 rounded-2xl shadow-sm border border-purple-100 hover:shadow-xl hover:border-purple-300 hover:-translate-y-1 transition-all duration-300">
+              <div className="w-14 h-14 bg-gradient-to-br from-purple-400 to-violet-500 rounded-xl flex items-center justify-center mb-5 group-hover:scale-110 transition-transform duration-300">
+                <Users className="w-7 h-7 text-white" />
+              </div>
+              <div className="text-3xl font-bold text-purple-500 mb-1">-10%</div>
+              <h3 className="text-lg font-semibold text-foreground mb-2">Group Buying Deals</h3>
+              <p className="text-muted-foreground text-sm leading-relaxed mb-4">
+                Join group purchases with the community and unlock exclusive discounts every day.
+              </p>
+              <ul className="space-y-1.5 text-sm text-muted-foreground">
+                <li className="flex items-center gap-2"><span className="w-1.5 h-1.5 bg-purple-400 rounded-full flex-shrink-0"></span>Up to 10% off with group buys</li>
+                <li className="flex items-center gap-2"><span className="w-1.5 h-1.5 bg-purple-400 rounded-full flex-shrink-0"></span>Connect with buyer communities</li>
+                <li className="flex items-center gap-2"><span className="w-1.5 h-1.5 bg-purple-400 rounded-full flex-shrink-0"></span>Weekly flash deals</li>
+              </ul>
             </div>
           </div>
         </div>
       </section>
 
-      {/* Promotion Banner */}
-      <section className="py-20 bg-gradient-to-r from-green-500 via-emerald-600 to-green-500">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex flex-col md:flex-row items-center justify-between gap-8">
-            <div className="text-white space-y-4">
-              <div className="inline-flex items-center gap-2 px-4 py-2 bg-white/20 rounded-full backdrop-blur-sm">
-                <Clock className="w-4 h-4" />
-                <span className="text-sm font-medium">Limited Time Offer</span>
-              </div>
-              <h2 className="text-4xl md:text-5xl font-bold">
-                Get 20% off your first order
-              </h2>
-              <p className="text-xl text-white/90">
-                Use code FRESH20 at checkout. Valid for new customers only.
-              </p>
-            </div>
-            <button className="px-8 py-4 bg-white text-emerald-600 rounded-xl font-semibold hover:bg-white/90 hover:shadow-xl hover:-translate-y-0.5 transition-all duration-200 whitespace-nowrap">
-              Shop Now →
-            </button>
-          </div>
-        </div>
-      </section>
-
-      {/* Footer */}
       <footer className="bg-foreground text-white py-16">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid md:grid-cols-4 gap-8 mb-12">

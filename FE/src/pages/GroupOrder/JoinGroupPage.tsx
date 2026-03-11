@@ -57,6 +57,7 @@ export default function JoinGroupPage() {
       setGroupSession({
         groupId,
         groupName: group.groupName,
+        role: 'member',
         memberId: member._id,
         displayName: user.name,
       });

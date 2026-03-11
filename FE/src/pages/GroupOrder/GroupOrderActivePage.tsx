@@ -45,15 +45,15 @@ function roundUpTo(amount: number, step: number): number {
 }
 
 function QuickTopupModal({ shortfall, groupId, cartSnapshot, groupName, onClose }: QuickTopupModalProps) {
+  const exactShortfall = Math.max(shortfall, 10000);
   const presets = (() => {
-    const exact  = Math.max(shortfall, 10000);
     const buffer = roundUpTo(shortfall + 50000, 50000);
-    const candidates = [exact, buffer, 100000, 200000, 500000];
+    const candidates = [exactShortfall, buffer, 100000, 200000, 500000];
     const uniq = Array.from(new Set(candidates)).filter((v) => v >= 10000).sort((a, b) => a - b);
     return uniq.slice(0, 4);
   })();
 
-  const [selected, setSelected] = useState<number>(presets[0]);
+  const [selected, setSelected] = useState<number>(exactShortfall);
   const [loading,  setLoading]  = useState(false);
 
   const handleTopup = async () => {
@@ -70,13 +70,7 @@ function QuickTopupModal({ shortfall, groupId, cartSnapshot, groupName, onClose 
       });
       const payUrl: string | undefined = (res as any)?.data?.payUrl ?? (res as any)?.payUrl;
       if (payUrl) {
-        // Open MoMo in a NEW TAB — current page stays alive so socket update works in real-time
-        window.open(payUrl, "_blank", "noopener,noreferrer");
-        onClose();
-        toast.info("MoMo window opened. Complete payment and come back here!", {
-          duration: 10000,
-          icon: "💜",
-        });
+        window.location.href = payUrl;
       } else {
         toast.error("Did not receive payment link from MoMo.");
         setLoading(false);
@@ -131,7 +125,7 @@ function QuickTopupModal({ shortfall, groupId, cartSnapshot, groupName, onClose 
                       : "border-gray-200 bg-white text-gray-700 hover:border-pink-300"
                   }`}
                 >
-                  {amt === presets[0] && shortfall > 0 ? (
+                  {amt === exactShortfall && shortfall > 0 ? (
                     <span>
                       {fmtVND(amt)}
                       <span className="block text-xs font-normal text-pink-500">exact shortfall</span>
@@ -226,7 +220,7 @@ function getMemberAvatar(idx: number): string {
 export default function GroupOrderActivePage() {
   const navigate  = useNavigate();
   const location  = useLocation();
-  const { groupSession } = useGroup();
+  const { groupSession, setGroupSession, clearGroupSession } = useGroup();
   const groupName = (location.state as any)?.groupName ?? groupSession?.groupName ?? "Group Order";
   const groupId   = ((location.state as any)?.groupId as string | undefined) ?? groupSession?.groupId;
 
@@ -265,6 +259,8 @@ export default function GroupOrderActivePage() {
 
   // Owner's member ID in DB – for syncing cart items to server
   const ownerMemberIdRef = useRef<string | null>(null);
+  // True for exactly one sync cycle after we hydrate cart from DB (skip that write-back)
+  const isLoadingCartFromDB = useRef(false);
 
   // Place order / cancel state
   const [placeOrderLoading,  setPlaceOrderLoading]  = useState(false);
@@ -289,7 +285,40 @@ export default function GroupOrderActivePage() {
         if (g.paymentOption) setPaymentOption(g.paymentOption);
         // Lưu lại memberId của Owner để dùng cho việc đồng bộ giỏ hàng
         const ownerMember = ms.find((m) => m.role === 'owner');
-        if (ownerMember) ownerMemberIdRef.current = ownerMember._id;
+        if (ownerMember) {
+          ownerMemberIdRef.current = ownerMember._id;
+          // Safety net: if session is missing memberId (e.g. older session or sticky bar return),
+          // patch it in so Add-to-Group works on product pages
+          if (groupSession && !groupSession.memberId) {
+            setGroupSession({ ...groupSession, memberId: ownerMember._id });
+          }
+          if (initialCart.length > 0) {
+            // Came from checkout: push checkout cart to DB right away
+            const payload = initialCart.map((i) => ({
+              productId: i.productId || String(i.id),
+              name:      i.name,
+              price:     i.price,
+              image:     i.image,
+              qty:       i.qty,
+            }));
+            groupService.syncGroupItems(groupId!, ownerMember._id, payload).catch(() => {});
+          } else {
+            // Came back via Sticky Bar (no location.state): restore cart from DB
+            const dbCart: CartItem[] = (ownerMember.cartItems ?? []).map((item, idx) => ({
+              id:        idx + 1,
+              productId: item.productId,
+              name:      item.name,
+              price:     item.price,
+              qty:       item.qty,
+              image:     item.image || '🛒',
+              unit:      'serving',
+            }));
+            if (dbCart.length > 0) {
+              isLoadingCartFromDB.current = true; // skip the write-back sync
+              setCart(dbCart);
+            }
+          }
+        }
       })
       .catch(console.error)
       .finally(() => setMembersLoading(false));
@@ -323,6 +352,11 @@ export default function GroupOrderActivePage() {
 
   const syncTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => {
+    // Skip sync for the one render triggered by loading cart from DB (avoid write-back)
+    if (isLoadingCartFromDB.current) {
+      isLoadingCartFromDB.current = false;
+      return;
+    }
     if (syncTimerRef.current) clearTimeout(syncTimerRef.current);
     syncTimerRef.current = setTimeout(() => syncOwnerCart(cart), 800);
     return () => { if (syncTimerRef.current) clearTimeout(syncTimerRef.current); };
@@ -432,10 +466,15 @@ export default function GroupOrderActivePage() {
   const totalHeld      = members
     .filter((m) => m.walletPaid)
     .reduce((s, m) => s + (m.walletHoldAmount ?? 0), 0);
+  // Owner's individual-mode total: their own items + shared shipping − personal discount
+  const ownerIndividualTotal = ownerCartSubtotal + ownerSharedShipping - ownerDiscount;
+
   // For equal_split: owner pays a fixed ownerEqualShare regardless of what others held
   const ownerRemaining = paymentOption === 'equal_split'
     ? ownerEqualShare
-    : Math.max(0, total + 25000 - totalHeld);
+    : paymentOption === 'individual'
+      ? ownerIndividualTotal
+      : Math.max(0, total + 25000 - totalHeld);
 
   const handleCopy = () => {
     navigator.clipboard.writeText(inviteLink).catch(() => {});
@@ -487,6 +526,7 @@ export default function GroupOrderActivePage() {
           ownerCart:           cart.map((i) => ({ name: i.name, price: i.price, qty: i.qty, image: i.image })),
         },
       });
+      clearGroupSession();
     } catch (err: any) {
       const msg = err?.response?.data?.message || "Failed to place order. Please try again."; 
       toast.error(msg);
@@ -506,6 +546,7 @@ export default function GroupOrderActivePage() {
         ? "Group order deleted successfully."
         : "Group order cancelled. Deposits have been refunded to all members."; 
       toast.success(msg, { duration: 6000 });
+      clearGroupSession();
       navigate("/checkout");
     } catch (err: any) {
       const msg = err?.response?.data?.message || "Cancellation failed. Please try again."; 
@@ -932,11 +973,17 @@ export default function GroupOrderActivePage() {
 
             <div className="border-t border-gray-100 pt-4 space-y-2.5 text-sm text-gray-600">
               <div className="flex justify-between">
-                <span>Subtotal <span className="text-gray-400 font-normal">(whole group)</span></span>
-                <span className="font-semibold text-gray-900">{fmtVND(subtotal)}</span>
+                <span>
+                  {paymentOption === 'individual'
+                    ? 'Subtotal (Your items)'
+                    : <span>Subtotal <span className="text-gray-400 font-normal">(whole group)</span></span>}
+                </span>
+                <span className="font-semibold text-gray-900">
+                  {fmtVND(paymentOption === 'individual' ? ownerCartSubtotal : subtotal)}
+                </span>
               </div>
               <div className="flex justify-between">
-                <span>{paymentOption === 'individual' ? 'Shipping (your share)' : 'Shipping fee'}</span>
+                <span>{paymentOption === 'individual' ? 'Shipping (Your share)' : 'Shipping fee'}</span>
                 <span className="font-semibold text-gray-900">{paymentOption === 'individual' ? fmtVND(ownerSharedShipping) : '25.000đ'}</span>
               </div>
               {activePct > 0 && (
@@ -951,7 +998,9 @@ export default function GroupOrderActivePage() {
               )}
               <div className="border-t border-gray-100 pt-2.5 flex justify-between">
                 <span className="font-bold text-gray-900">Total</span>
-                <span className="font-extrabold text-green-600 text-base">{fmtVND(total + 25000)}</span>
+                <span className="font-extrabold text-green-600 text-base">
+                  {fmtVND(paymentOption === 'individual' ? ownerIndividualTotal : total + 25000)}
+                </span>
               </div>
 
               {/* ── Deposit breakdown – only for individual / equal_split ── */}
@@ -1073,8 +1122,8 @@ export default function GroupOrderActivePage() {
             );
           })()}
 
-          {/* ── Wallet balance indicator (non-owner_only modes) ── */}
-          {paymentOption !== 'owner_only' && ownerRemaining > 0 && (
+          {/* ── Wallet balance indicator ── */}
+          {ownerRemaining > 0 && (
             <div className={`flex items-center justify-between px-4 py-2.5 rounded-xl text-xs font-medium ${
               walletBalance >= ownerRemaining
                 ? "bg-green-50 border border-green-200 text-green-700"
@@ -1089,7 +1138,7 @@ export default function GroupOrderActivePage() {
           )}
 
           {/* ── Chốt đơn / Nạp thêm button ── */}
-          {paymentOption !== 'owner_only' && walletBalance < ownerRemaining && ownerRemaining > 0 ? (
+          {walletBalance < ownerRemaining && ownerRemaining > 0 ? (
             <button
               onClick={() => setShowTopupModal(true)}
               disabled={cart.length === 0}
@@ -1114,6 +1163,11 @@ export default function GroupOrderActivePage() {
                 <><ShoppingCart className="w-5 h-5" /> Place group order →</>
               )}
             </button>
+          )}
+          {paymentOption === 'individual' && (
+            <p className="text-center text-xs text-gray-400 -mt-1">
+              You are paying for your selected items only
+            </p>
           )}
           {paymentOption === 'equal_split' && !allNonOwnerPaid && nonOwnerCount > 0 && (
             <p className="text-center text-xs text-amber-500 font-medium -mt-1">

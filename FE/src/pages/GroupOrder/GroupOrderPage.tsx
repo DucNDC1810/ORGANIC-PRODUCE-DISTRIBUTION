@@ -3,6 +3,7 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { toast } from "sonner";
 import { groupService } from "../../services/groupService";
 import { useAuth } from "../../context/AuthContext";
+import { useGroup } from "../../context/GroupContext";
 import {
   ArrowLeft,
   Users,
@@ -38,6 +39,7 @@ export default function GroupOrderPage() {
   const location  = useLocation();
   const passedCartItems = (location.state as any)?.cartItems ?? [];
   const { user } = useAuth();
+  const { setGroupSession } = useGroup();
 
   const [groupName,    setGroupName]    = useState(`Order by ${user?.username ?? user?.name ?? "me"}`);
   const [editingName,  setEditingName]  = useState(false);
@@ -54,6 +56,15 @@ export default function GroupOrderPage() {
         paymentMethod: paymentMode,
         paymentOption: paymentMode,
         timeLimit: null,
+      });
+      // Fetch owner's GroupMember record to get memberId (needed for Add to Group on product pages)
+      const members = await groupService.getMembers(group._id);
+      const ownerMember = members.find((m) => m.role === 'owner');
+      setGroupSession({
+        groupId: group._id,
+        groupName,
+        role: 'owner',
+        memberId: ownerMember?._id,
       });
       navigate("/group-order/active", {
         state: { groupName, cartItems: passedCartItems, groupId: group._id, paymentOption: paymentMode },

@@ -290,6 +290,8 @@ export class GroupService {
     // Tạo đơn hàng chính thức
     const order = await Order.create({
       userId: ownerId,
+      orderType: 'group_buy',
+      groupId: new mongoose.Types.ObjectId(groupId),
       totalAmount: total,
       status: 'confirmed',
       paymentMethod: 'wallet',

@@ -411,7 +411,7 @@ export default function CheckoutPage() {
       frequency: frequencyMap[recurringData.recurringFrequency],
       deliveryDay,
       nextDeliveryDate: nextDelivery.toISOString(),
-      items: checkoutItems.map((item) => ({
+      items: cart.map((item) => ({
         productId: item.id,
         quantity: localQty[item.id] ?? item.quantity,
         priceAtSubscription: item.price,
@@ -448,7 +448,7 @@ export default function CheckoutPage() {
           ...(deliveryType === 'pickup' && selectedStore
             ? { pickupLocation: { name: selectedStore.name, address: selectedStore.address } }
             : {}),
-          items: checkoutItems.map((item) => ({
+          items: cart.map((item) => ({
             productId: item.id,
             quantity: localQty[item.id] ?? item.quantity,
             price: item.price,
@@ -474,7 +474,7 @@ export default function CheckoutPage() {
             address: momoBuiltAddress,
             type: deliveryType,
           },
-          items: checkoutItems.map((item) => ({
+          items: cart.map((item) => ({
             productId: item.id,
             quantity: localQty[item.id] ?? item.quantity,
             price: item.price,
@@ -546,7 +546,7 @@ export default function CheckoutPage() {
           ...(deliveryType === 'pickup' && selectedStore
             ? { pickupLocation: { name: selectedStore.name, address: selectedStore.address } }
             : {}),
-          items: checkoutItems.map((item) => ({
+          items: cart.map((item) => ({
             productId: item.id,
             quantity: localQty[item.id] ?? item.quantity,
             price: item.price,
@@ -581,8 +581,16 @@ export default function CheckoutPage() {
               console.warn("Subscription creation failed:", subErr);
             }
           }
-          // Xoá giỏ hàng sau khi đặt hàng thành công (không xoá nếu là Buy Now)
-          if (!buyNowItem) await clearCart(true);
+          // Snapshot cart items before clearing (for display on success page)
+          const cartItemsSnapshot = cart.map((item) => ({
+            productId: { _id: item.id, name: item.name, thumbnail: item.image },
+            quantity: item.quantity,
+            price: item.price,
+            subtotal: item.price * item.quantity,
+          }));
+
+          // Xoá giỏ hàng sau khi đặt hàng thành công
+          await clearCart(true);
 
           navigate("/order-success", {
             state: {
@@ -593,7 +601,7 @@ export default function CheckoutPage() {
               isRecurring: isRecurringOrder,
               subscriptionConfig: isRecurringOrder ? buildSubscriptionPayload() : null,
               deliveryType,
-              cartItems: checkoutItems,
+              cartItems: cartItemsSnapshot,
               pickupLocation:
                 deliveryType === "pickup" && selectedStore
                   ? { name: selectedStore.name, address: selectedStore.address }
@@ -652,7 +660,7 @@ export default function CheckoutPage() {
           ...(deliveryType === "pickup" && selectedStore
             ? { pickupLocation: { name: selectedStore.name, address: selectedStore.address } }
             : {}),
-          items: checkoutItems.map((item) => ({
+          items: cart.map((item) => ({
             productId: item.id,
             quantity: localQty[item.id] ?? item.quantity,
             price: item.price,
@@ -668,8 +676,16 @@ export default function CheckoutPage() {
         const newBalance = result?.walletBalance ?? walletBalance - total;
         setWalletBalance(newBalance);
 
-        // Xoá giỏ hàng sau khi thanh toán thành công (không xoá nếu là Buy Now)
-        if (!buyNowItem) await clearCart(true);
+        // Snapshot cart items before clearing (for display on success page)
+        const cartItemsSnapshot = cart.map((item) => ({
+          productId: { _id: item.id, name: item.name, thumbnail: item.image },
+          quantity: item.quantity,
+          price: item.price,
+          subtotal: item.price * item.quantity,
+        }));
+
+        // Xoá giỏ hàng sau khi thanh toán thành công
+        await clearCart(true);
 
         navigate("/order-success", {
           state: {
@@ -679,7 +695,7 @@ export default function CheckoutPage() {
             totalAmount: total,
             notes: formData.notes || null,
             deliveryType,
-            cartItems: checkoutItems,
+            cartItems: cartItemsSnapshot,
             pickupLocation:
               deliveryType === "pickup" && selectedStore
                 ? { name: selectedStore.name, address: selectedStore.address }
@@ -754,7 +770,7 @@ export default function CheckoutPage() {
     );
   }
 
-  if (checkoutItems.length === 0) {
+  if (cart.length === 0) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
@@ -1338,7 +1354,7 @@ export default function CheckoutPage() {
                 </h3>
 
                 <div className="space-y-4">
-                  {checkoutItems.map((item) => (
+                  {cart.map((item) => (
                     <div key={item.id} className="flex gap-3">
                       <div className="w-14 h-14 bg-gray-100 rounded-lg overflow-hidden flex-shrink-0">
                         <img
@@ -1645,11 +1661,11 @@ export default function CheckoutPage() {
               <div className="rounded-xl border border-gray-100 overflow-hidden">
                 <div className="px-3 py-1.5 bg-gray-50 border-b border-gray-100">
                   <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
-                    Products ({checkoutItems.length})
+                    Products ({cart.length})
                   </p>
                 </div>
                 <div className="divide-y divide-gray-50">
-                  {checkoutItems.map((item) => (
+                  {cart.map((item) => (
                     <div key={item.id} className="flex items-center gap-2.5 px-3 py-2">
                       <div className="w-8 h-8 bg-gray-100 rounded-lg overflow-hidden flex-shrink-0">
                         <img src={item.image} alt={item.name} className="w-full h-full object-cover" />

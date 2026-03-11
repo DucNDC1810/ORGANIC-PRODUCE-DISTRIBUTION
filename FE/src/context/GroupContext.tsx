@@ -5,6 +5,8 @@ import { createContext, useContext, useState, useEffect, type ReactNode } from "
 export interface GroupSession {
   groupId: string;
   groupName: string;
+  /** 'owner' = người tạo nhóm, 'member' = thành viên tham gia qua link */
+  role: 'owner' | 'member';
   /** ID bản ghi GroupMember – dùng để đánh dấu isReady */
   memberId?: string;
   /** Tên hiển thị (nickname nhập khi join, hoặc tên tài khoản) */
