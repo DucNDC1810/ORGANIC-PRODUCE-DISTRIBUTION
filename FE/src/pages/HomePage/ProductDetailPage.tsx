@@ -124,10 +124,20 @@ export default function ProductDetailPage() {
     await addToCart(cartProduct, quantity, !openCart);
   };
 
-  const handleBuyNow = async () => {
+  const handleBuyNow = () => {
     if (!selectedProduct) return;
-    await handleAddToCart(false);
-    navigate('/checkout', { state: { selectedItemIds: [selectedProduct._id] } });
+    navigate('/checkout', {
+      state: {
+        buyNowItem: {
+          id: selectedProduct._id,
+          name: selectedProduct.name,
+          price: selectedProduct.price,
+          image: selectedProduct.images?.[0] || selectedProduct.thumbnail || '',
+          category: selectedProduct.category,
+          quantity,
+        },
+      },
+    });
   };
 
   const nextImage = () => {
@@ -411,7 +421,7 @@ export default function ProductDetailPage() {
                       ? 'bg-orange-500 hover:bg-orange-600 text-white border-orange-500'
                       : 'border-emerald-500 text-emerald-600 hover:bg-emerald-50'
                   }`}
-                  disabled={selectedProduct.stock <= 0 || addingToGroup}
+                  disabled={selectedProduct.stock <= 0 || addingToGroup || quantity > selectedProduct.stock}
                 >
                   {isGroupMode
                     ? <Users className="w-5 h-5 mr-2" />
@@ -424,7 +434,7 @@ export default function ProductDetailPage() {
                     onClick={handleBuyNow}
                     size="lg"
                     className="flex-1 bg-emerald-600 hover:bg-emerald-700"
-                    disabled={selectedProduct.stock <= 0}
+                    disabled={selectedProduct.stock <= 0 || quantity > selectedProduct.stock}
                   >
                     Buy Now
                   </Button>
