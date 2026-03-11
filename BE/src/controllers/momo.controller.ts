@@ -395,9 +395,9 @@ export class MoMoController {
         payment.markModified('metadata');
         await payment.save();
 
-        // Cập nhật order status thành "confirmed"
+        // Cập nhật order status thành "pending" để manager xác nhận
         await Order.findByIdAndUpdate(payment.orderId, {
-          status: 'confirmed',
+          status: 'pending',
           paymentStatus: 'paid',
         });
 
@@ -451,7 +451,7 @@ export class MoMoController {
       // resultCode != 0: chưa thanh toán hoặc thất bại
 
       if (statusResponse.resultCode === 0) {
-        orderStatus = 'confirmed';
+        orderStatus = 'pending';
         paymentStatus = 'paid';
       } else {
         orderStatus = 'failed';
@@ -482,7 +482,6 @@ export class MoMoController {
           // Cập nhật order status
           const order = await Order.findById(payment.orderId);
           if (order && order.status === 'pending') {
-            order.status = 'confirmed';
             order.paymentStatus = 'paid';
             await order.save();
           }
