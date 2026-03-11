@@ -33,10 +33,10 @@ const STATUS_CONFIG: Record<
   string,
   { label: string; bgColor: string; textColor: string; borderColor: string; dotColor: string }
 > = {
-  pending:    { label: 'Awaiting Payment', bgColor: 'bg-amber-50',   textColor: 'text-amber-700',   borderColor: 'border-amber-200',  dotColor: 'bg-amber-400'   },
-  confirmed:  { label: 'Confirmed',        bgColor: 'bg-blue-50',    textColor: 'text-blue-700',    borderColor: 'border-blue-200',   dotColor: 'bg-blue-400'    },
+  pending:    { label: 'Pending',          bgColor: 'bg-amber-50',   textColor: 'text-amber-700',   borderColor: 'border-amber-200',  dotColor: 'bg-amber-400'   },
+  confirmed:  { label: 'To Ship',          bgColor: 'bg-blue-50',    textColor: 'text-blue-700',    borderColor: 'border-blue-200',   dotColor: 'bg-blue-400'    },
   processing: { label: 'Processing',       bgColor: 'bg-violet-50',  textColor: 'text-violet-700',  borderColor: 'border-violet-200', dotColor: 'bg-violet-400'  },
-  shipped:    { label: 'Shipped',          bgColor: 'bg-indigo-50',  textColor: 'text-indigo-700',  borderColor: 'border-indigo-200', dotColor: 'bg-indigo-400'  },
+  shipped:    { label: 'Shipping',         bgColor: 'bg-indigo-50',  textColor: 'text-indigo-700',  borderColor: 'border-indigo-200', dotColor: 'bg-indigo-400'  },
   delivered:  { label: 'Delivered',        bgColor: 'bg-green-50',   textColor: 'text-green-700',   borderColor: 'border-green-200',  dotColor: 'bg-green-500'   },
   cancelled:  { label: 'Cancelled',        bgColor: 'bg-red-50',     textColor: 'text-red-700',     borderColor: 'border-red-200',    dotColor: 'bg-red-400'     },
   refunded:   { label: 'Refunded',         bgColor: 'bg-gray-50',    textColor: 'text-gray-700',    borderColor: 'border-gray-200',   dotColor: 'bg-gray-400'    },
@@ -44,9 +44,9 @@ const STATUS_CONFIG: Record<
 
 const TABS = [
   { key: '',           label: 'All' },
-  { key: 'pending',    label: 'Awaiting Payment' },
-  { key: 'processing', label: 'Processing' },
-  { key: 'shipped',    label: 'Shipped' },
+  { key: 'pending',    label: 'Pending' },
+  { key: 'confirmed',  label: 'To Ship' },
+  { key: 'shipped',    label: 'Shipping' },
   { key: 'delivered',  label: 'Delivered' },
   { key: 'cancelled',  label: 'Cancelled' },
 ];

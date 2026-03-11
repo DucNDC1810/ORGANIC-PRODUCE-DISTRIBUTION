@@ -132,6 +132,7 @@ async function processSubscriptionOrders(): Promise<void> {
 
       const newOrder = await Order.create({
         userId: userIdValue,
+        orderType: 'subscription',
         addressId: sub.addressId,
         subscriptionId: sub._id,
         orderDate: new Date(),

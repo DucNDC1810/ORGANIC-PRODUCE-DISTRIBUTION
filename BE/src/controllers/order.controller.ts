@@ -56,6 +56,7 @@ export class OrderController {
 
       const order = await Order.create({
         userId,
+        orderType: 'regular',
         addressId: addressId || null,
         deliveryInfo: deliveryInfo || {},
         pickupLocation: pickupLocation || null,
