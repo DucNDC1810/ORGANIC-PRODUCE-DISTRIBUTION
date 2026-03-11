@@ -5,6 +5,7 @@ import { Order } from '../models/Order.model';
 import { User } from '../models/User.model';
 import { Product } from '../models/Product.model';
 import { Transaction } from '../models/Transaction.model';
+import { Cart } from '../models/Cart.model';
 import momoService from '../services/momo.service';
 import { AuthRequest } from '../middlewares/auth.middleware';
 import { AppError } from '../utils/AppError';
@@ -396,10 +397,20 @@ export class MoMoController {
         await payment.save();
 
         // Cập nhật order status thành "pending" để manager xác nhận
-        await Order.findByIdAndUpdate(payment.orderId, {
-          status: 'pending',
-          paymentStatus: 'paid',
-        });
+        const paidOrder = await Order.findByIdAndUpdate(
+          payment.orderId,
+          { status: 'pending', paymentStatus: 'paid' },
+          { new: true }
+        );
+
+        // Xóa cart của user sau khi thanh toán thành công
+        if (paidOrder?.userId) {
+          await Cart.findOneAndUpdate(
+            { userId: paidOrder.userId },
+            { $set: { items: [], totalItems: 0, totalPrice: 0 } }
+          );
+          console.log('🛒 Cart cleared for user:', paidOrder.userId);
+        }
 
         console.log('✅ PAYMENT UPDATED TO PAID');
         console.log('  PaymentId:', payment._id);
@@ -451,7 +462,7 @@ export class MoMoController {
       // resultCode != 0: chưa thanh toán hoặc thất bại
 
       if (statusResponse.resultCode === 0) {
-        orderStatus = 'pending';
+        orderStatus = 'confirmed';
         paymentStatus = 'paid';
       } else {
         orderStatus = 'failed';
@@ -479,11 +490,18 @@ export class MoMoController {
           payment.markModified('metadata');
           await payment.save();
 
-          // Cập nhật order status
+          // Cập nhật order status thành "pending" để manager xác nhận
           const order = await Order.findById(payment.orderId);
-          if (order && order.status === 'pending') {
+          if (order && order.status === 'pending' && order.paymentStatus !== 'paid') {
             order.paymentStatus = 'paid';
             await order.save();
+
+            // Xóa cart của user sau khi thanh toán thành công
+            await Cart.findOneAndUpdate(
+              { userId: order.userId },
+              { $set: { items: [], totalItems: 0, totalPrice: 0 } }
+            );
+            console.log('🛒 Cart cleared for user:', order.userId);
           }
 
           console.log('✅ Payment status updated to PAID via query');

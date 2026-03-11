@@ -4,6 +4,7 @@ import { User } from '../models/User.model';
 import { Order } from '../models/Order.model';
 import { Product } from '../models/Product.model';
 import { Transaction } from '../models/Transaction.model';
+import { Cart } from '../models/Cart.model';
 import momoService from '../services/momo.service';
 import { AuthRequest } from '../middlewares/auth.middleware';
 import { AppError } from '../utils/AppError';
@@ -218,7 +219,7 @@ export class WalletController {
             discountAmount: discountAmount || 0,
             shippingCost: shippingCost || 0,
             notes,
-            status: 'confirmed',
+            status: 'pending',
             orderDate: new Date()
           }
         ],
@@ -243,6 +244,12 @@ export class WalletController {
       // 4. Commit transaction — tất cả hoặc không gì cả
       await session.commitTransaction();
       session.endSession();
+
+      // 5. Xóa cart của user sau khi thanh toán thành công
+      await Cart.findOneAndUpdate(
+        { userId },
+        { $set: { items: [], totalItems: 0, totalPrice: 0 } }
+      );
 
       await order.populate('items.productId', 'name price thumbnail');
 
