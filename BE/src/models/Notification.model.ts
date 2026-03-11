@@ -1,6 +1,6 @@
 import mongoose, { Document, Schema } from 'mongoose';
 
-export type NotificationType = 'new_order' | 'account_locked' | 'unlock_request' | 'new_review' | 'stock_low' | 'system';
+export type NotificationType = 'new_order' | 'account_locked' | 'unlock_request' | 'new_review' | 'stock_low' | 'system' | 'order_update';
 
 export interface INotification extends Document {
   type: NotificationType;
@@ -8,6 +8,7 @@ export interface INotification extends Document {
   message: string;
   link?: string;       // admin tab query param, e.g. "?tab=orders"
   isRead: boolean;
+  userId?: mongoose.Types.ObjectId; // Optional: notification for specific user
   metadata?: Record<string, any>;
   createdAt: Date;
 }
@@ -16,13 +17,14 @@ const NotificationSchema = new Schema<INotification>(
   {
     type: {
       type: String,
-      enum: ['new_order', 'account_locked', 'unlock_request', 'new_review', 'stock_low', 'system'],
+      enum: ['new_order', 'account_locked', 'unlock_request', 'new_review', 'stock_low', 'system', 'order_update'],
       required: true,
     },
     title: { type: String, required: true },
     message: { type: String, required: true },
     link: { type: String },
     isRead: { type: Boolean, default: false },
+    userId: { type: Schema.Types.ObjectId, ref: 'User' },
     metadata: { type: Schema.Types.Mixed },
   },
   { timestamps: true }
@@ -48,7 +50,7 @@ export async function createNotification(
   type: NotificationType,
   title: string,
   message: string,
-  options?: { link?: string; metadata?: Record<string, any> }
+  options?: { link?: string; metadata?: Record<string, any>; userId?: mongoose.Types.ObjectId }
 ): Promise<void> {
   try {
     await Notification.create({ type, title, message, ...options });

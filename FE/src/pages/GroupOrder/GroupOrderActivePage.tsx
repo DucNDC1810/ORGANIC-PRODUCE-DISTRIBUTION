@@ -45,15 +45,15 @@ function roundUpTo(amount: number, step: number): number {
 }
 
 function QuickTopupModal({ shortfall, groupId, cartSnapshot, groupName, onClose }: QuickTopupModalProps) {
+  const exactShortfall = Math.max(shortfall, 10000);
   const presets = (() => {
-    const exact  = Math.max(shortfall, 10000);
     const buffer = roundUpTo(shortfall + 50000, 50000);
-    const candidates = [exact, buffer, 100000, 200000, 500000];
+    const candidates = [exactShortfall, buffer, 100000, 200000, 500000];
     const uniq = Array.from(new Set(candidates)).filter((v) => v >= 10000).sort((a, b) => a - b);
     return uniq.slice(0, 4);
   })();
 
-  const [selected, setSelected] = useState<number>(presets[0]);
+  const [selected, setSelected] = useState<number>(exactShortfall);
   const [loading,  setLoading]  = useState(false);
 
   const handleTopup = async () => {
@@ -70,13 +70,7 @@ function QuickTopupModal({ shortfall, groupId, cartSnapshot, groupName, onClose 
       });
       const payUrl: string | undefined = (res as any)?.data?.payUrl ?? (res as any)?.payUrl;
       if (payUrl) {
-        // Open MoMo in a NEW TAB — current page stays alive so socket update works in real-time
-        window.open(payUrl, "_blank", "noopener,noreferrer");
-        onClose();
-        toast.info("MoMo window opened. Complete payment and come back here!", {
-          duration: 10000,
-          icon: "💜",
-        });
+        window.location.href = payUrl;
       } else {
         toast.error("Did not receive payment link from MoMo.");
         setLoading(false);
@@ -131,7 +125,7 @@ function QuickTopupModal({ shortfall, groupId, cartSnapshot, groupName, onClose 
                       : "border-gray-200 bg-white text-gray-700 hover:border-pink-300"
                   }`}
                 >
-                  {amt === presets[0] && shortfall > 0 ? (
+                  {amt === exactShortfall && shortfall > 0 ? (
                     <span>
                       {fmtVND(amt)}
                       <span className="block text-xs font-normal text-pink-500">exact shortfall</span>
@@ -472,10 +466,15 @@ export default function GroupOrderActivePage() {
   const totalHeld      = members
     .filter((m) => m.walletPaid)
     .reduce((s, m) => s + (m.walletHoldAmount ?? 0), 0);
+  // Owner's individual-mode total: their own items + shared shipping − personal discount
+  const ownerIndividualTotal = ownerCartSubtotal + ownerSharedShipping - ownerDiscount;
+
   // For equal_split: owner pays a fixed ownerEqualShare regardless of what others held
   const ownerRemaining = paymentOption === 'equal_split'
     ? ownerEqualShare
-    : Math.max(0, total + 25000 - totalHeld);
+    : paymentOption === 'individual'
+      ? ownerIndividualTotal
+      : Math.max(0, total + 25000 - totalHeld);
 
   const handleCopy = () => {
     navigator.clipboard.writeText(inviteLink).catch(() => {});
@@ -974,11 +973,17 @@ export default function GroupOrderActivePage() {
 
             <div className="border-t border-gray-100 pt-4 space-y-2.5 text-sm text-gray-600">
               <div className="flex justify-between">
-                <span>Subtotal <span className="text-gray-400 font-normal">(whole group)</span></span>
-                <span className="font-semibold text-gray-900">{fmtVND(subtotal)}</span>
+                <span>
+                  {paymentOption === 'individual'
+                    ? 'Subtotal (Your items)'
+                    : <span>Subtotal <span className="text-gray-400 font-normal">(whole group)</span></span>}
+                </span>
+                <span className="font-semibold text-gray-900">
+                  {fmtVND(paymentOption === 'individual' ? ownerCartSubtotal : subtotal)}
+                </span>
               </div>
               <div className="flex justify-between">
-                <span>{paymentOption === 'individual' ? 'Shipping (your share)' : 'Shipping fee'}</span>
+                <span>{paymentOption === 'individual' ? 'Shipping (Your share)' : 'Shipping fee'}</span>
                 <span className="font-semibold text-gray-900">{paymentOption === 'individual' ? fmtVND(ownerSharedShipping) : '25.000đ'}</span>
               </div>
               {activePct > 0 && (
@@ -993,7 +998,9 @@ export default function GroupOrderActivePage() {
               )}
               <div className="border-t border-gray-100 pt-2.5 flex justify-between">
                 <span className="font-bold text-gray-900">Total</span>
-                <span className="font-extrabold text-green-600 text-base">{fmtVND(total + 25000)}</span>
+                <span className="font-extrabold text-green-600 text-base">
+                  {fmtVND(paymentOption === 'individual' ? ownerIndividualTotal : total + 25000)}
+                </span>
               </div>
 
               {/* ── Deposit breakdown – only for individual / equal_split ── */}
@@ -1115,8 +1122,8 @@ export default function GroupOrderActivePage() {
             );
           })()}
 
-          {/* ── Wallet balance indicator (non-owner_only modes) ── */}
-          {paymentOption !== 'owner_only' && ownerRemaining > 0 && (
+          {/* ── Wallet balance indicator ── */}
+          {ownerRemaining > 0 && (
             <div className={`flex items-center justify-between px-4 py-2.5 rounded-xl text-xs font-medium ${
               walletBalance >= ownerRemaining
                 ? "bg-green-50 border border-green-200 text-green-700"
@@ -1131,7 +1138,7 @@ export default function GroupOrderActivePage() {
           )}
 
           {/* ── Chốt đơn / Nạp thêm button ── */}
-          {paymentOption !== 'owner_only' && walletBalance < ownerRemaining && ownerRemaining > 0 ? (
+          {walletBalance < ownerRemaining && ownerRemaining > 0 ? (
             <button
               onClick={() => setShowTopupModal(true)}
               disabled={cart.length === 0}
@@ -1156,6 +1163,11 @@ export default function GroupOrderActivePage() {
                 <><ShoppingCart className="w-5 h-5" /> Place group order →</>
               )}
             </button>
+          )}
+          {paymentOption === 'individual' && (
+            <p className="text-center text-xs text-gray-400 -mt-1">
+              You are paying for your selected items only
+            </p>
           )}
           {paymentOption === 'equal_split' && !allNonOwnerPaid && nonOwnerCount > 0 && (
             <p className="text-center text-xs text-amber-500 font-medium -mt-1">

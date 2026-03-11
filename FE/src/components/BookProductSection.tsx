@@ -320,7 +320,7 @@ export default function BookProductSection({
       <div className="absolute top-0 right-0 w-96 h-96 bg-gradient-to-br from-emerald-100/40 to-transparent rounded-full blur-3xl pointer-events-none" />
       <div className="absolute bottom-0 left-0 w-96 h-96 bg-gradient-to-tr from-green-100/40 to-transparent rounded-full blur-3xl pointer-events-none" />
 
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
+      <div className="max-w-[1400px] mx-auto px-2 sm:px-4 lg:px-6 relative z-10">
         {/* ── Section Header ──────────────────────────────────────────────── */}
         <div className="text-center mb-12">
           <div className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-100 rounded-full mb-4">
@@ -337,23 +337,23 @@ export default function BookProductSection({
         </div>
 
         {/* ── Navigation + Book ─────────────────────────────────────────── */}
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-2">
           {/* Prev */}
           <button
             onClick={goPrev}
             disabled={!canPrev}
             aria-label="Previous page"
-            className="w-12 h-12 flex-shrink-0 bg-white rounded-full shadow-md flex items-center justify-center hover:bg-emerald-50 hover:shadow-lg disabled:opacity-30 disabled:cursor-not-allowed transition-all duration-200"
+            className="w-14 h-14 flex-shrink-0 bg-white rounded-full shadow-md flex items-center justify-center hover:bg-emerald-50 hover:shadow-lg disabled:opacity-30 disabled:cursor-not-allowed transition-all duration-200"
           >
-            <ChevronLeft className="w-6 h-6 text-gray-700" />
+            <ChevronLeft className="w-7 h-7 text-gray-700" />
           </button>
 
           {/* ════════════ THE BOOK ════════════ */}
           <div
             className="flex-1 relative rounded-2xl shadow-2xl overflow-hidden"
             style={{
-              height: '520px',
-              perspective: '1600px',
+              height: '660px',
+              perspective: '1800px',
               perspectiveOrigin: '50% 50%',
             }}
           >
@@ -393,10 +393,10 @@ export default function BookProductSection({
                   <span className="text-xs font-bold uppercase tracking-wider">{spread.label}</span>
                 </div>
 
-                <h3 className="text-2xl font-extrabold drop-shadow-lg leading-tight mb-1">
+                <h3 className="text-3xl font-extrabold drop-shadow-lg leading-tight mb-1">
                   {spread.title}
                 </h3>
-                <p className="text-sm text-white/80">{spread.subtitle}</p>
+                <p className="text-base text-white/80">{spread.subtitle}</p>
 
                 {/* Page X / 3 */}
                 <div className="flex items-center gap-2 mt-5">
@@ -469,8 +469,7 @@ export default function BookProductSection({
                   <p className="text-sm text-gray-400">No products available for this page</p>
                 </div>
               ) : (
-                <div
-                  className="grid grid-cols-2 gap-3 h-full p-5"
+                <div className="grid grid-cols-2 gap-4 h-full p-6"
                   style={{ gridTemplateRows: 'repeat(2, 1fr)' }}
                 >
                   {currentProducts.map((product) => (
@@ -558,9 +557,9 @@ export default function BookProductSection({
             onClick={goNext}
             disabled={!canNext}
             aria-label="Next page"
-            className="w-12 h-12 flex-shrink-0 bg-white rounded-full shadow-md flex items-center justify-center hover:bg-emerald-50 hover:shadow-lg disabled:opacity-30 disabled:cursor-not-allowed transition-all duration-200"
+            className="w-14 h-14 flex-shrink-0 bg-white rounded-full shadow-md flex items-center justify-center hover:bg-emerald-50 hover:shadow-lg disabled:opacity-30 disabled:cursor-not-allowed transition-all duration-200"
           >
-            <ChevronRight className="w-6 h-6 text-gray-700" />
+            <ChevronRight className="w-7 h-7 text-gray-700" />
           </button>
         </div>
 
@@ -585,7 +584,7 @@ export default function BookProductSection({
         <div className="text-center mt-9">
           <Link
             to="/products"
-            className="inline-flex items-center gap-2 px-8 py-3.5 bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-xl font-semibold hover:from-green-600 hover:to-emerald-700 shadow-lg hover:shadow-emerald-500/20 transition-all duration-200"
+            className="inline-flex items-center gap-2 px-10 py-4 bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-xl font-semibold text-base hover:from-green-600 hover:to-emerald-700 shadow-lg hover:shadow-emerald-500/20 transition-all duration-200"
           >
             View all products
             <ChevronRight className="w-4 h-4" />

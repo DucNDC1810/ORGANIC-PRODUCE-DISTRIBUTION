@@ -77,15 +77,15 @@ interface MemberTopupModalProps {
 }
 
 function MemberQuickTopupModal({ shortfall, groupId, onClose }: MemberTopupModalProps) {
+  const exactShortfall = Math.max(shortfall, 10000);
   const presets = (() => {
-    const exact  = Math.max(shortfall, 10000);
     const buffer = roundUpTo(shortfall + 50000, 50000);
-    const candidates = [exact, buffer, 100000, 200000, 500000];
+    const candidates = [exactShortfall, buffer, 100000, 200000, 500000];
     const uniq = Array.from(new Set(candidates)).filter((v) => v >= 10000).sort((a, b) => a - b);
     return uniq.slice(0, 4);
   })();
 
-  const [selected, setSelected] = useState<number>(presets[0]);
+  const [selected, setSelected] = useState<number>(exactShortfall);
   const [loading,  setLoading]  = useState(false);
 
   const handleTopup = async () => {
@@ -97,12 +97,7 @@ function MemberQuickTopupModal({ shortfall, groupId, onClose }: MemberTopupModal
       });
       const payUrl: string | undefined = (res as any)?.data?.payUrl ?? (res as any)?.payUrl;
       if (payUrl) {
-        window.open(payUrl, "_blank", "noopener,noreferrer");
-        onClose();
-        toast.info("MoMo window opened. Once topped up, your wallet will update automatically!", {
-          duration: 10000,
-          icon: "💜",
-        });
+        window.location.href = payUrl;
       } else {
         toast.error("Did not receive payment link from MoMo.");
         setLoading(false);
@@ -151,7 +146,7 @@ function MemberQuickTopupModal({ shortfall, groupId, onClose }: MemberTopupModal
                       : "border-gray-200 bg-white text-gray-700 hover:border-pink-300"
                   }`}
                 >
-                  {amt === presets[0] && shortfall > 0 ? (
+                  {amt === exactShortfall && shortfall > 0 ? (
                     <span>
                       {fmtVND(amt)}
                       <span className="block text-xs font-normal text-pink-500">exact shortfall</span>
@@ -1016,28 +1011,36 @@ export default function GroupMemberPage() {
                     <span className="font-semibold text-gray-900">{fmtVND(groupTotal)}</span>
                   </div>
                 )}
+                {paymentOpt === 'individual' && (
+                  <div className="flex justify-between">
+                    <span>Subtotal (Your items)</span>
+                    <span className="font-semibold text-gray-900">{fmtVND(mySubtotal)}</span>
+                  </div>
+                )}
                 {paymentOpt === 'individual' && sharedShipping > 0 && (
                   <div className="flex justify-between text-gray-500">
-                    <span>Shipping (your share)</span>
+                    <span>Shipping (Your share)</span>
                     <span className="font-medium">+{fmtVND(sharedShipping)}</span>
                   </div>
                 )}
                 {paymentOpt === 'individual' && myDiscount > 0 && (
                   <div className="flex justify-between text-green-600">
-                    <span>Your discount ({myDiscountPct.toFixed(1).replace(/\\.0\$/, '')}%)</span>
+                    <span>Your discount ({myDiscountPct.toFixed(1).replace(/\.0$/, '')}%)</span>
                     <span className="font-medium">−{fmtVND(myDiscount)}</span>
                   </div>
                 )}
                 <div className="border-t border-gray-100 pt-2.5 flex justify-between">
                   <span className="font-bold text-gray-900">Total</span>
                   <span className="font-extrabold text-green-600 text-base">
-                    {fmtVND(groupTotal)}
+                    {fmtVND(paymentOpt === 'individual' ? myShare : groupTotal)}
                   </span>
                 </div>
-                <p className="text-xs text-gray-400 text-center">
-                  {paymentOpt === 'individual' ? 'You pay' : 'Your share'}:{" "}
-                  <span className="font-semibold text-gray-700">{fmtVND(myShare)}</span>
-                </p>
+                {paymentOpt !== 'individual' && (
+                  <p className="text-xs text-gray-400 text-center">
+                    Your share:{" "}
+                    <span className="font-semibold text-gray-700">{fmtVND(myShare)}</span>
+                  </p>
+                )}
               </div>
             )}
 
@@ -1116,6 +1119,11 @@ export default function GroupMemberPage() {
                             ? `Contribute equal share · ${fmtVND(equalShare)}`
                             : `Pay my share${mySubtotal > 0 ? ` · ${fmtVND(myShare)}` : ''}`}
                         </button>
+                      )}
+                      {paymentOpt === 'individual' && (
+                        <p className="text-xs text-gray-400 text-center mt-1.5">
+                          You are paying for your selected items only
+                        </p>
                       )}
                     </>
                   )

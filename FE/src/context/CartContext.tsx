@@ -14,6 +14,7 @@ export interface Product {
 
 export interface CartItem extends Product {
   quantity: number;
+  stock?: number;
 }
 
 interface CartContextType {
@@ -49,7 +50,8 @@ const convertAPICartItemToLocal = (apiItem: APICartItem): CartItem | null => {
     price: apiItem.price,
     image: apiItem.image || apiItem.product.images?.[0] || apiItem.product.thumbnail || '',
     category: '',
-    quantity: apiItem.quantity
+    quantity: apiItem.quantity,
+    stock: apiItem.product.stock,
   };
 };
 
@@ -207,10 +209,9 @@ export function CartProvider({ children }: { children: ReactNode }) {
           return prev;
         });
       }
-    } catch (error: any) {
-      // Revert on failure
+    } catch {
+      // Revert silently — UI already prevents exceeding stock
       setCart(prevCart);
-      toast.error(error.response?.data?.message || 'Failed to update cart');
       console.error('Error updating quantity:', error);
     }
   };

@@ -60,6 +60,17 @@ export default function MiniCart() {
     await updateQuantity(itemId, newQty);
   };
 
+  const handleQtyChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value.replace(/[^0-9]/g, '');
+    setEditingQtyValue(val);
+  };
+
+  const handleQtyPaste = (e: React.ClipboardEvent<HTMLInputElement>) => {
+    e.preventDefault();
+    const pasted = e.clipboardData.getData('text').replace(/[^0-9]/g, '');
+    if (pasted) setEditingQtyValue(pasted);
+  };
+
   const handleQtyKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (['e', 'E', '+', '-', '.'].includes(e.key)) {
       e.preventDefault();
@@ -68,15 +79,6 @@ export default function MiniCart() {
     if (e.key === 'Enter') { (e.target as HTMLInputElement).blur(); return; }
     if (e.key === 'Escape') { setEditingQtyId(null); setEditingQtyValue(''); }
   };
-
-  const handleQtyPaste = (e: React.ClipboardEvent<HTMLInputElement>) => {
-    if (!/^\d+$/.test(e.clipboardData.getData('text'))) e.preventDefault();
-  };
-
-  const handleQtyChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setEditingQtyValue(e.target.value.replace(/\D/g, ''));
-  };
-  // ──────────────────────────────────────────────────────────────────────
 
   return (
     <AnimatePresence>
@@ -252,7 +254,7 @@ export default function MiniCart() {
                             )}
                             <button
                               onClick={() => updateQuantity(item.id, item.quantity + 1)}
-                              disabled={item.quantity >= QTY_MAX}
+                              disabled={item.quantity >= ((item as any).stock ?? QTY_MAX)}
                               className="p-1 hover:bg-muted rounded transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                             >
                               <Plus className="w-4 h-4 text-muted-foreground" />
@@ -306,7 +308,7 @@ export default function MiniCart() {
                   </Link>
                   <button
                     onClick={handleCheckout}
-                    disabled={selectedItems.length === 0}
+                    disabled={selectedItems.length === 0 || selectedItems.some((i) => (i as any).stock !== undefined && i.quantity > (i as any).stock)}
                     className="block w-full px-6 py-4 bg-primary text-white rounded-xl font-semibold text-center hover:bg-primary-dark hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     Checkout ({selectedItems.length}) →
