@@ -1016,28 +1016,36 @@ export default function GroupMemberPage() {
                     <span className="font-semibold text-gray-900">{fmtVND(groupTotal)}</span>
                   </div>
                 )}
+                {paymentOpt === 'individual' && (
+                  <div className="flex justify-between">
+                    <span>Subtotal (Your items)</span>
+                    <span className="font-semibold text-gray-900">{fmtVND(mySubtotal)}</span>
+                  </div>
+                )}
                 {paymentOpt === 'individual' && sharedShipping > 0 && (
                   <div className="flex justify-between text-gray-500">
-                    <span>Shipping (your share)</span>
+                    <span>Shipping (Your share)</span>
                     <span className="font-medium">+{fmtVND(sharedShipping)}</span>
                   </div>
                 )}
                 {paymentOpt === 'individual' && myDiscount > 0 && (
                   <div className="flex justify-between text-green-600">
-                    <span>Your discount ({myDiscountPct.toFixed(1).replace(/\\.0\$/, '')}%)</span>
+                    <span>Your discount ({myDiscountPct.toFixed(1).replace(/\.0$/, '')}%)</span>
                     <span className="font-medium">−{fmtVND(myDiscount)}</span>
                   </div>
                 )}
                 <div className="border-t border-gray-100 pt-2.5 flex justify-between">
                   <span className="font-bold text-gray-900">Total</span>
                   <span className="font-extrabold text-green-600 text-base">
-                    {fmtVND(groupTotal)}
+                    {fmtVND(paymentOpt === 'individual' ? myShare : groupTotal)}
                   </span>
                 </div>
-                <p className="text-xs text-gray-400 text-center">
-                  {paymentOpt === 'individual' ? 'You pay' : 'Your share'}:{" "}
-                  <span className="font-semibold text-gray-700">{fmtVND(myShare)}</span>
-                </p>
+                {paymentOpt !== 'individual' && (
+                  <p className="text-xs text-gray-400 text-center">
+                    Your share:{" "}
+                    <span className="font-semibold text-gray-700">{fmtVND(myShare)}</span>
+                  </p>
+                )}
               </div>
             )}
 
@@ -1116,6 +1124,11 @@ export default function GroupMemberPage() {
                             ? `Contribute equal share · ${fmtVND(equalShare)}`
                             : `Pay my share${mySubtotal > 0 ? ` · ${fmtVND(myShare)}` : ''}`}
                         </button>
+                      )}
+                      {paymentOpt === 'individual' && (
+                        <p className="text-xs text-gray-400 text-center mt-1.5">
+                          You are paying for your selected items only
+                        </p>
                       )}
                     </>
                   )

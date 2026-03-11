@@ -23,7 +23,7 @@ export default function GroupSessionBar() {
           <div className="flex-1 min-w-0 flex items-center gap-2.5">
             <Crown className="w-4 h-4 text-yellow-400 flex-shrink-0" />
             <div className="min-w-0">
-              <p className="text-xs text-emerald-300 leading-none mb-0.5">Bạn đang tổ chức nhóm đặt hàng</p>
+              <p className="text-xs text-emerald-300 leading-none mb-0.5">You are organizing a group event.</p>
               <p className="text-sm font-bold text-white truncate">{groupSession.groupName}</p>
             </div>
           </div>
@@ -32,11 +32,11 @@ export default function GroupSessionBar() {
             className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-white text-xs font-bold transition-colors flex-shrink-0"
           >
             <Users className="w-3.5 h-3.5" />
-            Quản lý nhóm
+            Group Management
           </button>
           <button
             onClick={clearGroupSession}
-            title="Huỷ nhóm / Thoát"
+            title="Cancel / Exit group"
             className="w-7 h-7 rounded-lg bg-white/10 hover:bg-white/20 flex items-center justify-center text-emerald-300 hover:text-white transition-colors flex-shrink-0"
           >
             <X className="w-3.5 h-3.5" />
@@ -52,7 +52,7 @@ export default function GroupSessionBar() {
         <div className="flex-1 min-w-0 flex items-center gap-2.5">
           <span className="text-base flex-shrink-0">📦</span>
           <div className="min-w-0">
-            <p className="text-xs text-gray-400 leading-none mb-0.5">Bạn đang đặt đơn cùng nhóm</p>
+            <p className="text-xs text-gray-400 leading-none mb-0.5">You are ordering with a group</p>
             <p className="text-sm font-bold text-white truncate">{groupSession.groupName}</p>
           </div>
         </div>
@@ -61,11 +61,11 @@ export default function GroupSessionBar() {
           className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-green-500 hover:bg-green-400 text-white text-xs font-bold transition-colors flex-shrink-0"
         >
           <ShoppingBag className="w-3.5 h-3.5" />
-          Xem giỏ hàng nhóm
+          View Group Cart
         </button>
         <button
           onClick={clearGroupSession}
-          title="Rời khỏi nhóm"
+          title="Leave group"
           className="w-7 h-7 rounded-lg bg-white/10 hover:bg-white/20 flex items-center justify-center text-gray-400 hover:text-white transition-colors flex-shrink-0"
         >
           <X className="w-3.5 h-3.5" />

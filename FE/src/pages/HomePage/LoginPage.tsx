@@ -146,27 +146,26 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen flex">
+    <div className="h-screen overflow-hidden flex">
       {/* Left Side - Image with Glassmorphism Quote */}
       <div className="hidden lg:flex lg:w-1/2 relative overflow-hidden">
         {/* Background Image */}
         <img
-          src="https://images.unsplash.com/photo-1678831654314-8d68bb47cb0f?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxmcmVzaCUyMHZlZ2V0YWJsZXMlMjBmcnVpdHMlMjB3b29kZW4lMjB0YWJsZSUyMHRvcCUyMHZpZXd8ZW58MXx8fHwxNzY4NDY3MzEwfDA&ixlib=rb-4.1.0&q=80&w=1080"
+          src="/image/Gemini_Generated_Image_buiyffbuiyffbuiy.png"
           alt="Fresh vegetables and fruits"
           className="w-full h-full object-cover"
         />
         
         {/* Glassmorphism Overlay with Quote */}
-        <div className="absolute inset-0 flex items-center justify-center p-12">
-          <div className="relative backdrop-blur-xl bg-white/20 border border-white/30 rounded-3xl p-12 shadow-2xl max-w-lg">
-            <div className="absolute inset-0 bg-gradient-to-br from-primary/10 to-transparent rounded-3xl"></div>
+        <div className="absolute bottom-8 left-8 right-8">
+          <div className="relative backdrop-blur-md bg-black/30 border border-white/20 rounded-2xl px-8 py-6 shadow-xl">
             <div className="relative">
-              <Leaf className="w-12 h-12 text-white mb-6 mx-auto" />
+              <Leaf className="w-7 h-7 text-white mb-3 mx-auto" />
               <blockquote className="text-center">
-                <p className="text-2xl font-semibold text-white leading-relaxed mb-4">
+                <p className="text-lg font-medium text-white leading-relaxed mb-2">
                   "Eating organic is not a luxury, it's a necessity for a healthier tomorrow."
                 </p>
-                <footer className="text-white/90 text-lg">— FreshMarket</footer>
+                <footer className="text-white/80 text-sm">— FreshMarket</footer>
               </blockquote>
             </div>
           </div>
@@ -359,17 +358,6 @@ export default function LoginPage() {
                 </svg>
               </button>
 
-              {/* Facebook */}
-              <button
-                type="button"
-                className="w-16 h-16 bg-white border-2 border-border rounded-full hover:border-primary hover:shadow-lg transition-all flex items-center justify-center group opacity-50 cursor-not-allowed"
-                title="Sign in with Facebook (Coming soon)"
-                disabled
-              >
-                <svg className="w-7 h-7 group-hover:scale-110 transition-transform" viewBox="0 0 24 24" fill="#1877F2">
-                  <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
-                </svg>
-              </button>
             </div>
           </form>
 

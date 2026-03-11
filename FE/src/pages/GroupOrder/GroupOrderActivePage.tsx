@@ -472,10 +472,15 @@ export default function GroupOrderActivePage() {
   const totalHeld      = members
     .filter((m) => m.walletPaid)
     .reduce((s, m) => s + (m.walletHoldAmount ?? 0), 0);
+  // Owner's individual-mode total: their own items + shared shipping − personal discount
+  const ownerIndividualTotal = ownerCartSubtotal + ownerSharedShipping - ownerDiscount;
+
   // For equal_split: owner pays a fixed ownerEqualShare regardless of what others held
   const ownerRemaining = paymentOption === 'equal_split'
     ? ownerEqualShare
-    : Math.max(0, total + 25000 - totalHeld);
+    : paymentOption === 'individual'
+      ? ownerIndividualTotal
+      : Math.max(0, total + 25000 - totalHeld);
 
   const handleCopy = () => {
     navigator.clipboard.writeText(inviteLink).catch(() => {});
@@ -974,11 +979,17 @@ export default function GroupOrderActivePage() {
 
             <div className="border-t border-gray-100 pt-4 space-y-2.5 text-sm text-gray-600">
               <div className="flex justify-between">
-                <span>Subtotal <span className="text-gray-400 font-normal">(whole group)</span></span>
-                <span className="font-semibold text-gray-900">{fmtVND(subtotal)}</span>
+                <span>
+                  {paymentOption === 'individual'
+                    ? 'Subtotal (Your items)'
+                    : <span>Subtotal <span className="text-gray-400 font-normal">(whole group)</span></span>}
+                </span>
+                <span className="font-semibold text-gray-900">
+                  {fmtVND(paymentOption === 'individual' ? ownerCartSubtotal : subtotal)}
+                </span>
               </div>
               <div className="flex justify-between">
-                <span>{paymentOption === 'individual' ? 'Shipping (your share)' : 'Shipping fee'}</span>
+                <span>{paymentOption === 'individual' ? 'Shipping (Your share)' : 'Shipping fee'}</span>
                 <span className="font-semibold text-gray-900">{paymentOption === 'individual' ? fmtVND(ownerSharedShipping) : '25.000đ'}</span>
               </div>
               {activePct > 0 && (
@@ -993,7 +1004,9 @@ export default function GroupOrderActivePage() {
               )}
               <div className="border-t border-gray-100 pt-2.5 flex justify-between">
                 <span className="font-bold text-gray-900">Total</span>
-                <span className="font-extrabold text-green-600 text-base">{fmtVND(total + 25000)}</span>
+                <span className="font-extrabold text-green-600 text-base">
+                  {fmtVND(paymentOption === 'individual' ? ownerIndividualTotal : total + 25000)}
+                </span>
               </div>
 
               {/* ── Deposit breakdown – only for individual / equal_split ── */}
@@ -1156,6 +1169,11 @@ export default function GroupOrderActivePage() {
                 <><ShoppingCart className="w-5 h-5" /> Place group order →</>
               )}
             </button>
+          )}
+          {paymentOption === 'individual' && (
+            <p className="text-center text-xs text-gray-400 -mt-1">
+              You are paying for your selected items only
+            </p>
           )}
           {paymentOption === 'equal_split' && !allNonOwnerPaid && nonOwnerCount > 0 && (
             <p className="text-center text-xs text-amber-500 font-medium -mt-1">
