@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
+import { useCart } from '../../context/CartContext';
 import { 
   CheckCircle, 
   Package, 
@@ -42,6 +43,7 @@ function getDeliveryScheduleLabel(config: any): string {
 
 export default function OrderSuccessPage() {
   const location = useLocation();
+  const { refreshCart } = useCart();
   const [orderData, setOrderData] = useState<any>(null);
   const [subscriptionConfig, setSubscriptionConfig] = useState<any>(null);
   const [verificationStatus, setVerificationStatus] = useState<"idle" | "verifying" | "verified">("idle");
@@ -298,7 +300,12 @@ export default function OrderSuccessPage() {
       }
     };
 
-    verifyAndLoadOrder();
+    verifyAndLoadOrder().then(() => {
+      // Sync FE cart with server after successful payment
+      // Delay to allow MoMo callback to finish clearing cart on BE first
+      refreshCart();
+      setTimeout(() => refreshCart(), 3000);
+    });
   }, []);
 
   const isPickup = orderData?.deliveryInfo?.type === 'pickup';
