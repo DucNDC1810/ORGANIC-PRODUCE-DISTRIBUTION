@@ -40,7 +40,15 @@ export default function JoinGroupPage() {
     if (!groupId || !isAuthenticated) return;
     groupService
       .getGroup(groupId)
-      .then(setGroup)
+      .then((g) => {
+        if (g.status === 'deleted') {
+          setGroupError("This group order no longer exists. The owner may have cancelled it.");
+        } else if (g.status !== 'active') {
+          setGroupError("This group is no longer accepting new members.");
+        } else {
+          setGroup(g);
+        }
+      })
       .catch(() => setGroupError("Group not found or already closed."))
       .finally(() => setLoadingGroup(false));
   }, [groupId, isAuthenticated]);

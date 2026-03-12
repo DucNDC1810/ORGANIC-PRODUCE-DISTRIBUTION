@@ -283,15 +283,14 @@ export default function GroupMemberPage() {
         duration: 6000,
       });
     });
-    socket.on("group:cancelled", () => {
+    socket.on("group:deleted", () => {
       const isOwnerPays = (groupRef.current?.paymentOption ?? 'owner_only') === 'owner_only';
-      if (isOwnerPays) {
-        toast.info("Group order was cancelled by the owner.", { duration: 5000 });
-      } else {
-        toast.info("Group order was cancelled. Your deposit has been refunded to your wallet.", { duration: 6000 });
-      }
+      const msg = isOwnerPays
+        ? "The group order has been cancelled by the owner."
+        : "The group order has been cancelled by the owner. Your deposit has been refunded to your wallet.";
+      toast.info(msg, { duration: 6000 });
       clearGroupSession();
-      navigate("/products");
+      navigate("/");
     });
 
     // ── Owner đã chốt đơn → chuyển member sang trang xác nhận thành công ──

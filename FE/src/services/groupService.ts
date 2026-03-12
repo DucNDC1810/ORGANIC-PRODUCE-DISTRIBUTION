@@ -14,7 +14,7 @@ export interface Group {
   inviteCode: string;
   settings: GroupSettings;
   paymentOption: 'owner_only' | 'individual' | 'equal_split';
-  status: 'active' | 'locked' | 'completed';
+  status: 'active' | 'locked' | 'completed' | 'deleted';
   createdAt: string;
 }
 

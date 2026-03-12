@@ -549,10 +549,10 @@ export default function GroupOrderActivePage() {
       await groupService.cancelGroup(groupId);
       const msg = paymentOption === 'owner_only'
         ? "Group order deleted successfully."
-        : "Group order cancelled. Deposits have been refunded to all members."; 
+        : "Group order cancelled. Deposits have been refunded to all members.";
       toast.success(msg, { duration: 6000 });
       clearGroupSession();
-      navigate("/checkout");
+      navigate("/");
     } catch (err: any) {
       const msg = err?.response?.data?.message || "Cancellation failed. Please try again."; 
       toast.error(msg);

@@ -9,7 +9,7 @@ export interface IGroup extends Document {
     timeLimit: Date | null;
   };
   paymentOption: 'owner_only' | 'individual' | 'equal_split';
-  status: 'active' | 'locked' | 'completed';
+  status: 'active' | 'locked' | 'completed' | 'deleted';
   createdAt: Date;
 }
 
@@ -29,7 +29,7 @@ const groupSchema = new Schema<IGroup>(
     },
     status: {
       type: String,
-      enum: ['active', 'locked', 'completed'],
+      enum: ['active', 'locked', 'completed', 'deleted'],
       default: 'active',
     },
   },

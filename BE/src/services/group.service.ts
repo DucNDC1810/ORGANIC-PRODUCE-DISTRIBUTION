@@ -207,8 +207,10 @@ export class GroupService {
       }
     }
 
-    await GroupMember.deleteMany({ groupId });
-    await group.deleteOne();
+    // Soft delete: đánh dấu nhóm là 'deleted' thay vì xóa vĩnh viễn
+    // Giữ lại GroupMember records để audit trail; inviteCode tự động mất hiệu lực
+    group.status = 'deleted';
+    await group.save();
     return group;
   }
 
