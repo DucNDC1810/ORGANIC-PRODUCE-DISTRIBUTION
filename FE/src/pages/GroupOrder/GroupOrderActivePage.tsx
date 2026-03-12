@@ -28,6 +28,7 @@ import { toast } from "sonner";
 import Header from "../../components/Header";
 import { groupService, type GroupMember as APIMember } from "../../services/groupService";
 import walletService from "../../services/walletService";
+import { useCart } from "../../context/CartContext";
 
 // ─── QuickTopupModal ─────────────────────────────────────────────────────────
 
@@ -192,8 +193,10 @@ const TIERS = [
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-function fmtVND(n: number) {
-  return n.toLocaleString("vi-VN") + "đ";
+function fmtVND(n: number | undefined | null) {
+  const v = Number(n);
+  if (!isFinite(v) || isNaN(v)) return '0đ';
+  return v.toLocaleString("vi-VN") + "đ";
 }
 
 function calcProgress(count: number) {
@@ -221,25 +224,22 @@ export default function GroupOrderActivePage() {
   const navigate  = useNavigate();
   const location  = useLocation();
   const { groupSession, setGroupSession, clearGroupSession } = useGroup();
+  const { clearCart } = useCart();
   const groupName = (location.state as any)?.groupName ?? groupSession?.groupName ?? "Group Order";
   const groupId   = ((location.state as any)?.groupId as string | undefined) ?? groupSession?.groupId;
 
-  // Map cart items from checkout (CartContext shape) → local CartItem shape
+  // Map cart items from checkout (CartContext shape) OR restored local format → local CartItem shape
+  // Checkout format: { id, name, price, quantity, image }
+  // Restored format (from sessionStorage after MoMo topup): { id, productId, name, price, qty, image, unit }
   const initialCart: CartItem[] = ((location.state as any)?.cartItems ?? []).length > 0
-    ? ((location.state as any).cartItems as Array<{
-        id: string;
-        name: string;
-        price: number;
-        quantity: number;
-        image: string;
-      }>).map((item, idx) => ({
+    ? ((location.state as any).cartItems as Array<any>).map((item, idx) => ({
         id: idx + 1,
-        productId: item.id,
-        name: item.name,
-        price: item.price,
-        qty: item.quantity,
+        productId: String(item.productId || item.id || ''),
+        name: item.name ?? '',
+        price: Number(item.price) || 0,
+        qty: Number(item.qty ?? item.quantity) || 1,
         image: item.image || "🛒",
-        unit: "serving",
+        unit: item.unit || "serving",
       }))
     : [];
 
@@ -424,8 +424,8 @@ export default function GroupOrderActivePage() {
   // The owner's member record on the server has empty cartItems; local cart is source of truth.
   const getMemberTotalQty = (m: APIMember): number => {
     if (m.role === "owner")
-      return cart.reduce((s, i) => s + i.qty, 0);
-    return (m.cartItems ?? []).reduce((s, i) => s + i.qty, 0);
+      return cart.reduce((s, i) => s + (Number(i.qty) || 0), 0);
+    return (m.cartItems ?? []).reduce((s, i) => s + (Number(i.qty) || 0), 0);
   };
 
   const isMemberOrdered = (m: APIMember): boolean => {
@@ -440,11 +440,11 @@ export default function GroupOrderActivePage() {
   const nextTier      = TIERS[activeTierIdx + 1];
   const progress      = calcProgress(joinedCount);
 
-  const ownerCartSubtotal = cart.reduce((s, i) => s + i.price * i.qty, 0);
+  const ownerCartSubtotal = cart.reduce((s, i) => s + (Number(i.price) || 0) * (Number(i.qty) || 0), 0);
   const hasOwnerInMembers  = members.some((m) => m.role === "owner");
   const groupSubtotal = members.reduce((s, m) => {
     const memberCart = m.role === "owner" ? cart : (m.cartItems ?? []);
-    return s + memberCart.reduce((cs, i) => cs + i.price * i.qty, 0);
+    return s + memberCart.reduce((cs, i) => cs + (Number(i.price) || 0) * (Number(i.qty) || 0), 0);
   }, 0) + (hasOwnerInMembers ? 0 : ownerCartSubtotal);
   const subtotal   = groupSubtotal;
   const discount   = Math.round(groupSubtotal * activePct / 100);
@@ -514,6 +514,7 @@ export default function GroupOrderActivePage() {
       const result = await groupService.placeGroupOrder(groupId, ownerCartItems);
       const ownerMember = members.find((m) => m.role === "owner");
       const ownerName   = ownerMember ? getMemberName(ownerMember) : "Group Owner";
+      await clearCart(true);
       navigate("/group-order/owner-success", {
         replace: true,
         state: {

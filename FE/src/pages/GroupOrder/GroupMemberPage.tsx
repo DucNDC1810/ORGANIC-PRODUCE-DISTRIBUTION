@@ -26,6 +26,7 @@ import { toast } from "sonner";
 import { groupService, type Group, type GroupMember, type GroupCartItem } from "../../services/groupService";
 import { useGroup } from "../../context/GroupContext";
 import { useAuth } from "../../context/AuthContext";
+import { useCart } from "../../context/CartContext";
 import walletService from "../../services/walletService";
 
 // ── Constants ──────────────────────────────────────────────────────────────────
@@ -39,8 +40,10 @@ const TIERS = [
 const AVATARS = ["🧑‍🌾", "👩‍🍳", "🧑‍💼", "👩‍🌾", "👨‍🍳", "🧑‍🦱", "👩‍🦰", "🧑‍🦳"];
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
-function fmtVND(n: number) {
-  return n.toLocaleString("vi-VN") + "đ";
+function fmtVND(n: number | undefined | null) {
+  const v = Number(n);
+  if (!isFinite(v) || isNaN(v)) return '0đ';
+  return v.toLocaleString("vi-VN") + "đ";
 }
 
 function getMemberName(m: GroupMember): string {
@@ -185,6 +188,7 @@ export default function GroupMemberPage() {
   const navigate = useNavigate();
   const { groupSession, clearGroupSession } = useGroup();
   const { user } = useAuth();
+  const { clearCart } = useCart();
 
   const [group,           setGroup]           = useState<Group | null>(null);
   const [members,         setMembers]         = useState<GroupMember[]>([]);
@@ -308,6 +312,7 @@ export default function GroupMemberPage() {
       const tierIdx      = TIERS.reduce((acc, t, i) => (orderedCount >= t.members ? i : acc), -1);
       const pct          = tierIdx >= 0 ? TIERS[tierIdx].pct : 0;
 
+      clearCart(true);
       navigate("/group-order/success", {
         replace: true,
         state: {
@@ -431,10 +436,10 @@ export default function GroupMemberPage() {
   const nextTier      = TIERS[activeTierIdx + 1];
   const progress      = calcProgress(orderedCount);
 
-  const mySubtotal  = myCart.reduce((s, i) => s + i.price * i.qty, 0);
+  const mySubtotal  = myCart.reduce((s, i) => s + (Number(i.price) || 0) * (Number(i.qty) || 0), 0);
   const groupTotal  = members.reduce((s, m) => {
     const items = m._id === memberId ? myCart : (m.cartItems ?? []);
-    return s + items.reduce((si, i) => si + i.price * i.qty, 0);
+    return s + items.reduce((si, i) => si + (Number(i.price) || 0) * (Number(i.qty) || 0), 0);
   }, 0);
 
   // Per-member share based on paymentOption
