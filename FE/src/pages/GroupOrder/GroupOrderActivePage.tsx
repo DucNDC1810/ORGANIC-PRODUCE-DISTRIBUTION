@@ -462,6 +462,11 @@ export default function GroupOrderActivePage() {
 
   const allOrdered = members.length > 0 && members.every(isMemberOrdered);
 
+  // ── All non-owner members must be Ready before owner can pay ──
+  const nonOwnerMembers = members.filter((m) => m.role !== 'owner');
+  const isAllMembersReady = nonOwnerMembers.length === 0 || nonOwnerMembers.every((m) => m.isReady);
+  const notReadyMembers = nonOwnerMembers.filter((m) => !m.isReady);
+
   // Total amount already held from members' wallets (deposits)
   const totalHeld      = members
     .filter((m) => m.walletPaid)
@@ -1137,12 +1142,40 @@ export default function GroupOrderActivePage() {
             </div>
           )}
 
+          {/* ── Waiting for members feedback ── */}
+          {!isAllMembersReady && notReadyMembers.length > 0 && (
+            <motion.div
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="bg-amber-50 border border-amber-200 rounded-2xl px-4 py-3.5 flex items-start gap-3"
+            >
+              <div className="w-8 h-8 rounded-full bg-amber-100 flex items-center justify-center flex-shrink-0 mt-0.5">
+                <AlertTriangle className="w-4 h-4 text-amber-600" />
+              </div>
+              <div>
+                <p className="text-sm font-bold text-amber-800">Waiting for members to confirm</p>
+                <div className="mt-1.5 space-y-1">
+                  {notReadyMembers.map((m) => (
+                    <p key={m._id} className="text-xs text-amber-700 flex items-center gap-1.5">
+                      <span className="w-1.5 h-1.5 rounded-full bg-amber-400 flex-shrink-0" />
+                      Waiting for <span className="font-bold">{getMemberName(m)}</span> to confirm their items…
+                    </p>
+                  ))}
+                </div>
+              </div>
+            </motion.div>
+          )}
+
           {/* ── Chốt đơn / Nạp thêm button ── */}
           {walletBalance < ownerRemaining && ownerRemaining > 0 ? (
             <button
               onClick={() => setShowTopupModal(true)}
-              disabled={cart.length === 0}
-              className="w-full py-4 rounded-2xl bg-gradient-to-r from-pink-500 to-rose-500 text-white text-base font-extrabold shadow-lg hover:from-pink-600 hover:to-rose-600 active:scale-[0.98] transition-all duration-150 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+              disabled={cart.length === 0 || !isAllMembersReady}
+              className={`w-full py-4 rounded-2xl text-white text-base font-extrabold shadow-lg active:scale-[0.98] transition-all duration-300 flex items-center justify-center gap-2 disabled:cursor-not-allowed ${
+                !isAllMembersReady
+                  ? 'bg-gray-300 shadow-none'
+                  : 'bg-gradient-to-r from-pink-500 to-rose-500 hover:from-pink-600 hover:to-rose-600 disabled:opacity-50'
+              }`}
             >
               <Wallet className="w-5 h-5" />
               Top up {fmtVND(ownerRemaining - walletBalance)} to pay
@@ -1150,8 +1183,12 @@ export default function GroupOrderActivePage() {
           ) : (
             <button
               onClick={() => setShowPlaceConfirm(true)}
-              disabled={placeOrderLoading || cart.length === 0 || (paymentOption === 'equal_split' && !allNonOwnerPaid)}
-              className="w-full py-4 rounded-2xl bg-gradient-to-r from-green-600 to-emerald-500 text-white text-base font-extrabold shadow-lg hover:from-green-700 hover:to-emerald-600 active:scale-[0.98] transition-all duration-150 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+              disabled={placeOrderLoading || cart.length === 0 || !isAllMembersReady || (paymentOption === 'equal_split' && !allNonOwnerPaid)}
+              className={`w-full py-4 rounded-2xl text-white text-base font-extrabold shadow-lg active:scale-[0.98] transition-all duration-300 flex items-center justify-center gap-2 disabled:cursor-not-allowed ${
+                !isAllMembersReady
+                  ? 'bg-gray-300 shadow-none'
+                  : 'bg-gradient-to-r from-green-600 to-emerald-500 hover:from-green-700 hover:to-emerald-600 disabled:opacity-50'
+              }`}
             >
               {placeOrderLoading ? (
                 <><Loader2 className="w-5 h-5 animate-spin" /> Processing...</>
@@ -1164,19 +1201,14 @@ export default function GroupOrderActivePage() {
               )}
             </button>
           )}
-          {paymentOption === 'individual' && (
+          {isAllMembersReady && paymentOption === 'individual' && (
             <p className="text-center text-xs text-gray-400 -mt-1">
               You are paying for your selected items only
             </p>
           )}
-          {paymentOption === 'equal_split' && !allNonOwnerPaid && nonOwnerCount > 0 && (
+          {isAllMembersReady && paymentOption === 'equal_split' && !allNonOwnerPaid && nonOwnerCount > 0 && (
             <p className="text-center text-xs text-amber-500 font-medium -mt-1">
               ⚠ {members.filter((m) => m.role !== 'owner' && !m.walletPaid).length}/{nonOwnerCount} members haven't contributed yet
-            </p>
-          )}
-          {!allOrdered && !(paymentOption === 'equal_split' && !allNonOwnerPaid) && (
-            <p className="text-center text-xs text-amber-500 font-medium -mt-1">
-              ⚠ {members.filter((m) => !m.isReady).length} members haven't chosen items yet
             </p>
           )}
 
