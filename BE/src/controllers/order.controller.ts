@@ -17,7 +17,7 @@ export class OrderController {
    */
   createOrder = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
     try {
-      const { addressId, deliveryInfo, voucherId, voucherCode, items, paymentMethod, notes, pickupLocation, discountAmount: clientDiscount } = req.body;
+      const { addressId, deliveryInfo, voucherId, voucherCode, items, paymentMethod, isRecurring, subscriptionFrequency, notes, pickupLocation, discountAmount: clientDiscount } = req.body;
       const userId = req.user?.id;
 
       if (!userId) {
@@ -118,7 +118,9 @@ export class OrderController {
         discountAmount: totalDiscount,
         notes,
         status: 'pending',
-        orderDate: new Date()
+        orderDate: new Date(),
+        isRecurring: isRecurring === true || isRecurring === 'true',
+        subscriptionFrequency: subscriptionFrequency || null
       });
 
       // ── Step 2: Create pending VoucherUsage (soft lock) ────────────────
@@ -807,6 +809,79 @@ export class OrderController {
           totalRevenue,
           byStatus: stats
         }
+      });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  /**
+   * Update payment method for a subscription order (owner only, pending status only)
+   * PATCH /api/orders/:id/payment-method
+   * Body: { paymentMethod: 'cod' | 'momo' }
+   */
+  updatePaymentMethod = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const { id } = req.params;
+      const { paymentMethod } = req.body;
+      const userId = req.user?.id;
+
+      if (!userId) {
+        throw new AppError('User not authenticated', 401);
+      }
+
+      if (!paymentMethod) {
+        throw new AppError('paymentMethod is required', 400);
+      }
+
+      const allowedMethods = ['cod', 'momo'];
+      if (!allowedMethods.includes(paymentMethod)) {
+        throw new AppError(`Invalid payment method. Must be one of: ${allowedMethods.join(', ')}`, 400);
+      }
+
+      const order = await Order.findById(id);
+
+      if (!order) {
+        throw new AppError('Order not found', 404);
+      }
+
+      // Owner check
+      if (order.userId.toString() !== userId) {
+        throw new AppError('You do not have permission to update this order', 403);
+      }
+
+      // Must be a subscription order
+      if (!order.subscriptionId) {
+        throw new AppError('Payment method switching is only available for subscription orders', 400);
+      }
+
+      // Must still be pending (not yet accepted by manager)
+      if (order.status !== 'pending') {
+        throw new AppError(
+          `Cannot change payment method for an order with status: ${order.status}. Only pending orders can be modified.`,
+          400
+        );
+      }
+
+      // Determine new paymentStatus based on method
+      const isCOD = paymentMethod === 'cod';
+      const newPaymentStatus = isCOD ? 'pending' : 'unpaid';
+
+      const updatedOrder = await Order.findByIdAndUpdate(
+        id,
+        {
+          paymentMethod,
+          paymentStatus: newPaymentStatus
+        },
+        { new: true, runValidators: true }
+      )
+        .populate('userId', 'name email phone')
+        .populate('items.productId', 'name price thumbnail');
+
+      res.status(200).json({
+        success: true,
+        message: `Payment method updated to ${paymentMethod.toUpperCase()}`,
+        data: updatedOrder
       });
     } catch (error) {
       next(error);

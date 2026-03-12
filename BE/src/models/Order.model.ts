@@ -40,6 +40,8 @@ export interface IOrder extends Document {
   cancelReason?: string;
   cancelledAt?: Date;
   shipperCancelledAt?: Date;
+  isRecurring?: boolean;
+  subscriptionFrequency?: string;
   confirmedAt?: Date;
   confirmedBy?: mongoose.Types.ObjectId;
   deliveredAt?: Date;
@@ -222,6 +224,15 @@ const orderSchema = new Schema<IOrder>(
     },
     shippingAcceptedAt: {
       type: Date
+    },
+    isRecurring: {
+      type: Boolean,
+      default: false
+    },
+    subscriptionFrequency: {
+      type: String,
+      enum: ['weekly', 'bi-weekly', 'monthly', null],
+      default: null
     }
   },
   {

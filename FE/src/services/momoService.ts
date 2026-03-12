@@ -21,6 +21,9 @@ export interface MoMoCreatePaymentPayload {
   }>;
   notes?: string;
   pickupLocation?: { name: string; address: string };
+  isRecurring?: boolean;
+  subscriptionFrequency?: string;
+  discountAmount?: number;
 }
 
 export interface MoMoCreatePaymentResponse {

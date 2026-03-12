@@ -94,7 +94,10 @@ async function processSubscriptionOrders(): Promise<void> {
 
       const rawTotal = orderItems.reduce((sum, i) => sum + i.subtotal, 0);
       const discount = rawTotal * (sub.discountRate ?? 0);
-      const totalAmount = Math.max(0, rawTotal - discount);
+      const subtotalAfterDiscount = Math.max(0, rawTotal - discount);
+      const shipping = sub.shippingCost ?? 25000;
+      const vat = (subtotalAfterDiscount + shipping) * 0.0476;
+      const totalAmount = subtotalAfterDiscount + shipping + vat;
 
       // ── Xác định trạng thái đơn & thanh toán ────────────
       // Normalize sớm để dùng nhất quán

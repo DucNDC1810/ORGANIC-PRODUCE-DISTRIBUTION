@@ -14,6 +14,7 @@ export interface Product {
 
 export interface CartItem extends Product {
   quantity: number;
+  stock?: number;
 }
 
 interface CartContextType {
@@ -49,7 +50,8 @@ const convertAPICartItemToLocal = (apiItem: APICartItem): CartItem | null => {
     price: apiItem.price,
     image: apiItem.image || apiItem.product.images?.[0] || apiItem.product.thumbnail || '',
     category: '',
-    quantity: apiItem.quantity
+    quantity: apiItem.quantity,
+    stock: apiItem.product.stock,
   };
 };
 
@@ -132,13 +134,20 @@ export function CartProvider({ children }: { children: ReactNode }) {
           const existingItem = prevCart.find((item) => item.id === product.id);
           let newCart;
           if (existingItem) {
+            // Respect stock when increasing quantity locally
+            const max = (existingItem as any).stock ?? Number.MAX_SAFE_INTEGER;
             newCart = prevCart.map((item) =>
               item.id === product.id
-                ? { ...item, quantity: item.quantity + quantity }
+                ? { ...item, quantity: Math.min(item.quantity + quantity, max) }
                 : item
             );
+            if (existingItem && (existingItem as any).stock !== undefined && existingItem.quantity + quantity > (existingItem as any).stock) {
+              toast.error('Cannot add more than available stock');
+            }
           } else {
-            newCart = [...prevCart, { ...product, quantity }];
+            // Preserve stock if product object includes it
+            const stock = (product as any).stock;
+            newCart = [...prevCart, { ...product, quantity, stock }];
           }
           saveLocalCart(newCart);
           return newCart;
@@ -188,6 +197,13 @@ export function CartProvider({ children }: { children: ReactNode }) {
       return;
     }
 
+    // Respect stock limits before optimistic update
+    const existingItem = cart.find((i) => i.id === productId);
+    if (existingItem && (existingItem as any).stock !== undefined && quantity > (existingItem as any).stock) {
+      toast.error('Cannot exceed available stock');
+      return;
+    }
+
     // Optimistic update — apply immediately so the UI feels instant
     const prevCart = cart;
     setCart((prev) => prev.map((item) => item.id === productId ? { ...item, quantity } : item));
@@ -207,10 +223,9 @@ export function CartProvider({ children }: { children: ReactNode }) {
           return prev;
         });
       }
-    } catch (error: any) {
-      // Revert on failure
+    } catch (error) {
+      // Revert silently — UI already prevents exceeding stock
       setCart(prevCart);
-      toast.error(error.response?.data?.message || 'Failed to update cart');
       console.error('Error updating quantity:', error);
     }
   };

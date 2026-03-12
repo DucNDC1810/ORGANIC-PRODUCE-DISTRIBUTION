@@ -86,6 +86,13 @@ router.patch(
   orderController.managerCancelOrder as any
 );
 
+// Update payment method (owner only, pending subscription orders)
+router.patch(
+  '/:id/payment-method',
+  authenticate as any,
+  orderController.updatePaymentMethod as any
+);
+
 // Cancel order (owner or manager)
 router.patch(
   '/:id/cancel',

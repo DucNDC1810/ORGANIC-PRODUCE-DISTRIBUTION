@@ -24,7 +24,7 @@ export class MoMoController {
    */
   createPayment = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
     try {
-      const { orderId, amount, description, deliveryInfo, items, notes, pickupLocation } = req.body;
+      const { orderId, amount, description, deliveryInfo, items, notes, pickupLocation, isRecurring, subscriptionFrequency, discountAmount } = req.body;
       const userId = req.user?.id;
 
       // Validate required fields
@@ -76,8 +76,11 @@ export class MoMoController {
           paymentMethod: 'momo',
           items: orderItems,
           totalAmount: amount,
+          discountAmount: Math.max(0, parseFloat(discountAmount) || 0),
           status: 'pending',
           ...(notes ? { notes } : {}),
+          isRecurring: isRecurring === true || isRecurring === 'true',
+          subscriptionFrequency: subscriptionFrequency || null,
         });
 
         finalOrderId = newOrder._id.toString();
@@ -238,7 +241,7 @@ export class MoMoController {
 
           // Capture groupId stored by wallet controller
           topupGroupId = txn.metadata?.groupId as string | undefined;
-          topupUserId  = txn.userId.toString();
+          topupUserId = txn.userId.toString();
 
           if (txn.status !== 'success') {
             // Cộng tiền vào ví – capture new balance
@@ -321,12 +324,12 @@ export class MoMoController {
       // Kiểm tra resultCode (0 = success, khác = failed)
       if (resultCode !== 0) {
         console.log('⚠️ MoMo payment failed with resultCode:', resultCode);
-        
+
         // Cập nhật trạng thái thanh toán và đơn hàng thành "failed"
         let payment = await Payment.findOne({ 'metadata.momoOrderId': orderId });
         if (!payment) payment = await Payment.findOne({ transactionId: orderId });
         if (!payment) payment = await Payment.findOne({ orderId: orderId });
-        
+
         if (payment) {
           await Payment.findByIdAndUpdate(
             payment._id,
