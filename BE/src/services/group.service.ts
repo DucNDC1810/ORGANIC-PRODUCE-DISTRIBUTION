@@ -231,7 +231,7 @@ export class GroupService {
     if (group.ownerId.toString() !== ownerId) throw new AppError('Bạn không phải chủ nhóm', 403);
     if (group.status !== 'active') throw new AppError('Nhóm đã đóng hoặc hoàn thành', 400);
 
-    const members = await GroupMember.find({ groupId });
+    const members = await GroupMember.find({ groupId }).populate('userId', 'name');
 
     // Tính tổng tiền từng thành viên (không phải owner)
     const regularMembers = members.filter((m) => m.role !== 'owner');
@@ -289,19 +289,31 @@ export class GroupService {
       ),
     ];
 
-    // Tạo đơn hàng chính thức
+    // Lấy địa chỉ mặc định của owner từ User model (giống checkout) làm địa chỉ giao hàng chung
+    const canonicalDeliveryInfo =
+      deliveryInfo && Object.keys(deliveryInfo).length > 0
+        ? deliveryInfo
+        : {
+            fullName: owner.name,
+            phone:    owner.phone,
+            address:  [owner.street, owner.ward, owner.district, owner.province]
+                        .filter(Boolean).join(', ') || '',
+            type: 'delivery' as const,
+          };
+
+    // Tạo đơn hàng chính thức (pending – chờ manager duyệt trước khi ship)
     const order = await Order.create({
       userId: ownerId,
       orderType: 'group_buy',
       groupId: new mongoose.Types.ObjectId(groupId),
       totalAmount: total,
-      status: 'confirmed',
+      status: 'pending',
       paymentMethod: 'wallet',
       paymentStatus: 'paid',
       shippingCost: SHIPPING,
       discountAmount: discount,
       items: allItems,
-      deliveryInfo: deliveryInfo ?? {},
+      deliveryInfo: canonicalDeliveryInfo,
       notes: `Đơn nhóm: ${group.groupName}`,
     });
 
@@ -315,6 +327,41 @@ export class GroupService {
         orderId: order._id,
         description: `Group order leader payment for "${group.groupName}"`,
         metadata: { groupId },
+      });
+    }
+
+    // Tạo đơn hàng lịch sử cho từng thành viên (không phải owner) có giỏ hàng
+    const sharedShippingPerMember = members.length > 0 ? Math.round(SHIPPING / members.length) : 0;
+    const memberDiscountPct = members.length > 0 ? activePct / members.length : 0;
+
+    for (const m of regularMembers) {
+      if (!m.userId || m.cartItems.length === 0) continue;
+
+      const memberName = (m.userId as any)?.name || m.tempName || 'Member';
+      const mSubtotal  = m.cartItems.reduce((s, i) => s + i.price * i.qty, 0);
+      const mDiscount  = Math.round(mSubtotal * memberDiscountPct / 100);
+      const mTotal     = m.walletPaid
+        ? m.walletHoldAmount  // use exact amount already charged
+        : mSubtotal + sharedShippingPerMember - mDiscount;
+
+      await Order.create({
+        userId:         m.userId,
+        orderType:      'group_buy',
+        groupId:        new mongoose.Types.ObjectId(groupId),
+        totalAmount:    mTotal,
+        status:         'pending',
+        paymentMethod:  'wallet',
+        paymentStatus:  m.walletPaid ? 'paid' : 'unpaid',
+        shippingCost:   sharedShippingPerMember,
+        discountAmount: mDiscount,
+        items: m.cartItems.map((i) => ({
+          productId: new mongoose.Types.ObjectId(i.productId),
+          quantity:  i.qty,
+          price:     i.price,
+          subtotal:  i.price * i.qty,
+        })),
+        deliveryInfo: canonicalDeliveryInfo,  // always owner's address
+        notes: `[member: ${memberName}] Đơn nhóm: ${group.groupName}`,
       });
     }
 

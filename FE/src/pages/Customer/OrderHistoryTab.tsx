@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   ShoppingCart, Package, MapPin, ChevronLeft, ChevronRight,
   Eye, RotateCcw, X, FileText, Ban, AlertTriangle, RefreshCw, Tag, CreditCard,
-  ShoppingBag, CalendarClock, Repeat2, Store, Navigation2, ArrowLeftRight
+  ShoppingBag, CalendarClock, Repeat2, Store, Navigation2, ArrowLeftRight, Truck
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useCart } from '../../context/CartContext';
@@ -425,7 +425,9 @@ function OrderDetailModal({
   }, [order._id, order.isRecurring]);
 
   const delivery = fullOrder.deliveryInfo as any;
-  const isPickup = delivery?.type === 'pickup';
+  const isGroupOrder = fullOrder.orderType === 'group_buy' || !!(fullOrder as any).groupId;
+  // Group orders are always delivery — never pickup
+  const isPickup = !isGroupOrder && delivery?.type === 'pickup';
   const pickup = fullOrder.pickupLocation as any;
 
   return (
@@ -579,6 +581,14 @@ function OrderDetailModal({
                           </a>
                         </div>
                       </div>
+                      {isGroupOrder && (
+                        <div className="flex items-start gap-2 pt-2 border-t border-blue-200">
+                          <Truck className="w-3.5 h-3.5 text-blue-500 flex-shrink-0 mt-0.5" />
+                          <p className="text-xs text-blue-700 leading-relaxed">
+                            Đây là địa chỉ của chủ nhóm — tất cả sản phẩm trong nhóm sẽ được giao đến đây.
+                          </p>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
@@ -631,7 +641,7 @@ function OrderDetailModal({
           )}
 
           {/* ── Notes ── */}
-          {!loadingDetail && fullOrder.notes && (
+          {!loadingDetail && fullOrder.notes && !fullOrder.notes.startsWith('[member:') && (
             <div className="px-6 py-5">
               <h4 className="text-sm font-bold text-[#364153] flex items-center gap-2 mb-3">
                 <div className="w-6 h-6 rounded-lg bg-amber-50 flex items-center justify-center">

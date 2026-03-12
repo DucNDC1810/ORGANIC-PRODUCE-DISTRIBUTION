@@ -186,6 +186,9 @@ export class OrderController {
       if (status)        filter.status        = status;
       if (paymentStatus) filter.paymentStatus = paymentStatus;
       if (userId)        filter.userId        = userId;
+      if (req.query.groupId && mongoose.Types.ObjectId.isValid(req.query.groupId as string)) {
+        filter.groupId = new mongoose.Types.ObjectId(req.query.groupId as string);
+      }
 
       // Date range on orderDate
       if (startDate || endDate) {
@@ -519,6 +522,25 @@ export class OrderController {
       );
       if (usageUpdate.modifiedCount > 0 && order.voucherId) {
         await Voucher.findByIdAndUpdate(order.voucherId, { $inc: { usageCount: 1 } });
+      }
+
+      // Cascade: confirm all member sub-orders for the same group order
+      if (updatedOrder?.groupId && updatedOrder.orderType === 'group_buy') {
+        const gid = (updatedOrder.groupId as any)?._id ?? updatedOrder.groupId;
+        await Order.updateMany(
+          {
+            groupId: gid,
+            _id: { $ne: new mongoose.Types.ObjectId(id) },
+            status: 'pending',
+          },
+          {
+            $set: {
+              status: 'confirmed',
+              confirmedAt: new Date(),
+              confirmedBy: new mongoose.Types.ObjectId(managerId as string),
+            },
+          }
+        );
       }
 
       res.status(200).json({

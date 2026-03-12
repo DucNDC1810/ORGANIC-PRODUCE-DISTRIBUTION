@@ -1184,9 +1184,9 @@ export default function GroupOrderActivePage() {
           ) : (
             <button
               onClick={() => setShowPlaceConfirm(true)}
-              disabled={placeOrderLoading || cart.length === 0 || !isAllMembersReady || (paymentOption === 'equal_split' && !allNonOwnerPaid)}
+              disabled={placeOrderLoading || cart.length === 0 || !isAllMembersReady || (paymentOption === 'equal_split' && !allNonOwnerPaid && nonOwnerCount > 0) || (paymentOption === 'individual' && !allNonOwnerPaid && nonOwnerCount > 0)}
               className={`w-full py-4 rounded-2xl text-white text-base font-extrabold shadow-lg active:scale-[0.98] transition-all duration-300 flex items-center justify-center gap-2 disabled:cursor-not-allowed ${
-                !isAllMembersReady
+                !isAllMembersReady || (paymentOption === 'individual' && !allNonOwnerPaid && nonOwnerCount > 0)
                   ? 'bg-gray-300 shadow-none'
                   : 'bg-gradient-to-r from-green-600 to-emerald-500 hover:from-green-700 hover:to-emerald-600 disabled:opacity-50'
               }`}
@@ -1202,9 +1202,14 @@ export default function GroupOrderActivePage() {
               )}
             </button>
           )}
-          {isAllMembersReady && paymentOption === 'individual' && (
+          {isAllMembersReady && paymentOption === 'individual' && allNonOwnerPaid && (
             <p className="text-center text-xs text-gray-400 -mt-1">
               You are paying for your selected items only
+            </p>
+          )}
+          {isAllMembersReady && paymentOption === 'individual' && !allNonOwnerPaid && nonOwnerCount > 0 && (
+            <p className="text-center text-xs text-amber-500 font-medium -mt-1">
+              ⚠ Waiting for {members.filter((m) => m.role !== 'owner' && !m.walletPaid).length}/{nonOwnerCount} members to deposit their share
             </p>
           )}
           {isAllMembersReady && paymentOption === 'equal_split' && !allNonOwnerPaid && nonOwnerCount > 0 && (

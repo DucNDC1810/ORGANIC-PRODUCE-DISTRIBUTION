@@ -19,6 +19,7 @@ import {
   X,
   AlertTriangle,
   UserPlus,
+  Truck,
 } from "lucide-react";
 import { io, type Socket } from "socket.io-client";
 import { motion, AnimatePresence } from "framer-motion";
@@ -327,6 +328,15 @@ export default function GroupMemberPage() {
         },
       });
       clearGroupSession();
+    });
+
+    // ── Giao hàng nhóm hoàn tất → thông báo cho tất cả thành viên ──
+    socket.on("group:order_delivered", (data: { groupId: string; address: string; ownerName: string }) => {
+      toast.success(`Đơn hàng nhóm đã được giao đến địa chỉ của ${data.ownerName || 'Owner'}!`, {
+        description: data.address ? `Địa chỉ: ${data.address}` : 'Đơn hàng đã được giao thành công.',
+        icon: '🚚',
+        duration: 8000,
+      });
     });
 
     return () => { socket.disconnect(); };
@@ -1072,6 +1082,19 @@ export default function GroupMemberPage() {
                       </p>
                     </div>
                   </div>
+                )}
+
+                {/* Payment button / paid status – only for non-owner_only */}
+                {paymentOpt !== 'owner_only' && (
+                  <>
+                    {/* Delivery note: items go to owner's address */}
+                    <div className="mt-3 flex items-start gap-2 bg-blue-50 border border-blue-100 rounded-xl px-4 py-3">
+                      <Truck className="w-4 h-4 text-blue-500 flex-shrink-0 mt-0.5" />
+                      <p className="text-xs text-blue-700 leading-relaxed">
+                        Your items will be delivered together to the group owner's address to save shipping costs.
+                      </p>
+                    </div>
+                  </>
                 )}
 
                 {/* Payment button / paid status – only for non-owner_only */}

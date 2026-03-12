@@ -167,6 +167,7 @@ interface OrderDetailModalProps {
   onConfirm: (id: string) => void;
   onCancel: (id: string) => void;
   loading: boolean;
+  subOrders?: Order[];
 }
 
 const OrderDetailModal = ({
@@ -176,6 +177,7 @@ const OrderDetailModal = ({
   onConfirm,
   onCancel,
   loading,
+  subOrders = [],
 }: OrderDetailModalProps) => {
   if (!order) return null;
 
@@ -424,8 +426,86 @@ const OrderDetailModal = ({
             </div>
           </div>
 
+          {/* Group Packing List — only for group_buy main orders */}
+          {order.orderType === 'group_buy' && (
+            <div className="rounded-xl border bg-violet-50 border-violet-100 p-4 space-y-4">
+              <h4 className="text-sm font-semibold text-violet-800 flex items-center gap-1.5">
+                <Package className="w-4 h-4" />
+                Group Packing List
+              </h4>
+
+              {/* Owner's items */}
+              <div>
+                <p className="text-xs font-bold text-violet-700 mb-1.5">📦 Owner's items (delivery address)</p>
+                <div className="border rounded-lg overflow-hidden bg-white">
+                  <Table>
+                    <TableHeader>
+                      <TableRow className="bg-violet-50">
+                        <TableHead className="text-xs">Product</TableHead>
+                        <TableHead className="text-xs text-center">Qty</TableHead>
+                        <TableHead className="text-xs text-right">Subtotal</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {order.items.map((item, idx) => (
+                        <TableRow key={idx}>
+                          <TableCell className="text-xs text-gray-800 font-medium">
+                            {typeof item.productId === 'object' && item.productId !== null
+                              ? (item.productId as any).name ?? (item.productId as any)._id
+                              : item.productId}
+                          </TableCell>
+                          <TableCell className="text-center text-sm">{item.quantity}</TableCell>
+                          <TableCell className="text-right text-sm font-semibold">{formatCurrency(item.subtotal)}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              </div>
+
+              {/* Member sub-orders */}
+              {subOrders.length > 0 ? subOrders.map((sub) => {
+                const memberName = sub.notes?.match(/\[member: (.+?)\]/)?.[1] ?? 'Member';
+                const displayName = typeof sub.userId === 'object' && sub.userId !== null
+                  ? (sub.userId as any).name ?? memberName
+                  : memberName;
+                return (
+                  <div key={sub._id}>
+                    <p className="text-xs font-bold text-violet-700 mb-1.5">👤 {displayName}'s items</p>
+                    <div className="border rounded-lg overflow-hidden bg-white">
+                      <Table>
+                        <TableHeader>
+                          <TableRow className="bg-violet-50">
+                            <TableHead className="text-xs">Product</TableHead>
+                            <TableHead className="text-xs text-center">Qty</TableHead>
+                            <TableHead className="text-xs text-right">Subtotal</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {sub.items.map((item, idx) => (
+                            <TableRow key={idx}>
+                              <TableCell className="text-xs text-gray-800 font-medium">
+                                {typeof item.productId === 'object' && item.productId !== null
+                                  ? (item.productId as any).name ?? (item.productId as any)._id
+                                  : item.productId}
+                              </TableCell>
+                              <TableCell className="text-center text-sm">{item.quantity}</TableCell>
+                              <TableCell className="text-right text-sm font-semibold">{formatCurrency(item.subtotal)}</TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  </div>
+                );
+              }) : (
+                <p className="text-xs text-violet-500 italic">Loading member sub-orders…</p>
+              )}
+            </div>
+          )}
+
           {/* Notes */}
-          {order.notes && (
+          {order.notes && !order.notes.startsWith('[member:') && (
             <div className="flex items-start gap-2 p-3 bg-amber-50 border border-amber-100 rounded-lg">
               <StickyNote className="w-4 h-4 text-amber-600 mt-0.5 flex-shrink-0" />
               <div>
@@ -489,6 +569,7 @@ export default function OrderConfirmation() {
   const [isDetailOpen, setIsDetailOpen] = useState(false);
   const [cancelTarget, setCancelTarget] = useState<string | null>(null);
   const [cancelReason, setCancelReason] = useState('');
+  const [groupSubOrders, setGroupSubOrders] = useState<Order[]>([]);
 
   // ── Search debounce ───────────────────────────────────────
 
@@ -545,7 +626,12 @@ export default function OrderConfirmation() {
     try {
       setActionLoading(true);
       await orderAPI.confirmOrder(id);
-      toast.success('Order confirmed successfully!');
+      const isGroupOrder = selectedOrder?.orderType === 'group_buy' || orders.find(o => o._id === id)?.orderType === 'group_buy';
+      toast.success(
+        isGroupOrder
+          ? 'Group order confirmed! All member sub-orders have been updated.'
+          : 'Order confirmed successfully!'
+      );
       setIsDetailOpen(false);
       fetchOrders();
       fetchPendingSummary();
@@ -574,15 +660,29 @@ export default function OrderConfirmation() {
     }
   };
 
-  const openDetail = (order: Order) => {
+  const openDetail = async (order: Order) => {
     setSelectedOrder(order);
+    setGroupSubOrders([]);
     setIsDetailOpen(true);
+    if (order.orderType === 'group_buy' && order.groupId) {
+      try {
+        const subs = await orderAPI.getOrdersByGroupId(order.groupId);
+        // Only keep sub-orders (notes start with [member:]), exclude the main order itself
+        setGroupSubOrders(subs.filter(s => s._id !== order._id && s.notes?.startsWith('[member:')));
+      } catch {
+        // non-critical
+      }
+    }
   };
 
   // ── Derived data ──────────────────────────────────────────
 
   const safeOrders = useMemo(() => (Array.isArray(orders) ? orders : []), [orders]);
-  const displayedOrders = safeOrders;
+  // Hide member sub-orders from the table; they are shown inside the group order detail
+  const displayedOrders = useMemo(
+    () => safeOrders.filter(o => !o.notes?.startsWith('[member:')),
+    [safeOrders]
+  );
 
   const stats = useMemo(() => ({
     total:        totalItems,
@@ -779,8 +879,16 @@ export default function OrderConfirmation() {
                       </TableCell>
 
                       {/* Order ID */}
-                      <TableCell className="font-mono text-xs text-gray-500 max-w-[160px] truncate">
-                        {order._id}
+                      <TableCell className="font-mono text-xs text-gray-500 max-w-[160px]">
+                        <div className="flex flex-col gap-1">
+                          <span className="truncate block">{order._id}</span>
+                          {order.orderType === 'group_buy' && (
+                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] bg-purple-100 text-purple-700 rounded-full font-semibold w-fit">
+                              <Package className="w-2.5 h-2.5" />
+                              Group
+                            </span>
+                          )}
+                        </div>
                       </TableCell>
 
                       {/* Date */}
@@ -906,6 +1014,7 @@ export default function OrderConfirmation() {
           setCancelTarget(id);
         }}
         loading={actionLoading}
+        subOrders={groupSubOrders}
       />
 
       {/* ── Cancel Alert Dialog ──────────────────── */}
