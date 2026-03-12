@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Heart, ShoppingCart, Users } from 'lucide-react';
+import { ShoppingCart, Users } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
@@ -19,7 +19,6 @@ export default function ProductCard({ product }: ProductCardProps) {
   const { addToCart } = useCart();
   const { groupSession } = useGroup();
   const [adding, setAdding] = useState(false);
-  const [wishlisted, setWishlisted] = useState(false);
 
   const isOutOfStock = product.stock <= 0;
   const isGroupMode  = !!(groupSession?.groupId && groupSession?.memberId);
@@ -93,17 +92,7 @@ export default function ProductCard({ product }: ProductCardProps) {
             </div>
           )}
 
-          {/* Wishlist */}
-          <button
-            onClick={(e) => { e.preventDefault(); setWishlisted(w => !w); }}
-            className={`absolute top-3 right-3 w-8 h-8 rounded-full flex items-center justify-center shadow-sm transition-all duration-200
-              ${wishlisted
-                ? 'bg-red-500 text-white opacity-100'
-                : 'bg-white/90 text-gray-400 hover:text-red-500 opacity-0 group-hover:opacity-100'
-              }`}
-          >
-            <Heart className={`w-4 h-4 ${wishlisted ? 'fill-white' : ''}`} />
-          </button>
+
 
           {/* Add to Cart — slides up from bottom */}
           {!isOutOfStock && (

@@ -1,6 +1,6 @@
 import { useState, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Minus, Plus, X, ShoppingCart, Truck, Shield } from 'lucide-react';
+import { Minus, Plus, X, ShoppingCart, Truck, Shield, AlertCircle } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useCart } from '../../context/CartContext';
 import { ImageWithFallback } from '../../components/figma/ImageWithFallback';
@@ -223,6 +223,16 @@ export default function CartPage() {
                               </button>
                             </div>
                           </div>
+                          {/* Stock warning */}
+                          {(() => {
+                            const s = (item as any).stock;
+                            return s !== undefined && item.quantity >= s ? (
+                              <p className="text-xs text-red-500 mt-1 flex items-center gap-1">
+                                <AlertCircle className="w-3 h-3 flex-shrink-0" />
+                                 {s} products left in stock
+                              </p>
+                            ) : null;
+                          })()}
 
                           {/* Price */}
                           <div className="text-right">
@@ -231,7 +241,7 @@ export default function CartPage() {
                             </div>
                             {item.quantity > 1 && (
                               <div className="text-sm text-muted-foreground">
-                                {formatVND(item.price)} / sản phẩm
+                                {formatVND(item.price)} / product
                               </div>
                             )}
                           </div>
