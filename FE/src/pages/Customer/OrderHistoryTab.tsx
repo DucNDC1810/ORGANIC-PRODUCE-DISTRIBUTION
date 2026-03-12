@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   ShoppingCart, Package, MapPin, ChevronLeft, ChevronRight,
   Eye, RotateCcw, X, FileText, Ban, AlertTriangle, RefreshCw, Tag, CreditCard,
-  ShoppingBag, CalendarClock, Repeat2, Store, Navigation2
+  ShoppingBag, CalendarClock, Repeat2, Store, Navigation2, ArrowLeftRight
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useCart } from '../../context/CartContext';
@@ -1021,12 +1021,16 @@ function SubscriptionOrderCard({
   order,
   onViewDetail,
   onPay,
+  onSwitchPayment,
+  switchingId,
   isHighlighted,
   cardRef,
 }: {
   order: ExtendedOrder;
   onViewDetail: (order: ExtendedOrder) => void;
   onPay: (order: ExtendedOrder) => void;
+  onSwitchPayment: (order: ExtendedOrder, newMethod: 'cod' | 'momo') => void;
+  switchingId: string | null;
   isHighlighted: boolean;
   cardRef?: (el: HTMLDivElement | null) => void;
 }) {
@@ -1035,6 +1039,10 @@ function SubscriptionOrderCard({
   const thumbnail = firstItem ? getItemImage(firstItem) : '';
   const firstName = firstItem ? getItemName(firstItem) : 'Product';
   const isUnpaid = order.paymentStatus === 'unpaid';
+  const method = (order.paymentMethod ?? '').toLowerCase();
+  const isPending = order.status === 'pending';
+  const isSwitching = switchingId === order._id;
+  const isCOD = method === 'cod' || method === 'cash';
 
   return (
     <div
@@ -1123,9 +1131,16 @@ function SubscriptionOrderCard({
           <p className="text-2xl font-extrabold text-violet-600 leading-none">
             {formatCurrency(order.totalAmount)}
           </p>
+          {/* COD label when method is COD */}
+          {isPending && isCOD && (
+            <span className="inline-flex items-center gap-1 mt-2 text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
+              💵 Pay on delivery
+            </span>
+          )}
         </div>
         <div className="flex flex-col gap-2 items-end">
-          {isUnpaid && (
+          {/* Pay Now — only for unpaid online payment orders (not COD) */}
+          {isUnpaid && !isCOD && (
             <button
               onClick={() => onPay(order)}
               className="flex items-center gap-1.5 px-5 py-2.5 text-sm font-bold text-white bg-violet-600 rounded-xl hover:bg-violet-700 active:scale-95 transition-all shadow-sm shadow-violet-200"
@@ -1134,6 +1149,28 @@ function SubscriptionOrderCard({
               Pay Now
             </button>
           )}
+
+          {/* ── Switch Payment Method (only for pending subscription orders) ── */}
+          {isPending && order.subscriptionId && (
+            <button
+              onClick={() => onSwitchPayment(order, isCOD ? 'momo' : 'cod')}
+              disabled={isSwitching}
+              className={`flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold rounded-xl active:scale-95 transition-all
+                ${isCOD
+                  ? 'text-[#AE2070] border-2 border-[#AE2070]/30 hover:bg-pink-50'
+                  : 'text-emerald-700 border-2 border-emerald-200 hover:bg-emerald-50'
+                }
+                disabled:opacity-50 disabled:cursor-not-allowed`}
+            >
+              {isSwitching ? (
+                <div className="w-3.5 h-3.5 border-2 border-current/30 border-t-current rounded-full animate-spin" />
+              ) : (
+                <ArrowLeftRight className="w-3.5 h-3.5" />
+              )}
+              {isCOD ? 'Pay online with MoMo' : 'Change to Cash on Delivery'}
+            </button>
+          )}
+
           <button
             onClick={() => onViewDetail(order)}
             className="flex items-center gap-1.5 px-4 py-2 text-sm font-semibold text-violet-600 border-2 border-violet-200 rounded-xl hover:bg-violet-50 active:scale-95 transition-all"
@@ -1163,6 +1200,7 @@ export default function OrderHistoryTab({ highlightOrderId }: { highlightOrderId
     cancelling: boolean;
   }>({ order: null, cancelling: false });
   const [reordering, setReordering]       = useState(false);
+  const [switchingId, setSwitchingId]     = useState<string | null>(null);
 
   // Refs for auto-scroll to highlighted card
   const cardRefs = useRef<Record<string, HTMLDivElement | null>>({});
@@ -1247,6 +1285,43 @@ export default function OrderHistoryTab({ highlightOrderId }: { highlightOrderId
     }
   };
 
+  const handleSwitchPayment = async (order: ExtendedOrder, newMethod: 'cod' | 'momo') => {
+    if (switchingId) return;
+    setSwitchingId(order._id);
+    try {
+      await orderService.updateOrderPaymentMethod(order._id, newMethod);
+
+      // Optimistic UI update
+      setOrders(prev =>
+        prev.map(o =>
+          o._id === order._id
+            ? { ...o, paymentMethod: newMethod, paymentStatus: newMethod === 'cod' ? 'pending' : 'unpaid' }
+            : o
+        )
+      );
+
+      toast.success(
+        newMethod === 'cod'
+          ? 'Switched to Cash on Delivery'
+          : 'Switched to MoMo \u2014 redirecting to payment...'
+      );
+
+      // If switched to MoMo, auto-open payment modal for same-tab redirect
+      if (newMethod === 'momo') {
+        const updatedOrder: ExtendedOrder = {
+          ...order,
+          paymentMethod: 'momo',
+          paymentStatus: 'unpaid',
+        };
+        setTimeout(() => setPaymentOrder(updatedOrder), 300);
+      }
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message ?? 'Failed to switch payment method');
+    } finally {
+      setSwitchingId(null);
+    }
+  };
+
   return (
     <div className="space-y-5">
 
@@ -1309,6 +1384,8 @@ export default function OrderHistoryTab({ highlightOrderId }: { highlightOrderId
                 order={order}
                 onViewDetail={setDetailOrder}
                 onPay={setPaymentOrder}
+                onSwitchPayment={handleSwitchPayment}
+                switchingId={switchingId}
                 isHighlighted={highlightOrderId === order._id}
                 cardRef={(el) => { cardRefs.current[order._id] = el; }}
               />

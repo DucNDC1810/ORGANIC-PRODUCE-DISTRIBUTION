@@ -158,6 +158,10 @@ export const orderService = {
   deleteOrder: (id: string) =>
     api.delete(`/orders/${id}`),
 
+  // Update payment method (owner — pending subscription orders only)
+  updateOrderPaymentMethod: (id: string, paymentMethod: string) =>
+    api.patch<OrderResponse>(`/orders/${id}/payment-method`, { paymentMethod }),
+
   // Get order statistics
   getOrderStats: (startDate?: string, endDate?: string) =>
     api.get('/orders/stats/summary', {
