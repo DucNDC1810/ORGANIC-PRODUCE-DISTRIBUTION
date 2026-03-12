@@ -556,6 +556,7 @@ export interface OrderItem {
 export interface Order {
   _id: string;
   userId: string | { _id: string; name: string; email: string; phone?: string; avatar?: string };
+  orderType?: 'regular' | 'group_buy' | 'subscription';
   addressId?: string | Record<string, any>;
   voucherId?: string;
   groupBuyId?: string;

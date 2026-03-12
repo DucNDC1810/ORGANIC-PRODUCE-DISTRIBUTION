@@ -122,8 +122,8 @@ export const voucherService = {
   },
 
   // Get active vouchers
-  async getActiveVouchers(page = 1, limit = 10): Promise<VouchersResponse> {
-    const res: any = await api.get('/vouchers/active', { params: { page, limit } });
+  async getActiveVouchers(page = 1, limit = 10, userId?: string): Promise<VouchersResponse> {
+    const res: any = await api.get('/vouchers/active', { params: { page, limit, userId } });
     return res;
   },
 

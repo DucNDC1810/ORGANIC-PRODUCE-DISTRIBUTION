@@ -4,6 +4,8 @@ import { Order } from '../models/Order.model';
 import { Address } from '../models/Address.model';
 import { User } from '../models/User.model';
 import { Product } from '../models/Product.model';
+import { Voucher } from '../models/Voucher.model';
+import { VoucherUsage } from '../models/VoucherUsage.model';
 import { AuthRequest } from '../middlewares/auth.middleware';
 import { AppError } from '../utils/AppError';
 import { createNotification } from '../models/Notification.model';
@@ -15,7 +17,7 @@ export class OrderController {
    */
   createOrder = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
     try {
-      const { addressId, deliveryInfo, voucherId, items, paymentMethod, notes, pickupLocation, isRecurring, subscriptionFrequency, discountAmount } = req.body;
+      const { addressId, deliveryInfo, voucherId, voucherCode, items, paymentMethod, isRecurring, subscriptionFrequency, notes, pickupLocation, discountAmount: clientDiscount } = req.body;
       const userId = req.user?.id;
 
       if (!userId) {
@@ -46,15 +48,60 @@ export class OrderController {
       }));
       await Product.bulkWrite(stockDeductOps);
 
-      // Calculate totals
+      // Calculate subtotal
       let subtotal = 0;
       items.forEach((item: any) => {
         subtotal += item.subtotal;
       });
 
-      const discountAmountVal = Math.max(0, parseFloat(discountAmount) || 0);
-      const finalTotal = Math.max(0, subtotal - discountAmountVal);
+      // ── Voucher validation & discount ──────────────────────────────────
+      let resolvedVoucherId = voucherId || null;
+      let voucherDiscountAmount = 0;
 
+      if (voucherCode) {
+        const escapedCode = voucherCode.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const voucher = await Voucher.findOne({ code: { $regex: new RegExp(`^${escapedCode}$`, 'i') } });
+
+        if (!voucher) {
+          throw new AppError('Voucher not found', 404);
+        }
+
+        const now = new Date();
+        if (!voucher.isActive) throw new AppError('Voucher is not active', 400);
+        if (now < voucher.startDate) throw new AppError('Voucher is not yet active', 400);
+        if (now > voucher.expiryDate) throw new AppError('Voucher has expired', 400);
+        if (voucher.usageLimit && voucher.usageCount >= voucher.usageLimit) {
+          throw new AppError('Voucher usage limit reached', 400);
+        }
+        if (subtotal < (voucher.minPurchaseAmount || 0)) {
+          throw new AppError(`Minimum purchase amount is ${voucher.minPurchaseAmount}`, 400);
+        }
+
+        // Check VoucherUsage: pending or used = blocked
+        const existingUsage = await VoucherUsage.findOne({
+          userId,
+          voucherId: voucher._id,
+          status: { $in: ['used', 'pending'] },
+        });
+        if (existingUsage) {
+          throw new AppError('You have used this discount code.', 400);
+        }
+
+        // Calculate discount
+        if (voucher.discountType === 'fixed') {
+          voucherDiscountAmount = voucher.discountAmount || 0;
+        } else {
+          voucherDiscountAmount = Math.round((subtotal * (voucher.discountPercentage || 0)) / 100);
+          if (voucher.maxDiscountAmount && voucherDiscountAmount > voucher.maxDiscountAmount) {
+            voucherDiscountAmount = voucher.maxDiscountAmount;
+          }
+        }
+
+        resolvedVoucherId = voucher._id;
+      }
+      // ──────────────────────────────────────────────────────────────────
+
+      const totalDiscount = clientDiscount || voucherDiscountAmount;
       const isCOD = paymentMethod === 'cod';
 
       const order = await Order.create({
@@ -63,18 +110,29 @@ export class OrderController {
         addressId: addressId || null,
         deliveryInfo: deliveryInfo || {},
         pickupLocation: pickupLocation || null,
-        voucherId: voucherId || null,
+        voucherId: resolvedVoucherId,
         items,
         paymentMethod: paymentMethod || 'credit_card',
         paymentStatus: isCOD ? 'unpaid' : 'pending',
-        totalAmount: finalTotal,
-        discountAmount: discountAmountVal,
+        totalAmount: subtotal,
+        discountAmount: totalDiscount,
         notes,
         status: 'pending',
         orderDate: new Date(),
         isRecurring: isRecurring === true || isRecurring === 'true',
         subscriptionFrequency: subscriptionFrequency || null
       });
+
+      // ── Step 2: Create pending VoucherUsage (soft lock) ────────────────
+      if (resolvedVoucherId && voucherCode) {
+        await VoucherUsage.create({
+          userId,
+          voucherId: resolvedVoucherId,
+          orderId: order._id,
+          status: 'pending',
+        });
+      }
+      // ──────────────────────────────────────────────────────────────────
 
       await order.populate('userId', 'name email phone');
       await order.populate('items.productId', 'name price');
@@ -311,6 +369,27 @@ export class OrderController {
         throw new AppError('Order not found', 404);
       }
 
+      // Handle voucher usage based on new status
+      if (status === 'confirmed' && order.voucherId) {
+        const usageUp = await VoucherUsage.updateMany(
+          { orderId: id, status: 'pending' },
+          { status: 'used' }
+        );
+        if (usageUp.modifiedCount > 0) {
+          await Voucher.findByIdAndUpdate(order.voucherId, { $inc: { usageCount: 1 } });
+        }
+      } else if (['cancelled', 'refunded'].includes(status) && order.voucherId) {
+        const usages = await VoucherUsage.find({ orderId: id, status: { $in: ['pending', 'used'] } });
+        const hadUsed = usages.some(u => u.status === 'used');
+        await VoucherUsage.updateMany(
+          { orderId: id, status: { $in: ['pending', 'used'] } },
+          { status: 'cancelled' }
+        );
+        if (hadUsed) {
+          await Voucher.findByIdAndUpdate(order.voucherId, { $inc: { usageCount: -1 } });
+        }
+      }
+
       res.status(200).json({
         success: true,
         message: 'Order status updated successfully',
@@ -370,6 +449,19 @@ export class OrderController {
         await Product.bulkWrite(restoreOps);
       }
 
+      // Release voucher usage → cancelled (user can reuse)
+      if (order.voucherId) {
+        const usages = await VoucherUsage.find({ orderId: id, status: { $in: ['pending', 'used'] } });
+        const hadUsed = usages.some(u => u.status === 'used');
+        await VoucherUsage.updateMany(
+          { orderId: id, status: { $in: ['pending', 'used'] } },
+          { status: 'cancelled' }
+        );
+        if (hadUsed) {
+          await Voucher.findByIdAndUpdate(order.voucherId, { $inc: { usageCount: -1 } });
+        }
+      }
+
       res.status(200).json({
         success: true,
         message: 'Order cancelled successfully',
@@ -419,6 +511,15 @@ export class OrderController {
         .populate('addressId')
         .populate('items.productId', 'name price thumbnail')
         .populate('confirmedBy', 'name email');
+
+      // Confirm voucher usage: pending → used + increment usageCount
+      const usageUpdate = await VoucherUsage.updateMany(
+        { orderId: id, status: 'pending' },
+        { status: 'used' }
+      );
+      if (usageUpdate.modifiedCount > 0 && order.voucherId) {
+        await Voucher.findByIdAndUpdate(order.voucherId, { $inc: { usageCount: 1 } });
+      }
 
       res.status(200).json({
         success: true,
@@ -476,6 +577,19 @@ export class OrderController {
         await Product.bulkWrite(restoreOps);
       }
 
+      // Release voucher usage → cancelled (user can reuse)
+      if (order.voucherId) {
+        const usages = await VoucherUsage.find({ orderId: id, status: { $in: ['pending', 'used'] } });
+        const hadUsed = usages.some(u => u.status === 'used');
+        await VoucherUsage.updateMany(
+          { orderId: id, status: { $in: ['pending', 'used'] } },
+          { status: 'cancelled' }
+        );
+        if (hadUsed) {
+          await Voucher.findByIdAndUpdate(order.voucherId, { $inc: { usageCount: -1 } });
+        }
+      }
+
       res.status(200).json({
         success: true,
         message: 'Order cancelled by manager',
@@ -520,6 +634,18 @@ export class OrderController {
           }
         }
       );
+
+      // Confirm voucher usage for all confirmed orders: pending → used
+      const confirmedOrders = await Order.find({ _id: { $in: validIds }, status: 'confirmed', voucherId: { $ne: null } });
+      for (const o of confirmedOrders) {
+        const usageUp = await VoucherUsage.updateMany(
+          { orderId: o._id, status: 'pending' },
+          { status: 'used' }
+        );
+        if (usageUp.modifiedCount > 0 && o.voucherId) {
+          await Voucher.findByIdAndUpdate(o.voucherId, { $inc: { usageCount: 1 } });
+        }
+      }
 
       res.status(200).json({
         success: true,
