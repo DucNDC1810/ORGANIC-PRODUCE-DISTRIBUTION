@@ -208,6 +208,7 @@ export default function GroupMemberPage() {
   // Wallet balance for deposit check
   const [walletBalance,  setWalletBalance] = useState<number>(0);
   const [showTopupModal, setShowTopupModal] = useState(false);
+  const [topupShortfall, setTopupShortfall] = useState<number>(0);
 
   const socketRef = useRef<Socket | null>(null);
 
@@ -425,8 +426,17 @@ export default function GroupMemberPage() {
       );
       setHoldConfirm(false);
     } catch (err: any) {
-      const msg = err?.response?.data?.message || 'Deposit failed. Please try again.';
-      toast.error(msg);
+      const msg: string = err?.response?.data?.message || 'Deposit failed. Please try again.';
+      // Extract shortfall from server message "Cần thêm Xđ" or "need Xđ more"
+      const match = msg.match(/[\d.,]+(?=đ)/g);
+      const serverShortfall = match ? parseInt(match[0].replace(/[.,]/g, ''), 10) : Math.max(0, myShare - walletBalance);
+      if (serverShortfall > 0 && groupId) {
+        setHoldConfirm(false);
+        setTopupShortfall(serverShortfall);
+        setShowTopupModal(true);
+      } else {
+        toast.error(msg);
+      }
     } finally {
       setHoldLoading(false);
     }
@@ -1129,7 +1139,7 @@ export default function GroupMemberPage() {
                       {/* Conditional: topup or deposit button */}
                       {myShare > 0 && isReady && walletBalance < myShare ? (
                         <button
-                          onClick={() => setShowTopupModal(true)}
+                          onClick={() => { setTopupShortfall(0); setShowTopupModal(true); }}
                           className="mt-2 w-full py-3 rounded-xl bg-gradient-to-r from-pink-500 to-rose-500 text-white text-sm font-bold shadow hover:from-pink-600 hover:to-rose-600 active:scale-[0.98] transition-all flex items-center justify-center gap-2"
                         >
                           <Wallet className="w-4 h-4" />
@@ -1258,9 +1268,9 @@ export default function GroupMemberPage() {
       {/* ══════════════ HOLD WALLET MODAL ══════════════ */}
       {showTopupModal && groupId && (
         <MemberQuickTopupModal
-          shortfall={Math.max(0, myShare - walletBalance)}
+          shortfall={topupShortfall > 0 ? topupShortfall : Math.max(0, myShare - walletBalance)}
           groupId={groupId}
-          onClose={() => setShowTopupModal(false)}
+          onClose={() => { setShowTopupModal(false); setTopupShortfall(0); }}
         />
       )}
 
