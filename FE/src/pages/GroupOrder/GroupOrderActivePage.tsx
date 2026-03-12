@@ -453,10 +453,10 @@ export default function GroupOrderActivePage() {
   const ownerDiscountPct = members.length > 0 ? activePct / members.length : activePct;
   const ownerDiscount = Math.round(ownerCartSubtotal * ownerDiscountPct / 100);
 
-  // equal_split rounding: non-owner members pay ceil, owner pays remainder
+  // equal_split: mỗi người trả Math.round(groupNetTotal / memberCount), owner trả phần còn lại
   const groupNetTotal    = total + 25000;
   const nonOwnerCount    = members.filter((m) => m.role !== 'owner').length;
-  const memberEqualShare = members.length > 0 ? Math.ceil(groupNetTotal / members.length) : groupNetTotal;
+  const memberEqualShare = members.length > 0 ? Math.round(groupNetTotal / members.length) : groupNetTotal;
   const ownerEqualShare  = Math.max(0, groupNetTotal - nonOwnerCount * memberEqualShare);
   const allNonOwnerPaid  = nonOwnerCount > 0 && members.filter((m) => m.role !== 'owner').every((m) => m.walletPaid);
 

@@ -105,6 +105,8 @@ export class GroupService {
   /**
    * Tạm giữ (hold) tiền ví của thành viên cho đơn nhóm.
    * Trừ walletBalance, lưu walletHoldAmount, đánh dấu walletPaid = true.
+   * - equal_split : holdAmount = groupNetTotal / memberCount (chia đều tổng hóa đơn)
+   * - individual  : holdAmount = subtotal cá nhân + shipping chia đều - giảm giá cá nhân
    */
   async holdWalletShare(groupId: string, memberId: string) {
     const group = await Group.findById(groupId);
@@ -119,21 +121,28 @@ export class GroupService {
     const subtotal = member.cartItems.reduce((s, i) => s + i.price * i.qty, 0);
     if (subtotal <= 0) throw new AppError('Giỏ hàng trống, không thể đặt cọc', 400);
 
-    // Calculate shared shipping: split SHIPPING equally among all group members
     const allMembers = await GroupMember.find({ groupId });
-    const sharedShipping = allMembers.length > 0
-      ? Math.round(SHIPPING / allMembers.length)
-      : 0;
 
-    // Calculate group discount tier based on ready member count
+    // Discount tier based on ready member count
     const orderedCount = allMembers.filter((m) => m.isReady).length;
     const activeTierIdx = TIERS.reduce((acc, t, i) => (orderedCount >= t.members ? i : acc), -1);
     const activePct = activeTierIdx >= 0 ? TIERS[activeTierIdx].pct : 0;
-    const myDiscountPct = allMembers.length > 0 ? activePct / allMembers.length : 0;
-    const myDiscount = Math.round(subtotal * myDiscountPct / 100);
 
-    // Hold amount = cart items + shared shipping - personal discount
-    const holdAmount = subtotal + sharedShipping - myDiscount;
+    let holdAmount: number;
+
+    if (group.paymentOption === 'equal_split') {
+      // Tổng phụ của toàn nhóm → chia đều cho tất cả thành viên
+      const groupSubtotal = allMembers.reduce((s, m) => s + m.cartItems.reduce((si, i) => si + i.price * i.qty, 0), 0);
+      const groupDiscount = Math.round(groupSubtotal * activePct / 100);
+      const groupNetTotal = groupSubtotal - groupDiscount + SHIPPING;
+      holdAmount = allMembers.length > 0 ? Math.round(groupNetTotal / allMembers.length) : groupNetTotal;
+    } else {
+      // individual: subtotal cá nhân + shipping chia đều - giảm giá cá nhân
+      const sharedShipping = allMembers.length > 0 ? Math.round(SHIPPING / allMembers.length) : 0;
+      const myDiscountPct = allMembers.length > 0 ? activePct / allMembers.length : 0;
+      const myDiscount = Math.round(subtotal * myDiscountPct / 100);
+      holdAmount = subtotal + sharedShipping - myDiscount;
+    }
 
     const user = await User.findById(member.userId);
     if (!user) throw new AppError('Không tìm thấy tài khoản', 404);
@@ -150,10 +159,10 @@ export class GroupService {
     member.walletPaid = true;
     await member.save();
 
-    // Ghi log giao dịch
+    // Ghi log giao dịch (amount = tiền thực tế bị giữ)
     await Transaction.create({
       userId: member.userId,
-      amount: subtotal,
+      amount: holdAmount,
       type: 'payment',
       status: 'success',
       description: `Group order deposit for "${group.groupName}"`,
