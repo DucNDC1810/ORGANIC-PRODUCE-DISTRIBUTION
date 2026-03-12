@@ -13,7 +13,8 @@ import {
   RotateCcw,
   Check,
   Leaf,
-  Users
+  Users,
+  AlertCircle
 } from 'lucide-react';
 import { toast } from 'sonner';
 import Header from '../../components/Header';
@@ -410,6 +411,13 @@ export default function ProductDetailPage() {
                   </button>
                 </div>
               </div>
+              {/* Stock warning */}
+              {quantity >= selectedProduct.stock && selectedProduct.stock > 0 && (
+                <p className="text-xs text-red-500 flex items-center gap-1">
+                  <AlertCircle className="w-3 h-3 flex-shrink-0" />
+                  {selectedProduct.stock} products left in stock
+                </p>
+              )}
 
               {/* Action Buttons */}
               <div className="flex gap-4">

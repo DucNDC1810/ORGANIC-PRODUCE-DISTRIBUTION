@@ -170,6 +170,13 @@ export default function CheckoutPage() {
   const [showStoreModal, setShowStoreModal] = useState(false);
   const [selectedStore, setSelectedStore] = useState<StoreData | null>(null);
 
+  // Lock body scroll whenever any modal overlay is visible
+  useEffect(() => {
+    const locked = showConfirmModal || showStoreModal || showRecurringModal;
+    document.body.style.overflow = locked ? 'hidden' : '';
+    return () => { document.body.style.overflow = ''; };
+  }, [showConfirmModal, showStoreModal, showRecurringModal]);
+
   // ── Wallet ────────────────────────────────────────────────────────────────
   const [walletBalance, setWalletBalance] = useState<number>(0);
   const [walletLoading, setWalletLoading] = useState(false);
@@ -1468,6 +1475,17 @@ export default function CheckoutPage() {
                             </button>
                           </div>
                         </div>
+                        {/* Stock warning */}
+                        {(() => {
+                          const q = localQty[item.id] ?? item.quantity;
+                          const s = (item as any).stock;
+                          return s !== undefined && q >= s ? (
+                            <p className="text-xs text-red-500 mt-1 flex items-center gap-1">
+                              <AlertCircle className="w-3 h-3 flex-shrink-0" />
+                               {s} products left in stock
+                            </p>
+                          ) : null;
+                        })()}
                       </div>
                     </div>
                   ))}
@@ -1816,24 +1834,27 @@ export default function CheckoutPage() {
               <div className="rounded-xl border border-gray-100 overflow-hidden">
                 <div className="px-3 py-1.5 bg-gray-50 border-b border-gray-100">
                   <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
-                    Products ({checkoutItems.length})
+                    Products ({checkoutItems.reduce((s, i) => s + (localQty[i.id] ?? i.quantity), 0)})
                   </p>
                 </div>
                 <div className="divide-y divide-gray-50">
-                  {checkoutItems.map((item) => (
-                    <div key={item.id} className="flex items-center gap-2.5 px-3 py-2">
-                      <div className="w-8 h-8 bg-gray-100 rounded-lg overflow-hidden flex-shrink-0">
-                        <img src={item.image} alt={item.name} className="w-full h-full object-cover" />
+                  {checkoutItems.map((item) => {
+                    const qty = localQty[item.id] ?? item.quantity;
+                    return (
+                      <div key={item.id} className="flex items-center gap-2.5 px-3 py-2">
+                        <div className="w-8 h-8 bg-gray-100 rounded-lg overflow-hidden flex-shrink-0">
+                          <img src={item.image} alt={item.name} className="w-full h-full object-cover" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs font-medium text-gray-800 truncate">{item.name}</p>
+                          <p className="text-xs text-gray-400">x{qty}</p>
+                        </div>
+                        <span className="text-xs font-semibold text-gray-800 flex-shrink-0">
+                          {(item.price * qty).toLocaleString("vi-VN")}₫
+                        </span>
                       </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-xs font-medium text-gray-800 truncate">{item.name}</p>
-                        <p className="text-xs text-gray-400">x{item.quantity}</p>
-                      </div>
-                      <span className="text-xs font-semibold text-gray-800 flex-shrink-0">
-                        {(item.price * item.quantity).toLocaleString("vi-VN")}₫
-                      </span>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
 
