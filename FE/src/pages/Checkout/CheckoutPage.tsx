@@ -112,17 +112,20 @@ export default function CheckoutPage() {
 
   useEffect(() => {
     setVouchersLoading(true);
-    voucherService.getActiveVouchers(1, 50)
+    voucherService.getActiveVouchers(1, 50, (user as any)?._id)
       .then((res: any) => setActiveVouchers(res?.data ?? []))
       .catch(() => setActiveVouchers([]))
       .finally(() => setVouchersLoading(false));
-  }, []);
+  }, [user]);
 
   const handleSelectVoucher = async (code: string) => {
     try {
       setApplyingVoucherCode(code);
       setVoucherError("");
-      const response = await voucherService.validateVoucher(code, { purchaseAmount: subtotal });
+      const response = await voucherService.validateVoucher(code, {
+        purchaseAmount: subtotal,
+        userId: (user as any)?._id,
+      });
       setVoucherDiscount(response.data.discountValue);
       setAppliedVoucher(code);
       setFormData((p) => ({ ...p, promoCode: code }));
@@ -369,12 +372,9 @@ export default function CheckoutPage() {
     try {
       setLoading(true);
       setVoucherError("");
-      // const response = await voucherService.validateVoucher(
-      //   formData.promoCode,
-      //   { purchaseAmount: subtotal }
-      // );
       const response = await voucherService.validateVoucher(code, {
         purchaseAmount: subtotal,
+        userId: (user as any)?._id,
       });
       setVoucherDiscount(response.data.discountValue);
       setAppliedVoucher(code);
@@ -461,6 +461,7 @@ export default function CheckoutPage() {
           paymentMethod: "momo",
           amount: total,
           description: `Order payment from FreshMarket - ${formData.fullName}`,
+          ...(appliedVoucher ? { voucherCode: appliedVoucher, discountAmount: groupDiscount + recurringDiscount + voucherDiscount } : {}),
           ...(activeGroupId
             ? { groupId: activeGroupId, isGroupOrder: true, groupDiscount, groupDiscountPct }
             : {}),
@@ -558,6 +559,7 @@ export default function CheckoutPage() {
           notes: formData.notes,
           paymentMethod: "cod",
           totalAmount: total,
+          ...(appliedVoucher ? { voucherCode: appliedVoucher, discountAmount: groupDiscount + recurringDiscount + voucherDiscount } : {}),
           ...(activeGroupId
             ? {
                 groupId: activeGroupId,
@@ -673,6 +675,7 @@ export default function CheckoutPage() {
           notes: formData.notes || undefined,
           shippingCost: shipping,
           discountAmount: groupDiscount + recurringDiscount + voucherDiscount,
+          ...(appliedVoucher ? { voucherCode: appliedVoucher } : {}),
         } as any);
 
         const result = (response as any)?.data || response;
@@ -1435,7 +1438,7 @@ export default function CheckoutPage() {
                     <div className="flex items-center gap-2">
                       <span className="text-base">🎫</span>
                       <span className="text-sm text-primary font-medium">
-                        {vouchersLoading ? "Đang tải voucher..." : `Chọn voucher (${activeVouchers.length} khả dụng)`}
+                        {vouchersLoading ? "Loading voucher..." : "Choose voucher"}
                       </span>
                     </div>
                     <span className="text-primary text-lg">›</span>

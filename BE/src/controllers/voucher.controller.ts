@@ -1,5 +1,6 @@
 import { Response, NextFunction } from 'express';
 import { Voucher } from '../models/Voucher.model';
+import { VoucherUsage } from '../models/VoucherUsage.model';
 import { AuthRequest } from '../middlewares/auth.middleware';
 import { AppError } from '../utils/AppError';
 import mongoose from 'mongoose';
@@ -150,7 +151,7 @@ export class VoucherController {
    */
   getActiveVouchers = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
     try {
-      const { page = 1, limit = 10 } = req.query;
+      const { page = 1, limit = 10, userId } = req.query;
 
       const pageNum = parseInt(page as string) || 1;
       const limitNum = parseInt(limit as string) || 10;
@@ -158,17 +159,28 @@ export class VoucherController {
 
       const now = new Date();
 
-      const activeFilter = {
+      const activeFilter: any = {
         isActive: true,
         startDate: { $lte: now },
         expiryDate: { $gt: now },
       };
-      const vouchers = await Voucher.find(activeFilter)
+
+      let vouchers = await Voucher.find(activeFilter)
         .sort({ expiryDate: 1 })
         .skip(skip)
         .limit(limitNum);
 
-      const total = await Voucher.countDocuments(activeFilter);
+      // Filter out vouchers the user has already used or has pending
+      if (userId && typeof userId === 'string') {
+        const usedVoucherIds = await VoucherUsage.find({
+          userId,
+          status: { $in: ['used', 'pending'] },
+        }).distinct('voucherId');
+        const usedSet = new Set(usedVoucherIds.map((id: any) => id.toString()));
+        vouchers = vouchers.filter((v) => !usedSet.has(v._id.toString()));
+      }
+
+      const total = vouchers.length;
       const pages = Math.ceil(total / limitNum);
 
       res.status(200).json({
@@ -290,12 +302,15 @@ export class VoucherController {
         );
       }
 
-      // Check per-customer usage limit
+      // Check per-customer usage limit via VoucherUsage table
       if (userId) {
-        const userUsageCount = voucher.usedBy?.filter((id) => id.toString() === userId).length || 0;
-        const perCustomerLimit = voucher.perCustomerLimit || 1;
-        if (userUsageCount >= perCustomerLimit) {
-          throw new AppError('You have reached the usage limit for this voucher', 400);
+        const existingUsage = await VoucherUsage.findOne({
+          userId,
+          voucherId: voucher._id,
+          status: { $in: ['used', 'pending'] },
+        });
+        if (existingUsage) {
+          throw new AppError('You have used this discount code.', 400);
         }
       }
 
