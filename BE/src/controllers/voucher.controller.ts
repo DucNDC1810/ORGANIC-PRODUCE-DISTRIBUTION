@@ -158,7 +158,11 @@ export class VoucherController {
 
       const now = new Date();
 
-      const activeFilter = { isActive: true, startDate: { $lte: now }, expiryDate: { $gt: now } };
+      const activeFilter = {
+        isActive: true,
+        startDate: { $lte: now },
+        expiryDate: { $gt: now },
+      };
       const vouchers = await Voucher.find(activeFilter)
         .sort({ expiryDate: 1 })
         .skip(skip)
