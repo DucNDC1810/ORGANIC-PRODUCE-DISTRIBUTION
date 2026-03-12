@@ -210,7 +210,9 @@ export default function GroupMemberPage() {
   const [showTopupModal, setShowTopupModal] = useState(false);
   const [topupShortfall, setTopupShortfall] = useState<number>(0);
 
-  const socketRef = useRef<Socket | null>(null);
+  const socketRef      = useRef<Socket | null>(null);
+  // true while a cart-sync API call is in-flight → block socket from overwriting local edits
+  const isEditingRef   = useRef(false);
 
   // Refs to always have fresh state inside socket callbacks
   const myCartRef  = useRef<GroupCartItem[]>([]);
@@ -263,11 +265,12 @@ export default function GroupMemberPage() {
     );
     socket.on("member:updated", (m: GroupMember) => {
       setMembers((prev) => prev.map((x) => (x._id === m._id ? m : x)));
-      if (m._id === memberId) setMyCart(m.cartItems ?? []);
+      // Không ghi đè myCart nếu đang có cart-sync đang bay (tránh stale overwrite)
+      if (m._id === memberId && !isEditingRef.current) setMyCart(m.cartItems ?? []);
     });
     socket.on("member:item_added", (m: GroupMember) => {
       setMembers((prev) => prev.map((x) => (x._id === m._id ? m : x)));
-      if (m._id === memberId) setMyCart(m.cartItems ?? []);
+      if (m._id === memberId && !isEditingRef.current) setMyCart(m.cartItems ?? []);
       // Nếu là Owner cập nhật món, tự động mở rộng để Members thấy
       if (m.role === 'owner' && m.cartItems?.length > 0) {
         setExpandedMember(m._id);
@@ -344,11 +347,30 @@ export default function GroupMemberPage() {
   }, [groupId, memberId]);
 
   // ── Cart management ────────────────────────────────────────────────────────
+
+  /** Xóa 1 món và đồng bộ ngay lên server để tránh socket ghi đè stale data */
+  const removeItem = async (productId: string) => {
+    if (!groupId || !memberId || isReady) return;
+    const prevCart = myCartRef.current;
+    const newCart  = prevCart.filter((i) => i.productId !== productId);
+    setMyCart(newCart);
+    isEditingRef.current = true;
+    try {
+      await groupService.syncGroupItems(groupId, memberId, newCart);
+    } catch {
+      setMyCart(prevCart); // rollback nếu lỗi
+      toast.error("Could not remove item.");
+    } finally {
+      isEditingRef.current = false;
+    }
+  };
+
   const updateQty = async (item: GroupCartItem, delta: number) => {
     if (!groupId || !memberId || isReady) return;
     const newQty = item.qty + delta;
     if (newQty <= 0) {
-      setMyCart((prev) => prev.filter((i) => i.productId !== item.productId));
+      // Delegate sang removeItem để đảm bảo API được gọi
+      await removeItem(item.productId);
       return;
     }
     setMyCart((prev) =>
@@ -364,19 +386,20 @@ export default function GroupMemberPage() {
     }
   };
 
-  const removeItem = (productId: string) => {
-    if (isReady) return;
-    setMyCart((prev) => prev.filter((i) => i.productId !== productId));
-  };
-
   // ── Confirm ready ──────────────────────────────────────────────────────────
   const handleConfirmReady = async () => {
     if (!groupId || !memberId) return;
     setConfirming(true);
     try {
+      // Đồng bộ giỏ hàng hiện tại lên server trước khi đánh dấu ready
+      // (tránh trường hợp user xóa món nhưng server vẫn còn stale data)
+      isEditingRef.current = true;
+      await groupService.syncGroupItems(groupId, memberId, myCartRef.current);
+      isEditingRef.current = false;
       await groupService.setMemberReady(groupId, memberId, true);
       toast.success("Confirmed! Waiting for the owner to place the order.");
     } catch {
+      isEditingRef.current = false;
       toast.error("An error occurred. Please try again.");
     } finally {
       setConfirming(false);
