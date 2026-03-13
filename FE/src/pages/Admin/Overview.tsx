@@ -13,6 +13,7 @@ import { Badge } from '../../components/ui/badge';
 import { LineChart, Line, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { orderService } from '../../services/orderService';
 import { productService } from '../../services/productService';
+import { categoryService, Category } from '../../services/categoryService';
 import api from '../../services/api';
 
 const CHART_COLORS = ['#10b981', '#f59e0b', '#8b5cf6', '#ef4444', '#3b82f6', '#ec4899', '#14b8a6', '#f97316'];
@@ -33,6 +34,19 @@ interface RevenuePoint { month: string; revenue: number; orders: number; }
 interface CategoryPoint { name: string; value: number; color: string; [key: string]: unknown; }
 interface TopProduct    { name: string; sold: number; revenue: number; }
 interface RecentOrder   { _id: string; customerName: string; total: number; status: string; }
+interface UserStatsData {
+  totalUsers: number;
+  usersByRole?: Record<string, number>;
+}
+
+const humanizeCategorySlug = (slug: string) =>
+  slug
+    .split('-')
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(' ');
+
+const normalizeSlugToken = (value: string) => value.toLowerCase().replace(/[^a-z0-9]/g, '');
 
 export default function Overview() {
   const [loading, setLoading]           = useState(true);
@@ -52,26 +66,65 @@ export default function Overview() {
         sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
         const startDate = sixMonthsAgo.toISOString().split('T')[0];
 
-        const [orderStats, productStats, userStats, recentRes, topProductsRes, monthlyRes] =
+        const fetchAllOrders = async (params: Record<string, unknown> = {}) => {
+          const firstPage = await orderService.getAllOrders({ ...params, page: 1, limit: 100 }) as any;
+          const orders = [...(firstPage.data ?? [])];
+          const totalPages = firstPage.pagination?.totalPages ?? 1;
+
+          if (totalPages > 1) {
+            const pageRequests = Array.from({ length: totalPages - 1 }, (_, i) =>
+              orderService.getAllOrders({ ...params, page: i + 2, limit: 100 })
+            );
+            const restPages = await Promise.all(pageRequests);
+            restPages.forEach((page: any) => {
+              orders.push(...(page.data ?? []));
+            });
+          }
+
+          return orders;
+        };
+
+        const [orderStats, productStats, userStats, recentRes, categoriesRes, monthlyOrders, allOrders] =
           await Promise.all([
             orderService.getOrderStats() as Promise<any>,
             productService.getProductStats(),
-            api.get('/users/stats') as Promise<any>,
+            api.get('/users/stats') as Promise<{ success: boolean; data: UserStatsData }>,
             orderService.getAllOrders({ limit: 5 }) as Promise<any>,
-            productService.getAllProducts({ sortBy: 'soldCount', sortOrder: 'desc', limit: 5, isActive: true }),
-            orderService.getAllOrders({ limit: 500, startDate }) as Promise<any>,
+            categoryService.getAllCategories({ limit: 1000, isActive: true }),
+            fetchAllOrders({ startDate }),
+            fetchAllOrders(),
           ]);
 
         // ── Stats cards ──────────────────────────────────────────
         setTotalRevenue(orderStats.data?.totalRevenue ?? 0);
         setTotalOrders(orderStats.data?.totalOrders ?? 0);
-        setTotalCustomers(userStats.data?.totalUsers ?? 0);
+        setTotalCustomers(userStats.data?.usersByRole?.customer ?? 0);
         setTotalProducts(productStats.data?.totalProducts ?? 0);
 
         // ── Category pie ─────────────────────────────────────────
         const catDist: Record<string, number> = productStats.data?.categoryDistribution ?? {};
+        const categories = categoriesRes.data ?? [];
+        const resolveCategoryName = (rawSlug: string) => {
+          const exactMatch = categories.find((category: Category) => category.slug === rawSlug);
+          if (exactMatch) return exactMatch.name;
+
+          const normalizedRawSlug = normalizeSlugToken(rawSlug);
+          const fuzzyMatch = categories.find((category: Category) => {
+            const normalizedCategorySlug = normalizeSlugToken(category.slug);
+            return normalizedRawSlug.includes(normalizedCategorySlug) || normalizedCategorySlug.includes(normalizedRawSlug);
+          });
+
+          return fuzzyMatch?.name || humanizeCategorySlug(rawSlug);
+        };
+
+        const mergedCategoryDistribution = Object.entries(catDist).reduce<Record<string, number>>((acc, [slug, value]) => {
+          const displayName = resolveCategoryName(slug);
+          acc[displayName] = (acc[displayName] ?? 0) + value;
+          return acc;
+        }, {});
+
         setCategoryData(
-          Object.entries(catDist)
+          Object.entries(mergedCategoryDistribution)
             .sort(([, a], [, b]) => b - a)
             .map(([name, value], i) => ({
               name,
@@ -80,13 +133,34 @@ export default function Overview() {
             }))
         );
 
-        // ── Top products ─────────────────────────────────────────
+        // ── Top products from real order items ──────────────────
+        const productSalesMap: Record<string, TopProduct> = {};
+        allOrders
+          .filter((o: any) => !['cancelled', 'refunded'].includes(o.status))
+          .forEach((order: any) => {
+            (order.items ?? []).forEach((item: any) => {
+              const productObj = item.productId;
+              const productId = typeof productObj === 'object' ? productObj?._id : productObj;
+              const productName = typeof productObj === 'object' ? productObj?.name : undefined;
+              if (!productId) return;
+
+              if (!productSalesMap[productId]) {
+                productSalesMap[productId] = {
+                  name: productName || 'Unknown Product',
+                  sold: 0,
+                  revenue: 0,
+                };
+              }
+
+              productSalesMap[productId].sold += item.quantity ?? 0;
+              productSalesMap[productId].revenue += item.subtotal ?? ((item.quantity ?? 0) * (item.price ?? 0));
+            });
+          });
+
         setTopProducts(
-          (topProductsRes.data ?? []).map((p: any) => ({
-            name: p.name,
-            sold: p.soldCount ?? 0,
-            revenue: (p.soldCount ?? 0) * (p.price ?? 0),
-          }))
+          Object.values(productSalesMap)
+            .sort((a, b) => b.sold - a.sold)
+            .slice(0, 5)
         );
 
         // ── Recent orders ────────────────────────────────────────
@@ -106,7 +180,7 @@ export default function Overview() {
           const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
           monthlyMap[`${d.getFullYear()}-${d.getMonth()}`] = { revenue: 0, orders: 0 };
         }
-        (monthlyRes.data ?? []).forEach((order: any) => {
+        monthlyOrders.forEach((order: any) => {
           const d = new Date(order.orderDate ?? order.createdAt);
           const key = `${d.getFullYear()}-${d.getMonth()}`;
           if (monthlyMap[key]) {
@@ -186,7 +260,7 @@ export default function Overview() {
             <div className="text-2xl font-bold text-foreground">{totalCustomers.toLocaleString()}</div>
             <p className="text-xs text-purple-600 flex items-center gap-1 mt-1">
               <TrendingUp className="w-3 h-3" />
-              Registered users
+              Customer accounts
             </p>
           </CardContent>
         </Card>
