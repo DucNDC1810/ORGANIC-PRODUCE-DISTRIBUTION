@@ -120,7 +120,7 @@ export default function Profile() {
   const handleLogout = () => {
     clearLocalCart();
     logout();
-    navigate('/');
+    navigate(`/login?redirect=${encodeURIComponent(location.pathname + location.search)}`);
   };
 
   const handleEditToggle = () => {

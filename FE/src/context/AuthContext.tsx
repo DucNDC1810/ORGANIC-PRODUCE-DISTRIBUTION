@@ -17,13 +17,21 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 const INACTIVITY_TIMEOUT = 10 * 60 * 1000; // 10 minutes in milliseconds
+const AUTH_PAGES = ['/login', '/signup', '/forgot-password', '/reset-password', '/verify-email'];
 
 export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const inactivityTimerRef = useRef<NodeJS.Timeout | null>(null);
 
+  const persistCurrentPathForLoginRedirect = useCallback(() => {
+    const currentPath = `${window.location.pathname}${window.location.search}`;
+    if (AUTH_PAGES.includes(window.location.pathname)) return;
+    sessionStorage.setItem('redirectAfterLogin', currentPath);
+  }, []);
+
   const logout = useCallback(() => {
+    persistCurrentPathForLoginRedirect();
     authAPI.logout();
     setUser(null);
     // Clear cart from localStorage when logging out
@@ -32,7 +40,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       clearTimeout(inactivityTimerRef.current);
       inactivityTimerRef.current = null;
     }
-  }, []);
+  }, [persistCurrentPathForLoginRedirect]);
 
   const resetInactivityTimer = useCallback(() => {
     // Clear existing timer
@@ -45,7 +53,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       inactivityTimerRef.current = setTimeout(() => {
         toast.error('Your session has expired due to inactivity. Please log in again..');
         logout();
-        window.location.href = '/login';
+        window.location.href = `/login?redirect=${encodeURIComponent(`${window.location.pathname}${window.location.search}`)}`;
       }, INACTIVITY_TIMEOUT);
     }
   }, [user, logout]);
@@ -53,10 +61,11 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   useEffect(() => {
     // Setup callback for token expiration from api interceptor
     setTokenExpiredCallback(() => {
+      persistCurrentPathForLoginRedirect();
       setUser(null);
       toast.error('Your session has expired. Please log in again.');
       // Redirect to login page
-      window.location.href = '/login';
+      window.location.href = `/login?redirect=${encodeURIComponent(`${window.location.pathname}${window.location.search}`)}`;
     });
 
     // Check if user is already logged in
@@ -72,7 +81,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       }
     }
     setLoading(false);
-  }, []);
+  }, [persistCurrentPathForLoginRedirect]);
 
   // Setup inactivity timer and activity listeners
   useEffect(() => {

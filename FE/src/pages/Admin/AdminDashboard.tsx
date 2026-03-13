@@ -124,7 +124,7 @@ export default function AdminDashboard() {
     clearLocalCart();
     logout();
     toast.success('Logged out successfully!');
-    navigate('/login');
+    navigate(`/login?redirect=${encodeURIComponent(location.pathname + location.search)}`);
   };
 
   // Get tab display name

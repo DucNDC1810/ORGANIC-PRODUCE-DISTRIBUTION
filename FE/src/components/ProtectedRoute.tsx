@@ -1,5 +1,5 @@
 import React from 'react';
-import { Navigate } from 'react-router-dom';
+import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { toast } from 'sonner';
 
@@ -15,6 +15,7 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   redirectTo = '/login',
 }) => {
   const { user, isAuthenticated, loading } = useAuth();
+  const location = useLocation();
 
   // Show loading state while checking authentication
   if (loading) {
@@ -28,7 +29,12 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   // Not authenticated - redirect to login
   if (!isAuthenticated || !user) {
     toast.error('Please log in to continue.');
-    return <Navigate to={redirectTo} replace />;
+    const currentPath = `${location.pathname}${location.search}`;
+    const redirectTarget =
+      redirectTo === '/login'
+        ? `${redirectTo}?redirect=${encodeURIComponent(currentPath)}`
+        : redirectTo;
+    return <Navigate to={redirectTarget} replace state={{ from: currentPath }} />;
   }
 
   // Check role-based access if roles are specified

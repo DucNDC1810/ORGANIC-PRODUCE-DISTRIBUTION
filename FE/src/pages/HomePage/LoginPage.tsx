@@ -153,6 +153,19 @@ export default function LoginPage() {
     }
   };
 
+  const handleGoogleLogin = () => {
+    const redirectParam = searchParams.get('redirect');
+    const stateFrom = (location.state as any)?.from as string | undefined;
+    const pendingRedirect = redirectParam ? decodeURIComponent(redirectParam) : stateFrom;
+
+    if (pendingRedirect) {
+      sessionStorage.setItem('redirectAfterLogin', pendingRedirect);
+    }
+
+    const apiBaseUrl = import.meta.env.VITE_API_URL || 'https://organic-produce-be.onrender.com/api';
+    window.location.href = `${apiBaseUrl}/auth/google`;
+  };
+
   return (
     <div className="h-screen overflow-hidden flex">
       {/* Left Side - Image with Glassmorphism Quote */}
@@ -341,7 +354,8 @@ export default function LoginPage() {
               {/* Google */}
               <button
                 type="button"
-                onClick={() => window.location.href = `${import.meta.env.VITE_API_URL || 'https://organic-produce-be.onrender.com/api'}/auth/google`}
+                onClick={handleGoogleLogin}
+                tabIndex={-1}
                 className="w-16 h-16 bg-white border-2 border-border rounded-full hover:border-primary hover:shadow-lg transition-all flex items-center justify-center group"
                 title="Sign in with Google"
               >
