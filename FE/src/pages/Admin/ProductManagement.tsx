@@ -328,12 +328,12 @@ export default function AdminProductManagement() {
       const resolved = categories.find(
         (c) => c.slug === categoryObj.slug || c._id === categoryObj._id,
       );
-      return resolved?.name || 'Unknown';
+      return resolved?.name || categoryObj.slug || categoryObj._id || 'Unknown';
     }
 
     const value = String(categoryValue);
     const resolved = categories.find((c) => c.slug === value || c._id === value);
-    return resolved?.name || 'Unknown';
+    return resolved?.name || value || 'Unknown';
   };
 
   const getCategoryFormValue = (categoryValue: unknown) => {

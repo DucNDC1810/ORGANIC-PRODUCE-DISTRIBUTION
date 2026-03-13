@@ -1,4 +1,4 @@
-﻿import { useState, useEffect, useCallback } from "react";
+﻿import { useState, useEffect, useCallback, useMemo } from "react";
 import {
   Package,
   Plus,
@@ -65,6 +65,7 @@ import {
 } from "../../components/ui/alert-dialog";
 import { useCategories } from "../../hooks/useCategories";
 import { Category } from "../../services/categoryService";
+import { productService, Product as ProductItem } from "../../services/productService";
 
 // --- Category icon + color mapping by slug keywords ----------------------------
 interface CategoryStyle {
@@ -87,10 +88,6 @@ const SLUG_MAP: Array<{ keywords: string[]; style: CategoryStyle }> = [
   {
     keywords: ["herb", "spice", "thao", "basil", "mint"],
     style: { emoji: "\uD83C\uDF3F", bg: "bg-teal-100",    text: "text-teal-600",    border: "border-teal-200",    accent: "bg-teal-500"    },
-  },
-  {
-    keywords: ["mushroom", "nam", "fungus"],
-    style: { emoji: "\uD83C\uDF44", bg: "bg-orange-100",  text: "text-orange-600",  border: "border-orange-200",  accent: "bg-orange-500"  },
   },
   {
     keywords: ["seafood", "fish", "shrimp", "dried", "ca", "tom"],
@@ -195,7 +192,6 @@ export default function AdminCategoryManagement() {
     categories,
     loading,
     pagination,
-    stats,
     fetchCategories,
     fetchCategoryStats,
     createCategory,
@@ -219,6 +215,11 @@ export default function AdminCategoryManagement() {
   const [slugTaken, setSlugTaken]       = useState(false);
   const [isSaving, setIsSaving]         = useState(false);
   const [isDeleting, setIsDeleting]     = useState(false);
+  const [isProductsOpen, setIsProductsOpen] = useState(false);
+  const [activeCategory, setActiveCategory] = useState<Category | null>(null);
+  const [categoryProducts, setCategoryProducts] = useState<ProductItem[]>([]);
+  const [categoryProductsTotal, setCategoryProductsTotal] = useState(0);
+  const [productsLoading, setProductsLoading] = useState(false);
   const ITEMS_PER_PAGE = 9;
 
   const loadData = useCallback(async (page = 1, search = "", status: "all" | "active" | "inactive" = "all") => {
@@ -322,6 +323,39 @@ export default function AdminCategoryManagement() {
   const handleToggle = async (cat: Category) => { await toggleCategoryStatus(cat._id); fetchCategoryStats(); };
   const handlePageChange = (page: number) => { setCurrentPage(page); loadData(page, searchTerm, statusFilter); };
   const handleRefresh = () => { loadData(currentPage, searchTerm, statusFilter); fetchCategoryStats(); };
+  const visibleCategories = categories.filter((cat) => cat.slug !== 'mushrooms');
+  const visibleStats = useMemo(() => {
+    const total = visibleCategories.length;
+    const active = visibleCategories.filter((cat) => cat.isActive).length;
+    const inactive = total - active;
+    const withProducts = visibleCategories.filter((cat) => (cat.productCount || 0) > 0).length;
+    const totalProducts = visibleCategories.reduce((sum, cat) => sum + (cat.productCount || 0), 0);
+    const empty = total - withProducts;
+
+    return { total, active, inactive, withProducts, totalProducts, empty };
+  }, [visibleCategories]);
+
+  const handleOpenProducts = async (cat: Category) => {
+    setActiveCategory(cat);
+    setIsProductsOpen(true);
+    setProductsLoading(true);
+
+    try {
+      const response = await productService.getAllProducts({
+        category: cat.slug,
+        page: 1,
+        limit: 100,
+      });
+
+      setCategoryProducts(response.data || []);
+      setCategoryProductsTotal(response.pagination?.totalProducts || response.data?.length || 0);
+    } catch {
+      setCategoryProducts([]);
+      setCategoryProductsTotal(0);
+    } finally {
+      setProductsLoading(false);
+    }
+  };
 
   // Shared form body
   const FormBody = ({ isEdit = false }) => (
@@ -478,11 +512,11 @@ export default function AdminCategoryManagement() {
 
           {/* Stats */}
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
-            <StatCard icon={LayoutGrid} label="Total"        value={stats?.total ?? "..."} iconClass="bg-blue-50   text-blue-600"   />
-            <StatCard icon={Activity}   label="Active"       value={stats?.active ?? "..."} iconClass="bg-green-50  text-green-600"  />
-            <StatCard icon={EyeOff}     label="Inactive"     value={stats?.inactive ?? "..."} iconClass="bg-gray-100  text-gray-500"   />
-            <StatCard icon={Boxes}      label="Has Products" value={stats?.withProducts ?? "..."} iconClass="bg-violet-50 text-violet-600" />
-            <StatCard icon={BoxSelect}  label="Empty"        value={stats?.empty ?? "..."} iconClass="bg-amber-50  text-amber-600"  />
+            <StatCard icon={LayoutGrid} label="Total"        value={visibleStats.total} iconClass="bg-blue-50   text-blue-600"   />
+            <StatCard icon={Activity}   label="Active"       value={visibleStats.active} iconClass="bg-green-50  text-green-600"  />
+            <StatCard icon={EyeOff}     label="Inactive"     value={visibleStats.inactive} iconClass="bg-gray-100  text-gray-500"   />
+            <StatCard icon={Boxes}      label="Products" value={visibleStats.totalProducts} iconClass="bg-violet-50 text-violet-600" />
+            <StatCard icon={BoxSelect}  label="Empty"        value={visibleStats.empty} iconClass="bg-amber-50  text-amber-600"  />
           </div>
 
           {/* Toolbar */}
@@ -513,7 +547,7 @@ export default function AdminCategoryManagement() {
             </Tabs>
             {pagination && (
               <p className="text-xs text-gray-400 ml-auto hidden sm:block">
-                {pagination.totalCategories} categor{pagination.totalCategories === 1 ? "y" : "ies"}
+                {visibleCategories.length} categor{visibleCategories.length === 1 ? "y" : "ies"}
               </p>
             )}
           </div>
@@ -523,12 +557,16 @@ export default function AdminCategoryManagement() {
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {Array.from({ length: 6 }).map((_, i) => <SkeletonCard key={i} />)}
             </div>
-          ) : categories.length > 0 ? (
+          ) : visibleCategories.length > 0 ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {categories.map(cat => {
+              {visibleCategories.map(cat => {
                 const style = getCategoryStyle(cat.slug);
                 return (
-                  <Card key={cat._id} className="bg-white border border-gray-200 shadow-sm hover:shadow-md transition-all hover:-translate-y-0.5 overflow-hidden">
+                  <Card
+                    key={cat._id}
+                    className="bg-white border border-gray-200 shadow-sm hover:shadow-md transition-all hover:-translate-y-0.5 overflow-hidden cursor-pointer"
+                    onClick={() => handleOpenProducts(cat)}
+                  >
                     <div className={`h-1 w-full ${cat.isActive ? style.accent : "bg-gray-200"}`} />
                     <CardContent className="p-4">
                       {/* Top row */}
@@ -556,22 +594,27 @@ export default function AdminCategoryManagement() {
                         </div>
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon" className="h-7 w-7 text-gray-400 hover:text-gray-700 hover:bg-gray-100 flex-shrink-0">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7 text-gray-400 hover:text-gray-700 hover:bg-gray-100 flex-shrink-0"
+                              onClick={(e) => e.stopPropagation()}
+                            >
                               <MoreVertical className="w-4 h-4" />
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end" className="w-44">
-                            <DropdownMenuItem className="cursor-pointer" onClick={() => handleEditOpen(cat)}>
+                            <DropdownMenuItem className="cursor-pointer" onClick={(e) => { e.stopPropagation(); handleEditOpen(cat); }}>
                               <Edit className="w-4 h-4 mr-2 text-gray-500" />Edit
                             </DropdownMenuItem>
-                            <DropdownMenuItem className="cursor-pointer" onClick={() => handleToggle(cat)}>
+                            <DropdownMenuItem className="cursor-pointer" onClick={(e) => { e.stopPropagation(); handleToggle(cat); }}>
                               <Power className="w-4 h-4 mr-2 text-gray-500" />
                               {cat.isActive ? "Deactivate" : "Activate"}
                             </DropdownMenuItem>
                             <DropdownMenuSeparator />
                             <DropdownMenuItem
                               className="cursor-pointer text-red-600 focus:text-red-600 focus:bg-red-50"
-                              onClick={() => handleDeleteOpen(cat)}
+                              onClick={(e) => { e.stopPropagation(); handleDeleteOpen(cat); }}
                             >
                               <Trash2 className="w-4 h-4 mr-2" />Delete
                             </DropdownMenuItem>
@@ -600,7 +643,7 @@ export default function AdminCategoryManagement() {
                             <TooltipTrigger asChild>
                               <Button variant="ghost" size="sm"
                                 className="h-7 px-2.5 text-xs text-gray-600 hover:text-green-700 hover:bg-green-50"
-                                onClick={() => handleEditOpen(cat)}>
+                                onClick={(e) => { e.stopPropagation(); handleEditOpen(cat); }}>
                                 <Edit className="w-3.5 h-3.5 mr-1" />Edit
                               </Button>
                             </TooltipTrigger>
@@ -610,7 +653,7 @@ export default function AdminCategoryManagement() {
                             <TooltipTrigger asChild>
                               <Button variant="ghost" size="sm"
                                 className="h-7 px-2.5 text-xs text-gray-600 hover:text-red-700 hover:bg-red-50"
-                                onClick={() => handleDeleteOpen(cat)}>
+                                onClick={(e) => { e.stopPropagation(); handleDeleteOpen(cat); }}>
                                 <Trash2 className="w-3.5 h-3.5 mr-1" />Delete
                               </Button>
                             </TooltipTrigger>
@@ -649,7 +692,7 @@ export default function AdminCategoryManagement() {
             <div className="flex items-center justify-between py-1">
               <p className="text-sm text-gray-500">
                 Page <strong>{pagination.currentPage}</strong> of <strong>{pagination.totalPages}</strong>
-                <span className="text-gray-400 ml-1">({pagination.totalCategories} total)</span>
+                <span className="text-gray-400 ml-1">({visibleCategories.length} visible)</span>
               </p>
               <div className="flex items-center gap-1">
                 <Button variant="outline" size="icon" className="h-8 w-8"
@@ -678,6 +721,75 @@ export default function AdminCategoryManagement() {
             </div>
           )}
         </div>
+
+        {/* Category Products Dialog */}
+        <Dialog open={isProductsOpen} onOpenChange={(open) => {
+          setIsProductsOpen(open);
+          if (!open) {
+            setActiveCategory(null);
+            setCategoryProducts([]);
+            setCategoryProductsTotal(0);
+          }
+        }}>
+          <DialogContent className="sm:max-w-[760px] p-0 overflow-hidden">
+            <DialogHeader className="px-6 pt-6 pb-4 border-b bg-white">
+              <DialogTitle className="text-xl font-bold text-gray-900">
+                Products in {activeCategory?.name || "Category"}
+              </DialogTitle>
+              <DialogDescription className="text-sm text-gray-500">
+                {categoryProductsTotal} product(s) in /{activeCategory?.slug || ""}
+              </DialogDescription>
+              <div className="mt-3 flex items-center gap-2">
+                <Badge className="bg-green-100 text-green-700 border-0">Category</Badge>
+                <Badge variant="outline" className="text-gray-600">/{activeCategory?.slug || "unknown"}</Badge>
+              </div>
+            </DialogHeader>
+
+            {productsLoading ? (
+              <div className="py-14 flex items-center justify-center gap-2 text-gray-500">
+                <Loader2 className="w-5 h-5 animate-spin" />
+                Loading products...
+              </div>
+            ) : categoryProducts.length === 0 ? (
+              <div className="py-14 text-center text-gray-500">No products found in this category.</div>
+            ) : (
+              <div className="px-6 py-4 max-h-[58vh] overflow-y-auto bg-gray-50/40">
+                <div className="space-y-2">
+                {categoryProducts.map((product) => (
+                  <div key={product._id} className="flex items-center gap-3 rounded-xl border border-gray-200 bg-white p-3 shadow-sm">
+                    <img
+                      src={product.thumbnail || product.images?.[0] || "https://via.placeholder.com/56?text=No+Image"}
+                      alt={product.name}
+                      className="w-14 h-14 rounded-lg object-cover border border-gray-200"
+                      onError={(e) => {
+                        e.currentTarget.src = "https://via.placeholder.com/56?text=No+Image";
+                      }}
+                    />
+                    <div className="flex-1 min-w-0 space-y-1">
+                      <p className="text-sm font-semibold text-gray-900 truncate">{product.name}</p>
+                      <p className="text-xs text-gray-500 break-words overflow-hidden [display:-webkit-box] [-webkit-line-clamp:2] [-webkit-box-orient:vertical]">
+                        {product.description || "No description"}
+                      </p>
+                    </div>
+                    <div className="text-right shrink-0 space-y-1">
+                      <p className="text-sm font-bold text-gray-900">${product.price.toFixed(2)}</p>
+                      <Badge variant="outline" className="text-xs text-gray-600">
+                        Stock: {product.stock || 0}
+                      </Badge>
+                    </div>
+                  </div>
+                ))}
+                </div>
+              </div>
+            )}
+
+            <DialogFooter className="px-6 py-4 border-t bg-white">
+              <Button variant="outline" onClick={() => setIsProductsOpen(false)}>
+                Close
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
         {/* Add Dialog */}
         <Dialog open={isAddOpen} onOpenChange={open => { setIsAddOpen(open); if (!open) resetForm(); }}>
