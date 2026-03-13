@@ -29,6 +29,32 @@ export default function LoginPage() {
     emailRef.current?.focus();
   }, []);
 
+  useEffect(() => {
+    const error = searchParams.get('error');
+    const message = searchParams.get('message');
+
+    if (!error) {
+      return;
+    }
+
+    if (error === 'google_account_exists') {
+      toast.error(
+        message
+          ? decodeURIComponent(message)
+          : 'An account with the same email already exists. Please log in using your email and password, then link your Google account from your profile settings.',
+        { duration: 6000 }
+      );
+      return;
+    }
+
+    if (error === 'authentication_failed') {
+      toast.error(
+        message ? decodeURIComponent(message) : 'Google authentication failed. Please try again.',
+        { duration: 5000 }
+      );
+    }
+  }, [searchParams]);
+
   // Tab focus trap: cycle only between email → password → submit
   const handleTabTrap = useCallback((e: React.KeyboardEvent, current: 'email' | 'password' | 'submit') => {
     if (e.key !== 'Tab') return;
@@ -64,6 +90,7 @@ export default function LoginPage() {
         // Priority 1: ?redirect= URL param (e.g. from header or email link)
         const redirectParam = searchParams.get('redirect');
         if (redirectParam && (user.role === 'customer' || !user.role)) {
+          sessionStorage.removeItem('redirectAfterLogin');
           navigate(decodeURIComponent(redirectParam), { replace: true });
           return;
         }
@@ -71,6 +98,7 @@ export default function LoginPage() {
         // Priority 1b: location.state.from (header link using state)
         const stateFrom = (location.state as any)?.from as string | undefined;
         if (stateFrom && (user.role === 'customer' || !user.role)) {
+          sessionStorage.removeItem('redirectAfterLogin');
           navigate(stateFrom, { replace: true });
           return;
         }

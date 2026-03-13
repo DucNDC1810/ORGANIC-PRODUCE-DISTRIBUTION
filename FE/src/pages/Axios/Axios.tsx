@@ -162,9 +162,12 @@ export const authAPI = {
    */
   login: async (credentials: LoginCredentials): Promise<AuthResponse> => {
     const response: any = await api.post('/auth/login', credentials);
-    if (response.data?.token) {
-      localStorage.setItem('token', response.data.token);
-      localStorage.setItem('user', JSON.stringify(response.data.user));
+    const authData = response?.data ?? response;
+    const token = authData?.token;
+    const user = authData?.user;
+    if (token && user) {
+      localStorage.setItem('token', token);
+      localStorage.setItem('user', JSON.stringify(user));
     }
     return response;
   },
@@ -176,7 +179,13 @@ export const authAPI = {
    */
   register: async (userData: RegisterData): Promise<AuthResponse> => {
     const response: any = await api.post('/auth/register', userData);
-    // Don't store token or user - they need to verify email first
+    const authData = response?.data ?? response;
+    const token = authData?.token;
+    const user = authData?.user;
+    if (token && user) {
+      localStorage.setItem('token', token);
+      localStorage.setItem('user', JSON.stringify(user));
+    }
     return response;
   },
 

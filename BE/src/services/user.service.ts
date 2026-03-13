@@ -648,12 +648,25 @@ export class UserService {
 
   async googleLogin(profile: any): Promise<AuthResponse> {
     const { id, emails, displayName } = profile;
-    const email = emails[0].value;
+    const email = emails?.[0]?.value?.toLowerCase().trim();
 
-    // Find or create user
-    let user = await User.findOne({ $or: [{ googleId: id }, { email }] });
+    if (!email) {
+      throw new AppError('Unable to get email from Google account.', 400);
+    }
+
+    const existingGoogleUser = await User.findOne({ googleId: id });
+    let user = existingGoogleUser;
 
     if (!user) {
+      const existingEmailUser = await User.findOne({ email });
+
+      if (existingEmailUser) {
+        throw new AppError(
+          'This Google account or email is already registered. Please use a different Google account or login with your existing account.',
+          409
+        );
+      }
+
       // Generate username from email or displayName
       let username = email.split('@')[0].toLowerCase();
       // Check if username exists and add random suffix if needed
@@ -671,11 +684,6 @@ export class UserService {
         isEmailVerified: true, // Google emails are already verified
         role: 'customer'
       });
-    } else if (!user.googleId) {
-      // Link existing account with Google
-      user.googleId = id;
-      user.isEmailVerified = true;
-      await user.save();
     }
 
     // Generate token

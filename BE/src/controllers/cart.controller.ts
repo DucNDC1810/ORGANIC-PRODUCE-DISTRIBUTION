@@ -161,4 +161,39 @@ export class CartController {
       next(error);
     }
   };
+
+  /**
+   * Sync guest cart items into the authenticated user's cart
+   */
+  syncCart = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      if (!req.user?.id) {
+        res.status(401).json({
+          success: false,
+          message: 'User not authenticated'
+        });
+        return;
+      }
+
+      const { items } = req.body;
+
+      if (!Array.isArray(items) || items.length === 0) {
+        res.status(400).json({
+          success: false,
+          message: 'items array is required'
+        });
+        return;
+      }
+
+      const cart = await this.cartService.syncCart(req.user.id, items);
+
+      res.status(200).json({
+        success: true,
+        message: 'Cart synced',
+        data: cart
+      });
+    } catch (error) {
+      next(error);
+    }
+  };
 }

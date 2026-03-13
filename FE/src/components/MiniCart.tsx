@@ -39,8 +39,19 @@ export default function MiniCart() {
   const subtotal = selectedItems.reduce((sum, i) => sum + i.price * i.quantity, 0);
 
   const handleCheckout = () => {
+    const selectedItemIds = Array.from(selectedIds);
+    const params = new URLSearchParams();
+    if (selectedItemIds.length > 0) {
+      params.set('items', selectedItemIds.join(','));
+    }
+    params.set('intent', 'minicart');
+
+    sessionStorage.setItem('checkoutSelectedItemIds', JSON.stringify(selectedItemIds));
+
     closeCart();
-    navigate('/checkout', { state: { selectedItemIds: Array.from(selectedIds) } });
+    navigate(`/checkout${params.toString() ? `?${params.toString()}` : ''}`, {
+      state: { selectedItemIds },
+    });
   };
 
   const [editingQtyId, setEditingQtyId] = useState<string | null>(null);
