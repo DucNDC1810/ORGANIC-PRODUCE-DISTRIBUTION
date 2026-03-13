@@ -440,15 +440,18 @@ export default function CheckoutPage() {
       recurringData.recurringFrequency === "monthly"
         ? parseInt(recurringData.recurringDay)
         : weekdayToNum[recurringData.recurringDay] ?? 1;
+    const startDate = new Date(`${recurringData.recurringStartDate}T00:00:00`);
+    if (Number.isNaN(startDate.getTime())) return null;
     // Ưu tiên dùng firstDeliveryDate đã được tính sẵn trong Modal;
     // fallback về recurringStartDate nếu chưa có (tương thích ngược).
     const nextDelivery = recurringData.firstDeliveryDate
       ? new Date(recurringData.firstDeliveryDate)
-      : new Date(recurringData.recurringStartDate);
+      : startDate;
 
     return {
       frequency: frequencyMap[recurringData.recurringFrequency],
       deliveryDay,
+      startDate: startDate.toISOString(),
       nextDeliveryDate: nextDelivery.toISOString(),
       items: checkoutItems.map((item) => ({
         productId: item.id,
@@ -465,6 +468,43 @@ export default function CheckoutPage() {
     if (!validateForm()) return;
     if (!user) {
       setError("Please log in to place an order");
+      return;
+    }
+
+    // Recurring checkout should only create subscription plan.
+    // Actual recurring orders are created later by cron on delivery day.
+    if (isRecurringOrder) {
+      setLoading(true);
+      try {
+        const subPayload = buildSubscriptionPayload();
+        if (!subPayload) {
+          throw new Error("Invalid recurring schedule. Please reselect start date.");
+        }
+
+        const subResponse = await subscriptionService.createSubscription(subPayload as any);
+        const createdSub = (subResponse as any)?.data?.data ?? (subResponse as any)?.data ?? null;
+
+        // Remove checked-out items from cart after plan is created.
+        if (!buyNowItem) {
+          for (const item of checkoutItems) {
+            await removeFromCart(item.id);
+          }
+        }
+
+        navigate("/profile?tab=subscriptions", {
+          state: {
+            justCreatedSubscription: true,
+            subscriptionId: createdSub?._id,
+          },
+        });
+      } catch (err: any) {
+        setError(
+          err.response?.data?.message ||
+            err.message ||
+            "Could not create recurring plan. Please try again.",
+        );
+        setLoading(false);
+      }
       return;
     }
 
@@ -525,7 +565,6 @@ export default function CheckoutPage() {
             ? { pickupLocation: { name: selectedStore.name, address: selectedStore.address } }
             : {}),
           isRecurring: isRecurringOrder,
-          subscriptionFrequency: isRecurringOrder ? (recurringData?.recurringFrequency ?? undefined) : undefined,
           discountAmount: recurringDiscount > 0 ? recurringDiscount : undefined,
         });
 
@@ -600,7 +639,6 @@ export default function CheckoutPage() {
           totalAmount: total,
           ...(appliedVoucher ? { voucherCode: appliedVoucher, discountAmount: groupDiscount + recurringDiscount + voucherDiscount } : {}),
           isRecurring: isRecurringOrder,
-          subscriptionFrequency: isRecurringOrder ? (recurringData?.recurringFrequency ?? undefined) : undefined,
           discountAmount: recurringDiscount > 0 ? recurringDiscount : undefined,
           ...(activeGroupId
             ? {
@@ -616,18 +654,6 @@ export default function CheckoutPage() {
         const result = (response as any)?.data || response;
 
         if (result?.success !== false) {
-          // Create subscription if recurring order was configured
-          if (isRecurringOrder && recurringData) {
-            try {
-              const subPayload = buildSubscriptionPayload();
-              if (subPayload) {
-                await subscriptionService.createSubscription(subPayload as any);
-              }
-            } catch (subErr) {
-              // Non-fatal: order was placed successfully, log and continue
-              console.warn("Subscription creation failed:", subErr);
-            }
-          }
           // Snapshot cart items before clearing (for display on success page)
           const cartItemsSnapshot = checkoutItems.map((item) => ({
             productId: { _id: item.id, name: item.name, thumbnail: item.image },

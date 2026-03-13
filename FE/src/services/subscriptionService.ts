@@ -36,6 +36,7 @@ export interface CreateSubscriptionPayload {
   addressId?: string;
   frequency: 'weekly' | 'bi-weekly' | 'monthly';
   deliveryDay: number;
+  startDate?: string;
   nextDeliveryDate: string;
   items: SubscriptionItem[];
   discountRate?: number;
