@@ -82,10 +82,16 @@ export class ShipperController {
                 throw new AppError('Shipper not authenticated', 401);
             }
 
-            // Only get orders with status='confirmed', no shipper assigned, and not rejected by current shipper
+            // Get confirmed orders available for pickup:
+            // - not assigned yet (shipperId is null or missing), or
+            // - explicitly reopened for shipping after cancellation
             const baseQuery: any = {
                 status: 'confirmed',
-                shipperId: { $exists: false },
+                $or: [
+                    { shipperId: null },
+                    { shipperId: { $exists: false } },
+                    { reopenedForShipping: true }
+                ],
                 rejectedByShippers: { $ne: shipperId }
             };
 
@@ -323,6 +329,22 @@ export class ShipperController {
             }
 
             if (status === 'delivered') {
+                if (order.orderType === 'subscription') {
+                    const today = new Date();
+                    today.setHours(0, 0, 0, 0);
+
+                    const deliveryDate = new Date(order.orderDate);
+                    deliveryDate.setHours(0, 0, 0, 0);
+
+                    if (today.getTime() < deliveryDate.getTime()) {
+                        const deliveryDateText = deliveryDate.toLocaleDateString('vi-VN');
+                        throw new AppError(
+                            `Subscription order can only be marked as delivered on ${deliveryDateText} or later`,
+                            400
+                        );
+                    }
+                }
+
                 order.deliveredAt = new Date();
                 if (order.paymentMethod === 'cod') {
                     order.paymentStatus = 'paid';
@@ -362,12 +384,12 @@ export class ShipperController {
                         const deliveryAddr = (order.deliveryInfo as any)?.address || '';
                         const ownerUserName = (order as any).userId?.name || 'chủ nhóm';
                         getIO().to(`group:${order.groupId}`).emit('group:order_delivered', {
-                            groupId:  order.groupId.toString(),
-                            orderId:  order._id,
-                            address:  deliveryAddr,
+                            groupId: order.groupId.toString(),
+                            orderId: order._id,
+                            address: deliveryAddr,
                             ownerName: ownerUserName,
                         });
-                    } catch (_) {}
+                    } catch (_) { }
                 }
             } else if (status === 'cancelled') {
                 notificationTitle = 'Shipper hủy đơn';

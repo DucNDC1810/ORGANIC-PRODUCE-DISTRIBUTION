@@ -7,6 +7,22 @@ import {
   formatDateVN,
 } from "../utils/deliveryDate";
 
+const toLocalDateString = (date: Date): string => {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+};
+
+const parseLocalDate = (value: string): Date | null => {
+  if (!value) return null;
+  const [y, m, d] = value.split("-").map(Number);
+  if (!y || !m || !d) return null;
+  const result = new Date(y, m - 1, d);
+  result.setHours(0, 0, 0, 0);
+  return Number.isNaN(result.getTime()) ? null : result;
+};
+
 export interface RecurringData {
   recurringFrequency: "weekly" | "biweekly" | "monthly";
   recurringDay: string;
@@ -100,8 +116,8 @@ export default function RecurringDeliveryModal({
    */
   const firstDelivery = useMemo((): Date | null => {
     if (!data.recurringStartDate) return null;
-    const start = new Date(data.recurringStartDate);
-    if (isNaN(start.getTime())) return null;
+    const start = parseLocalDate(data.recurringStartDate);
+    if (!start) return null;
 
     if (data.recurringFrequency === "monthly") {
       const dom = parseInt(data.recurringDay);
@@ -115,8 +131,8 @@ export default function RecurringDeliveryModal({
   /** Kiểm tra trường hợp đặc biệt: ngày bắt đầu trùng với thứ giao */
   const isEdgeCase = useMemo(() => {
     if (!data.recurringStartDate || data.recurringFrequency === "monthly") return false;
-    const start = new Date(data.recurringStartDate);
-    if (isNaN(start.getTime())) return false;
+    const start = parseLocalDate(data.recurringStartDate);
+    if (!start) return false;
     return isSameDeliveryDay(start, data.recurringDay);
   }, [data.recurringStartDate, data.recurringDay, data.recurringFrequency]);
 
@@ -135,7 +151,12 @@ export default function RecurringDeliveryModal({
     onClose();
   };
 
-  const todayStr = new Date().toISOString().split("T")[0];
+  const today = useMemo(() => {
+    const d = new Date();
+    d.setHours(0, 0, 0, 0);
+    return d;
+  }, []);
+  const todayStr = toLocalDateString(today);
 
   if (!isOpen) return null;
 
@@ -249,7 +270,7 @@ export default function RecurringDeliveryModal({
           {/* Start date */}
           <div>
             <label className="block text-xs font-medium text-gray-600 mb-1">
-              Start date <span className="text-red-500">*</span>
+              Subscription Starts From <span className="text-red-500">*</span>
             </label>
             <input
               type="date"
@@ -337,6 +358,10 @@ export default function RecurringDeliveryModal({
                 , for{" "}
                 <span className="font-semibold text-gray-900">
                   {DURATION_LABELS[data.recurringDuration]}
+                </span>
+                . Your {DURATION_LABELS[data.recurringDuration]} cycle starts from{" "}
+                <span className="font-semibold text-gray-900">
+                  {formatDateVN(parseLocalDate(data.recurringStartDate) ?? today)}
                 </span>
                 .
               </p>

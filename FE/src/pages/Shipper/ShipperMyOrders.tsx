@@ -59,6 +59,12 @@ interface PaginationInfo {
     pages: number;
 }
 
+const isCodPayment = (paymentMethod?: string): boolean => {
+    if (!paymentMethod) return false;
+    const normalized = paymentMethod.toLowerCase();
+    return normalized === 'cod' || normalized === 'cash';
+};
+
 export default function ShipperMyOrders() {
     const [orders, setOrders] = useState<Order[]>([]);
     const [loading, setLoading] = useState(true);
@@ -350,6 +356,14 @@ export default function ShipperMyOrders() {
                                         <p className="text-2xl font-bold text-emerald-600">
                                             {order.totalAmount.toLocaleString('vi-VN')}₫
                                         </p>
+                                        {isCodPayment(order.paymentMethod) && (
+                                            <div className="mt-3 pt-3 border-t border-emerald-200">
+                                                <p className="text-xs text-amber-700 font-semibold">COD - Shipper needs to collect</p>
+                                                <p className="text-lg font-bold text-amber-700">
+                                                    {order.totalAmount.toLocaleString('vi-VN')}₫
+                                                </p>
+                                            </div>
+                                        )}
                                     </div>
 
                                     {order.status === 'shipped' && (

@@ -14,6 +14,7 @@ export class SubscriptionController {
         addressId,
         frequency,
         deliveryDay,
+        startDate,
         nextDeliveryDate,
         items,
         discountRate,
@@ -44,6 +45,11 @@ export class SubscriptionController {
         priceAtSubscription: item.priceAtSubscription
       }));
 
+      const resolvedStartDate = startDate ? new Date(startDate) : new Date();
+      if (Number.isNaN(resolvedStartDate.getTime())) {
+        throw new AppError('Invalid startDate', 400);
+      }
+
       const subscription = await Subscription.create({
         userId,
         addressId: addressId || null,
@@ -52,7 +58,7 @@ export class SubscriptionController {
         deliveryDay,
         nextDeliveryDate: new Date(nextDeliveryDate),
         status: 'active',
-        startDate: new Date(),
+        startDate: resolvedStartDate,
         discountRate: discountRate ?? 0.05,
         paymentMethod: paymentMethod ?? 'COD',
         notes
