@@ -16,6 +16,9 @@ import {
   CreditCard,
   User,
   CalendarDays,
+  Phone,
+  Mail,
+  Truck,
   CircleDollarSign,
   StickyNote,
   Filter,
@@ -164,6 +167,7 @@ interface OrderDetailModalProps {
   onConfirm: (id: string) => void;
   onCancel: (id: string) => void;
   loading: boolean;
+  subOrders?: Order[];
 }
 
 const OrderDetailModal = ({
@@ -173,6 +177,7 @@ const OrderDetailModal = ({
   onConfirm,
   onCancel,
   loading,
+  subOrders = [],
 }: OrderDetailModalProps) => {
   if (!order) return null;
 
@@ -222,7 +227,7 @@ const OrderDetailModal = ({
                 </p>
               </div>
             </div>
-            <div className="flex items-start gap-3 p-3 rounded-lg border bg-white">
+            {/* <div className="flex items-start gap-3 p-3 rounded-lg border bg-white">
               <User className="w-4 h-4 text-emerald-600 mt-0.5 flex-shrink-0" />
               <div>
                 <p className="text-xs text-gray-500 font-medium">Customer</p>
@@ -235,31 +240,125 @@ const OrderDetailModal = ({
                   <p className="text-sm text-gray-900 font-mono">{order.userId as string}</p>
                 )}
               </div>
+            </div> */}
+          </div>
+
+          {/* Delivery Info */}
+          {(order.deliveryInfo || order.notes) && (
+            <div className="rounded-xl border bg-blue-50 border-blue-100 p-4 space-y-3">
+              <h4 className="text-sm font-semibold text-blue-800 flex items-center gap-1.5">
+                <Truck className="w-4 h-4" />
+                Delivery Info
+              </h4>
+              {order.deliveryInfo && (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  {order.deliveryInfo.fullName && (
+                    <div className="flex items-center gap-2">
+                      <User className="w-3.5 h-3.5 text-blue-500 flex-shrink-0" />
+                      <div>
+                        <p className="text-[10px] text-blue-500 font-medium uppercase tracking-wide">Recipient</p>
+                        <p className="text-sm text-gray-900 font-semibold">{order.deliveryInfo.fullName}</p>
+                      </div>
+                    </div>
+                  )}
+                  {order.deliveryInfo.phone && (
+                    <div className="flex items-center gap-2">
+                      <Phone className="w-3.5 h-3.5 text-blue-500 flex-shrink-0" />
+                      <div>
+                        <p className="text-[10px] text-blue-500 font-medium uppercase tracking-wide">Phone</p>
+                        <p className="text-sm text-gray-900 font-semibold">{order.deliveryInfo.phone}</p>
+                      </div>
+                    </div>
+                  )}
+                  {order.deliveryInfo.email && (
+                    <div className="flex items-center gap-2">
+                      <Mail className="w-3.5 h-3.5 text-blue-500 flex-shrink-0" />
+                      <div>
+                        <p className="text-[10px] text-blue-500 font-medium uppercase tracking-wide">Email</p>
+                        <p className="text-sm text-gray-900 font-semibold">{order.deliveryInfo.email}</p>
+                      </div>
+                    </div>
+                  )}
+                  {order.deliveryInfo.type && (
+                    <div className="flex items-center gap-2">
+                      <Truck className="w-3.5 h-3.5 text-blue-500 flex-shrink-0" />
+                      <div>
+                        <p className="text-[10px] text-blue-500 font-medium uppercase tracking-wide">Type</p>
+                        <p className="text-sm text-gray-900 font-semibold capitalize">{order.deliveryInfo.type}</p>
+                      </div>
+                    </div>
+                  )}
+                  {order.deliveryInfo.address && (
+                    <div className="flex items-start gap-2 sm:col-span-2">
+                      <MapPin className="w-3.5 h-3.5 text-blue-500 flex-shrink-0 mt-0.5" />
+                      <div>
+                        <p className="text-[10px] text-blue-500 font-medium uppercase tracking-wide">Address</p>
+                        <p className="text-sm text-gray-900">{order.deliveryInfo.address}</p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+              {order.notes && (
+                <div className="flex items-start gap-2 pt-2 border-t border-blue-200">
+                  <StickyNote className="w-3.5 h-3.5 text-blue-500 flex-shrink-0 mt-0.5" />
+                  <div>
+                    <p className="text-[10px] text-blue-500 font-medium uppercase tracking-wide">Notes</p>
+                    <p className="text-sm text-gray-700 italic">{order.notes}</p>
+                  </div>
+                </div>
+              )}
             </div>
-            <div className="flex items-start gap-3 p-3 rounded-lg border bg-white">
-              <MapPin className="w-4 h-4 text-emerald-600 mt-0.5 flex-shrink-0" />
-              <div>
-                <p className="text-xs text-gray-500 font-medium">Shipping Address</p>
-                {typeof order.addressId === 'object' && order.addressId !== null ? (
-                  <>
-                    {(order.addressId as any).street && (
-                      <p className="text-sm text-gray-900 font-semibold">{(order.addressId as any).street}</p>
-                    )}
-                    {(order.addressId as any).city && (
-                      <p className="text-xs text-gray-500">
-                        {(order.addressId as any).city}{(order.addressId as any).province ? `, ${(order.addressId as any).province}` : ''}
-                      </p>
-                    )}
-                    {!(order.addressId as any).street && (
-                      <p className="text-sm text-gray-900 font-mono">{(order.addressId as any)._id}</p>
-                    )}
-                  </>
-                ) : (
-                  <p className="text-sm text-gray-900 font-mono">{order.addressId as string ?? '—'}</p>
+          )}
+
+          {/* Order Type */}
+          {(order.orderType || order.deliveryInfo?.type) && (
+            <div className="rounded-xl border bg-gray-50 p-4">
+              <h4 className="text-sm font-semibold text-gray-700 flex items-center gap-1.5 mb-3">
+                <Truck className="w-4 h-4 text-gray-500" />
+                Order Type
+              </h4>
+              <div className="flex flex-wrap items-center gap-3">
+                {/* Order type badge */}
+                {order.orderType && (() => {
+                  const typeConfig: Record<string, { label: string; className: string }> = {
+                    regular:      { label: 'Regular Order',    className: 'bg-gray-100 text-gray-800 border-gray-300' },
+                    group_buy:    { label: 'Group Buy',        className: 'bg-purple-100 text-purple-800 border-purple-200' },
+                    subscription: { label: 'Subscription',     className: 'bg-amber-100 text-amber-800 border-amber-200' },
+                  };
+                  const cfg = typeConfig[order.orderType] ?? { label: order.orderType, className: 'bg-gray-100 text-gray-700 border-gray-200' };
+                  return (
+                    <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-semibold border ${cfg.className}`}>
+                      <Package className="w-3.5 h-3.5" />
+                      {cfg.label}
+                    </span>
+                  );
+                })()}
+                {/* Delivery method badge */}
+                {order.deliveryInfo?.type === 'delivery' ? (
+                  <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-blue-100 text-blue-800 text-sm font-semibold border border-blue-200">
+                    <Truck className="w-3.5 h-3.5" />
+                    Delivery
+                  </span>
+                ) : order.deliveryInfo?.type === 'pickup' ? (
+                  <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-100 text-emerald-800 text-sm font-semibold border border-emerald-200">
+                    <Package className="w-3.5 h-3.5" />
+                    Pickup
+                  </span>
+                ) : null}
+                {order.deliveryInfo?.type === 'pickup' && order.pickupLocation && (
+                  <div className="flex items-center gap-1.5 text-sm text-gray-700">
+                    <MapPin className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
+                    <span>
+                      {order.pickupLocation.name && <strong>{order.pickupLocation.name}</strong>}
+                      {order.pickupLocation.name && order.pickupLocation.address && ' — '}
+                      {order.pickupLocation.address}
+                    </span>
+                  </div>
                 )}
               </div>
             </div>
-          </div>
+          )}
 
           {/* Order items */}
           <div>
@@ -327,8 +426,86 @@ const OrderDetailModal = ({
             </div>
           </div>
 
+          {/* Group Packing List — only for group_buy main orders */}
+          {order.orderType === 'group_buy' && (
+            <div className="rounded-xl border bg-violet-50 border-violet-100 p-4 space-y-4">
+              <h4 className="text-sm font-semibold text-violet-800 flex items-center gap-1.5">
+                <Package className="w-4 h-4" />
+                Group Packing List
+              </h4>
+
+              {/* Owner's items */}
+              <div>
+                <p className="text-xs font-bold text-violet-700 mb-1.5">📦 Owner's items (delivery address)</p>
+                <div className="border rounded-lg overflow-hidden bg-white">
+                  <Table>
+                    <TableHeader>
+                      <TableRow className="bg-violet-50">
+                        <TableHead className="text-xs">Product</TableHead>
+                        <TableHead className="text-xs text-center">Qty</TableHead>
+                        <TableHead className="text-xs text-right">Subtotal</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {order.items.map((item, idx) => (
+                        <TableRow key={idx}>
+                          <TableCell className="text-xs text-gray-800 font-medium">
+                            {typeof item.productId === 'object' && item.productId !== null
+                              ? (item.productId as any).name ?? (item.productId as any)._id
+                              : item.productId}
+                          </TableCell>
+                          <TableCell className="text-center text-sm">{item.quantity}</TableCell>
+                          <TableCell className="text-right text-sm font-semibold">{formatCurrency(item.subtotal)}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              </div>
+
+              {/* Member sub-orders */}
+              {subOrders.length > 0 ? subOrders.map((sub) => {
+                const memberName = sub.notes?.match(/\[member: (.+?)\]/)?.[1] ?? 'Member';
+                const displayName = typeof sub.userId === 'object' && sub.userId !== null
+                  ? (sub.userId as any).name ?? memberName
+                  : memberName;
+                return (
+                  <div key={sub._id}>
+                    <p className="text-xs font-bold text-violet-700 mb-1.5">👤 {displayName}'s items</p>
+                    <div className="border rounded-lg overflow-hidden bg-white">
+                      <Table>
+                        <TableHeader>
+                          <TableRow className="bg-violet-50">
+                            <TableHead className="text-xs">Product</TableHead>
+                            <TableHead className="text-xs text-center">Qty</TableHead>
+                            <TableHead className="text-xs text-right">Subtotal</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {sub.items.map((item, idx) => (
+                            <TableRow key={idx}>
+                              <TableCell className="text-xs text-gray-800 font-medium">
+                                {typeof item.productId === 'object' && item.productId !== null
+                                  ? (item.productId as any).name ?? (item.productId as any)._id
+                                  : item.productId}
+                              </TableCell>
+                              <TableCell className="text-center text-sm">{item.quantity}</TableCell>
+                              <TableCell className="text-right text-sm font-semibold">{formatCurrency(item.subtotal)}</TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  </div>
+                );
+              }) : (
+                <p className="text-xs text-violet-500 italic">Loading member sub-orders…</p>
+              )}
+            </div>
+          )}
+
           {/* Notes */}
-          {order.notes && (
+          {order.notes && !order.notes.startsWith('[member:') && (
             <div className="flex items-start gap-2 p-3 bg-amber-50 border border-amber-100 rounded-lg">
               <StickyNote className="w-4 h-4 text-amber-600 mt-0.5 flex-shrink-0" />
               <div>
@@ -392,6 +569,7 @@ export default function OrderConfirmation() {
   const [isDetailOpen, setIsDetailOpen] = useState(false);
   const [cancelTarget, setCancelTarget] = useState<string | null>(null);
   const [cancelReason, setCancelReason] = useState('');
+  const [groupSubOrders, setGroupSubOrders] = useState<Order[]>([]);
 
   // ── Search debounce ───────────────────────────────────────
 
@@ -448,7 +626,12 @@ export default function OrderConfirmation() {
     try {
       setActionLoading(true);
       await orderAPI.confirmOrder(id);
-      toast.success('Order confirmed successfully!');
+      const isGroupOrder = selectedOrder?.orderType === 'group_buy' || orders.find(o => o._id === id)?.orderType === 'group_buy';
+      toast.success(
+        isGroupOrder
+          ? 'Group order confirmed! All member sub-orders have been updated.'
+          : 'Order confirmed successfully!'
+      );
       setIsDetailOpen(false);
       fetchOrders();
       fetchPendingSummary();
@@ -477,15 +660,29 @@ export default function OrderConfirmation() {
     }
   };
 
-  const openDetail = (order: Order) => {
+  const openDetail = async (order: Order) => {
     setSelectedOrder(order);
+    setGroupSubOrders([]);
     setIsDetailOpen(true);
+    if (order.orderType === 'group_buy' && order.groupId) {
+      try {
+        const subs = await orderAPI.getOrdersByGroupId(order.groupId);
+        // Only keep sub-orders (notes start with [member:]), exclude the main order itself
+        setGroupSubOrders(subs.filter(s => s._id !== order._id && s.notes?.startsWith('[member:')));
+      } catch {
+        // non-critical
+      }
+    }
   };
 
   // ── Derived data ──────────────────────────────────────────
 
   const safeOrders = useMemo(() => (Array.isArray(orders) ? orders : []), [orders]);
-  const displayedOrders = safeOrders;
+  // Hide member sub-orders from the table; they are shown inside the group order detail
+  const displayedOrders = useMemo(
+    () => safeOrders.filter(o => !o.notes?.startsWith('[member:')),
+    [safeOrders]
+  );
 
   const stats = useMemo(() => ({
     total:        totalItems,
@@ -682,8 +879,16 @@ export default function OrderConfirmation() {
                       </TableCell>
 
                       {/* Order ID */}
-                      <TableCell className="font-mono text-xs text-gray-500 max-w-[160px] truncate">
-                        {order._id}
+                      <TableCell className="font-mono text-xs text-gray-500 max-w-[160px]">
+                        <div className="flex flex-col gap-1">
+                          <span className="truncate block">{order._id}</span>
+                          {order.orderType === 'group_buy' && (
+                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] bg-purple-100 text-purple-700 rounded-full font-semibold w-fit">
+                              <Package className="w-2.5 h-2.5" />
+                              Group
+                            </span>
+                          )}
+                        </div>
                       </TableCell>
 
                       {/* Date */}
@@ -809,6 +1014,7 @@ export default function OrderConfirmation() {
           setCancelTarget(id);
         }}
         loading={actionLoading}
+        subOrders={groupSubOrders}
       />
 
       {/* ── Cancel Alert Dialog ──────────────────── */}

@@ -257,9 +257,18 @@ export class ProductService {
       }
     }
 
+    // Strip empty-string / null / undefined values so required-field validators
+    // inside findByIdAndUpdate (runValidators: true) don't reject empty strings
+    // that were sent for fields the user didn't actually intend to clear.
+    const cleanData = Object.fromEntries(
+      Object.entries(data as Record<string, any>).filter(
+        ([_, v]) => v !== '' && v !== null && v !== undefined
+      )
+    );
+
     const product = await Product.findByIdAndUpdate(
       id,
-      { $set: data },
+      { $set: cleanData },
       { new: true, runValidators: true }
     ).populate('farmer', 'name email phone');
 

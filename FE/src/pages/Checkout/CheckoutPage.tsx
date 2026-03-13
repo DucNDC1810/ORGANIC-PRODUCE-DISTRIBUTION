@@ -132,8 +132,50 @@ export default function CheckoutPage() {
   const [voucherDiscount, setVoucherDiscount] = useState(0);
   const [appliedVoucher, setAppliedVoucher] = useState<string>("");
   const [voucherError, setVoucherError] = useState(""); // voucher-specific error
+
+  // ── Active voucher picker ─────────────────────────────────────────────────
+  const [showVoucherPicker, setShowVoucherPicker] = useState(false);
+  const [activeVouchers, setActiveVouchers] = useState<import("../../services/voucherService").Voucher[]>([]);
+  const [vouchersLoading, setVouchersLoading] = useState(false);
+  const [applyingVoucherCode, setApplyingVoucherCode] = useState<string>("");
+
+  useEffect(() => {
+    setVouchersLoading(true);
+    voucherService.getActiveVouchers(1, 50, (user as any)?._id)
+      .then((res: any) => setActiveVouchers(res?.data ?? []))
+      .catch(() => setActiveVouchers([]))
+      .finally(() => setVouchersLoading(false));
+  }, [user]);
+
+  const handleSelectVoucher = async (code: string) => {
+    try {
+      setApplyingVoucherCode(code);
+      setVoucherError("");
+      const response = await voucherService.validateVoucher(code, {
+        purchaseAmount: subtotal,
+        userId: (user as any)?._id,
+      });
+      setVoucherDiscount(response.data.discountValue);
+      setAppliedVoucher(code);
+      setFormData((p) => ({ ...p, promoCode: code }));
+      setShowVoucherPicker(false);
+    } catch (err: any) {
+      setVoucherError(err.response?.data?.message || "Voucher không hợp lệ");
+    } finally {
+      setApplyingVoucherCode("");
+    }
+  };
+  // ─────────────────────────────────────────────────────────────────────────
+
   const [showStoreModal, setShowStoreModal] = useState(false);
   const [selectedStore, setSelectedStore] = useState<StoreData | null>(null);
+
+  // Lock body scroll whenever any modal overlay is visible
+  useEffect(() => {
+    const locked = showConfirmModal || showStoreModal || showRecurringModal;
+    document.body.style.overflow = locked ? 'hidden' : '';
+    return () => { document.body.style.overflow = ''; };
+  }, [showConfirmModal, showStoreModal, showRecurringModal]);
 
   // ── Wallet ────────────────────────────────────────────────────────────────
   const [walletBalance, setWalletBalance] = useState<number>(0);
@@ -366,12 +408,9 @@ export default function CheckoutPage() {
     try {
       setLoading(true);
       setVoucherError("");
-      // const response = await voucherService.validateVoucher(
-      //   formData.promoCode,
-      //   { purchaseAmount: subtotal }
-      // );
       const response = await voucherService.validateVoucher(code, {
         purchaseAmount: subtotal,
+        userId: (user as any)?._id,
       });
       setVoucherDiscount(response.data.discountValue);
       setAppliedVoucher(code);
@@ -458,6 +497,7 @@ export default function CheckoutPage() {
           paymentMethod: "momo",
           amount: total,
           description: `Order payment from FreshMarket - ${formData.fullName}`,
+          ...(appliedVoucher ? { voucherCode: appliedVoucher, discountAmount: groupDiscount + recurringDiscount + voucherDiscount } : {}),
           ...(activeGroupId
             ? { groupId: activeGroupId, isGroupOrder: true, groupDiscount, groupDiscountPct }
             : {}),
@@ -484,6 +524,9 @@ export default function CheckoutPage() {
           ...(deliveryType === 'pickup' && selectedStore
             ? { pickupLocation: { name: selectedStore.name, address: selectedStore.address } }
             : {}),
+          isRecurring: isRecurringOrder,
+          subscriptionFrequency: isRecurringOrder ? (recurringData?.recurringFrequency ?? undefined) : undefined,
+          discountAmount: recurringDiscount > 0 ? recurringDiscount : undefined,
         });
 
         const momoResponse = response as any;
@@ -555,6 +598,10 @@ export default function CheckoutPage() {
           notes: formData.notes,
           paymentMethod: "cod",
           totalAmount: total,
+          ...(appliedVoucher ? { voucherCode: appliedVoucher, discountAmount: groupDiscount + recurringDiscount + voucherDiscount } : {}),
+          isRecurring: isRecurringOrder,
+          subscriptionFrequency: isRecurringOrder ? (recurringData?.recurringFrequency ?? undefined) : undefined,
+          discountAmount: recurringDiscount > 0 ? recurringDiscount : undefined,
           ...(activeGroupId
             ? {
                 groupId: activeGroupId,
@@ -674,6 +721,7 @@ export default function CheckoutPage() {
           notes: formData.notes || undefined,
           shippingCost: shipping,
           discountAmount: groupDiscount + recurringDiscount + voucherDiscount,
+          ...(appliedVoucher ? { voucherCode: appliedVoucher } : {}),
         } as any);
 
         const result = (response as any)?.data || response;
@@ -1427,6 +1475,17 @@ export default function CheckoutPage() {
                             </button>
                           </div>
                         </div>
+                        {/* Stock warning */}
+                        {(() => {
+                          const q = localQty[item.id] ?? item.quantity;
+                          const s = (item as any).stock;
+                          return s !== undefined && q >= s ? (
+                            <p className="text-xs text-red-500 mt-1 flex items-center gap-1">
+                              <AlertCircle className="w-3 h-3 flex-shrink-0" />
+                               {s} products left in stock
+                            </p>
+                          ) : null;
+                        })()}
                       </div>
                     </div>
                   ))}
@@ -1442,14 +1501,23 @@ export default function CheckoutPage() {
                 <h3 className="text-base font-semibold text-gray-800 mb-3">
                   Promo code
                 </h3>
-                {/*                 
-                <button className="w-full flex items-center justify-between p-3 mb-3 border border-gray-300 rounded-lg text-left hover:border-primary transition-colors">
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm">🎫</span>
-                    <span className="text-sm text-gray-600">Chọn mã</span>
-                  </div>
-                  <span className="text-gray-400">›</span>
-                </button> */}
+
+                {/* Nút chọn voucher từ danh sách */}
+                {!appliedVoucher && (
+                  <button
+                    type="button"
+                    onClick={() => setShowVoucherPicker(true)}
+                    className="w-full flex items-center justify-between p-3 mb-3 border border-dashed border-primary rounded-lg text-left hover:bg-primary/5 transition-colors"
+                  >
+                    <div className="flex items-center gap-2">
+                      <span className="text-base">🎫</span>
+                      <span className="text-sm text-primary font-medium">
+                        {vouchersLoading ? "Loading voucher..." : "Choose voucher"}
+                      </span>
+                    </div>
+                    <span className="text-primary text-lg">›</span>
+                  </button>
+                )}
 
                 <div className="space-y-2">
                   <div className="flex gap-2">
@@ -1483,8 +1551,98 @@ export default function CheckoutPage() {
                 </div>
 
                 {appliedVoucher && (
-                  <div className="mt-2 p-2 bg-green-50 border border-green-200 rounded text-green-700 text-xs">
-                    ✓ Code {appliedVoucher} has been applied
+                  <div className="mt-2 p-2 bg-green-50 border border-green-200 rounded-lg flex items-center justify-between">
+                    <span className="text-green-700 text-xs font-medium">✓ Code <strong>{appliedVoucher}</strong> đã được áp dụng</span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setAppliedVoucher("");
+                        setVoucherDiscount(0);
+                        setFormData((p) => ({ ...p, promoCode: "" }));
+                      }}
+                      className="text-gray-400 hover:text-red-500 transition-colors ml-2"
+                      title="Xoá voucher"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                )}
+
+                {/* Voucher picker modal */}
+                {showVoucherPicker && (
+                  <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40">
+                    <div className="bg-white w-full max-w-md rounded-t-2xl sm:rounded-2xl shadow-xl flex flex-col max-h-[80vh]">
+                      {/* Header */}
+                      <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
+                        <h4 className="font-semibold text-gray-800 text-base">Chọn voucher</h4>
+                        <button
+                          type="button"
+                          onClick={() => setShowVoucherPicker(false)}
+                          className="text-gray-400 hover:text-gray-600"
+                        >
+                          <X className="w-5 h-5" />
+                        </button>
+                      </div>
+
+                      {/* Danh sách */}
+                      <div className="overflow-y-auto flex-1 p-4 space-y-3">
+                        {vouchersLoading ? (
+                          <div className="flex justify-center py-10">
+                            <Loader className="w-6 h-6 animate-spin text-primary" />
+                          </div>
+                        ) : activeVouchers.length === 0 ? (
+                          <p className="text-center text-gray-500 text-sm py-10">Hiện không có voucher khả dụng</p>
+                        ) : (
+                          activeVouchers.map((v) => {
+                            const isEligible = !v.minPurchaseAmount || subtotal >= v.minPurchaseAmount;
+                            const isApplying = applyingVoucherCode === v.code;
+                            const discountLabel =
+                              v.discountType === "percentage"
+                                ? `Giảm ${v.discountPercentage}%${v.maxDiscountAmount ? ` (tối đa ${v.maxDiscountAmount.toLocaleString("vi-VN")}₫)` : ""}`
+                                : `Giảm ${(v.discountAmount ?? 0).toLocaleString("vi-VN")}₫`;
+                            return (
+                              <button
+                                key={v._id}
+                                type="button"
+                                disabled={!isEligible || !!applyingVoucherCode}
+                                onClick={() => handleSelectVoucher(v.code)}
+                                className={`w-full text-left rounded-xl border p-3 transition-colors ${
+                                  isEligible
+                                    ? "border-gray-200 hover:border-primary hover:bg-primary/5 cursor-pointer"
+                                    : "border-gray-100 opacity-50 cursor-not-allowed bg-gray-50"
+                                }`}
+                              >
+                                <div className="flex items-start gap-3">
+                                  <span className="text-xl mt-0.5">{isApplying ? <Loader className="w-5 h-5 animate-spin text-primary" /> : "🎫"}</span>
+                                  <div className="flex-1 min-w-0">
+                                    <div className="flex items-center gap-2 flex-wrap">
+                                      <span className="font-bold text-sm text-gray-800 tracking-wide">{v.code}</span>
+                                      <span className="text-xs px-2 py-0.5 rounded-full bg-green-100 text-green-700 font-medium">
+                                        {discountLabel}
+                                      </span>
+                                    </div>
+                                    {v.description && (
+                                      <p className="text-xs text-gray-500 mt-0.5 truncate">{v.description}</p>
+                                    )}
+                                    <div className="flex items-center gap-3 mt-1 flex-wrap">
+                                      {v.minPurchaseAmount ? (
+                                        <span className={`text-xs ${isEligible ? "text-gray-400" : "text-red-400"}`}>
+                                          Đơn tối thiểu {v.minPurchaseAmount.toLocaleString("vi-VN")}₫
+                                          {!isEligible && ` (thiếu ${(v.minPurchaseAmount - subtotal).toLocaleString("vi-VN")}₫)`}
+                                        </span>
+                                      ) : null}
+                                      <span className="text-xs text-gray-400">
+                                        HSD: {new Date(v.expiryDate).toLocaleDateString("vi-VN")}
+                                      </span>
+                                    </div>
+                                  </div>
+                                </div>
+                              </button>
+                            );
+                          })
+                        )}
+                      </div>
+                    </div>
                   </div>
                 )}
               </div>
@@ -1676,24 +1834,27 @@ export default function CheckoutPage() {
               <div className="rounded-xl border border-gray-100 overflow-hidden">
                 <div className="px-3 py-1.5 bg-gray-50 border-b border-gray-100">
                   <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
-                    Products ({checkoutItems.length})
+                    Products ({checkoutItems.reduce((s, i) => s + (localQty[i.id] ?? i.quantity), 0)})
                   </p>
                 </div>
                 <div className="divide-y divide-gray-50">
-                  {checkoutItems.map((item) => (
-                    <div key={item.id} className="flex items-center gap-2.5 px-3 py-2">
-                      <div className="w-8 h-8 bg-gray-100 rounded-lg overflow-hidden flex-shrink-0">
-                        <img src={item.image} alt={item.name} className="w-full h-full object-cover" />
+                  {checkoutItems.map((item) => {
+                    const qty = localQty[item.id] ?? item.quantity;
+                    return (
+                      <div key={item.id} className="flex items-center gap-2.5 px-3 py-2">
+                        <div className="w-8 h-8 bg-gray-100 rounded-lg overflow-hidden flex-shrink-0">
+                          <img src={item.image} alt={item.name} className="w-full h-full object-cover" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs font-medium text-gray-800 truncate">{item.name}</p>
+                          <p className="text-xs text-gray-400">x{qty}</p>
+                        </div>
+                        <span className="text-xs font-semibold text-gray-800 flex-shrink-0">
+                          {(item.price * qty).toLocaleString("vi-VN")}₫
+                        </span>
                       </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-xs font-medium text-gray-800 truncate">{item.name}</p>
-                        <p className="text-xs text-gray-400">x{item.quantity}</p>
-                      </div>
-                      <span className="text-xs font-semibold text-gray-800 flex-shrink-0">
-                        {(item.price * item.quantity).toLocaleString("vi-VN")}₫
-                      </span>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
 

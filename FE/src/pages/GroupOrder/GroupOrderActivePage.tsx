@@ -28,6 +28,7 @@ import { toast } from "sonner";
 import Header from "../../components/Header";
 import { groupService, type GroupMember as APIMember } from "../../services/groupService";
 import walletService from "../../services/walletService";
+import { useCart } from "../../context/CartContext";
 
 // ─── QuickTopupModal ─────────────────────────────────────────────────────────
 
@@ -192,8 +193,10 @@ const TIERS = [
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-function fmtVND(n: number) {
-  return n.toLocaleString("vi-VN") + "đ";
+function fmtVND(n: number | undefined | null) {
+  const v = Number(n);
+  if (!isFinite(v) || isNaN(v)) return '0đ';
+  return v.toLocaleString("vi-VN") + "đ";
 }
 
 function calcProgress(count: number) {
@@ -221,25 +224,22 @@ export default function GroupOrderActivePage() {
   const navigate  = useNavigate();
   const location  = useLocation();
   const { groupSession, setGroupSession, clearGroupSession } = useGroup();
+  const { clearCart } = useCart();
   const groupName = (location.state as any)?.groupName ?? groupSession?.groupName ?? "Group Order";
   const groupId   = ((location.state as any)?.groupId as string | undefined) ?? groupSession?.groupId;
 
-  // Map cart items from checkout (CartContext shape) → local CartItem shape
+  // Map cart items from checkout (CartContext shape) OR restored local format → local CartItem shape
+  // Checkout format: { id, name, price, quantity, image }
+  // Restored format (from sessionStorage after MoMo topup): { id, productId, name, price, qty, image, unit }
   const initialCart: CartItem[] = ((location.state as any)?.cartItems ?? []).length > 0
-    ? ((location.state as any).cartItems as Array<{
-        id: string;
-        name: string;
-        price: number;
-        quantity: number;
-        image: string;
-      }>).map((item, idx) => ({
+    ? ((location.state as any).cartItems as Array<any>).map((item, idx) => ({
         id: idx + 1,
-        productId: item.id,
-        name: item.name,
-        price: item.price,
-        qty: item.quantity,
+        productId: String(item.productId || item.id || ''),
+        name: item.name ?? '',
+        price: Number(item.price) || 0,
+        qty: Number(item.qty ?? item.quantity) || 1,
         image: item.image || "🛒",
-        unit: "serving",
+        unit: item.unit || "serving",
       }))
     : [];
 
@@ -424,8 +424,8 @@ export default function GroupOrderActivePage() {
   // The owner's member record on the server has empty cartItems; local cart is source of truth.
   const getMemberTotalQty = (m: APIMember): number => {
     if (m.role === "owner")
-      return cart.reduce((s, i) => s + i.qty, 0);
-    return (m.cartItems ?? []).reduce((s, i) => s + i.qty, 0);
+      return cart.reduce((s, i) => s + (Number(i.qty) || 0), 0);
+    return (m.cartItems ?? []).reduce((s, i) => s + (Number(i.qty) || 0), 0);
   };
 
   const isMemberOrdered = (m: APIMember): boolean => {
@@ -440,11 +440,11 @@ export default function GroupOrderActivePage() {
   const nextTier      = TIERS[activeTierIdx + 1];
   const progress      = calcProgress(joinedCount);
 
-  const ownerCartSubtotal = cart.reduce((s, i) => s + i.price * i.qty, 0);
+  const ownerCartSubtotal = cart.reduce((s, i) => s + (Number(i.price) || 0) * (Number(i.qty) || 0), 0);
   const hasOwnerInMembers  = members.some((m) => m.role === "owner");
   const groupSubtotal = members.reduce((s, m) => {
     const memberCart = m.role === "owner" ? cart : (m.cartItems ?? []);
-    return s + memberCart.reduce((cs, i) => cs + i.price * i.qty, 0);
+    return s + memberCart.reduce((cs, i) => cs + (Number(i.price) || 0) * (Number(i.qty) || 0), 0);
   }, 0) + (hasOwnerInMembers ? 0 : ownerCartSubtotal);
   const subtotal   = groupSubtotal;
   const discount   = Math.round(groupSubtotal * activePct / 100);
@@ -453,14 +453,19 @@ export default function GroupOrderActivePage() {
   const ownerDiscountPct = members.length > 0 ? activePct / members.length : activePct;
   const ownerDiscount = Math.round(ownerCartSubtotal * ownerDiscountPct / 100);
 
-  // equal_split rounding: non-owner members pay ceil, owner pays remainder
+  // equal_split: mỗi người trả Math.round(groupNetTotal / memberCount), owner trả phần còn lại
   const groupNetTotal    = total + 25000;
   const nonOwnerCount    = members.filter((m) => m.role !== 'owner').length;
-  const memberEqualShare = members.length > 0 ? Math.ceil(groupNetTotal / members.length) : groupNetTotal;
+  const memberEqualShare = members.length > 0 ? Math.round(groupNetTotal / members.length) : groupNetTotal;
   const ownerEqualShare  = Math.max(0, groupNetTotal - nonOwnerCount * memberEqualShare);
   const allNonOwnerPaid  = nonOwnerCount > 0 && members.filter((m) => m.role !== 'owner').every((m) => m.walletPaid);
 
   const allOrdered = members.length > 0 && members.every(isMemberOrdered);
+
+  // ── All non-owner members must be Ready before owner can pay ──
+  const nonOwnerMembers = members.filter((m) => m.role !== 'owner');
+  const isAllMembersReady = nonOwnerMembers.length === 0 || nonOwnerMembers.every((m) => m.isReady);
+  const notReadyMembers = nonOwnerMembers.filter((m) => !m.isReady);
 
   // Total amount already held from members' wallets (deposits)
   const totalHeld      = members
@@ -509,6 +514,7 @@ export default function GroupOrderActivePage() {
       const result = await groupService.placeGroupOrder(groupId, ownerCartItems);
       const ownerMember = members.find((m) => m.role === "owner");
       const ownerName   = ownerMember ? getMemberName(ownerMember) : "Group Owner";
+      await clearCart(true);
       navigate("/group-order/owner-success", {
         replace: true,
         state: {
@@ -544,10 +550,10 @@ export default function GroupOrderActivePage() {
       await groupService.cancelGroup(groupId);
       const msg = paymentOption === 'owner_only'
         ? "Group order deleted successfully."
-        : "Group order cancelled. Deposits have been refunded to all members."; 
+        : "Group order cancelled. Deposits have been refunded to all members.";
       toast.success(msg, { duration: 6000 });
       clearGroupSession();
-      navigate("/checkout");
+      navigate("/");
     } catch (err: any) {
       const msg = err?.response?.data?.message || "Cancellation failed. Please try again."; 
       toast.error(msg);
@@ -1137,12 +1143,40 @@ export default function GroupOrderActivePage() {
             </div>
           )}
 
+          {/* ── Waiting for members feedback ── */}
+          {!isAllMembersReady && notReadyMembers.length > 0 && (
+            <motion.div
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="bg-amber-50 border border-amber-200 rounded-2xl px-4 py-3.5 flex items-start gap-3"
+            >
+              <div className="w-8 h-8 rounded-full bg-amber-100 flex items-center justify-center flex-shrink-0 mt-0.5">
+                <AlertTriangle className="w-4 h-4 text-amber-600" />
+              </div>
+              <div>
+                <p className="text-sm font-bold text-amber-800">Waiting for members to confirm</p>
+                <div className="mt-1.5 space-y-1">
+                  {notReadyMembers.map((m) => (
+                    <p key={m._id} className="text-xs text-amber-700 flex items-center gap-1.5">
+                      <span className="w-1.5 h-1.5 rounded-full bg-amber-400 flex-shrink-0" />
+                      Waiting for <span className="font-bold">{getMemberName(m)}</span> to confirm their items…
+                    </p>
+                  ))}
+                </div>
+              </div>
+            </motion.div>
+          )}
+
           {/* ── Chốt đơn / Nạp thêm button ── */}
           {walletBalance < ownerRemaining && ownerRemaining > 0 ? (
             <button
               onClick={() => setShowTopupModal(true)}
-              disabled={cart.length === 0}
-              className="w-full py-4 rounded-2xl bg-gradient-to-r from-pink-500 to-rose-500 text-white text-base font-extrabold shadow-lg hover:from-pink-600 hover:to-rose-600 active:scale-[0.98] transition-all duration-150 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+              disabled={cart.length === 0 || !isAllMembersReady}
+              className={`w-full py-4 rounded-2xl text-white text-base font-extrabold shadow-lg active:scale-[0.98] transition-all duration-300 flex items-center justify-center gap-2 disabled:cursor-not-allowed ${
+                !isAllMembersReady
+                  ? 'bg-gray-300 shadow-none'
+                  : 'bg-gradient-to-r from-pink-500 to-rose-500 hover:from-pink-600 hover:to-rose-600 disabled:opacity-50'
+              }`}
             >
               <Wallet className="w-5 h-5" />
               Top up {fmtVND(ownerRemaining - walletBalance)} to pay
@@ -1150,8 +1184,12 @@ export default function GroupOrderActivePage() {
           ) : (
             <button
               onClick={() => setShowPlaceConfirm(true)}
-              disabled={placeOrderLoading || cart.length === 0 || (paymentOption === 'equal_split' && !allNonOwnerPaid)}
-              className="w-full py-4 rounded-2xl bg-gradient-to-r from-green-600 to-emerald-500 text-white text-base font-extrabold shadow-lg hover:from-green-700 hover:to-emerald-600 active:scale-[0.98] transition-all duration-150 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+              disabled={placeOrderLoading || cart.length === 0 || !isAllMembersReady || (paymentOption === 'equal_split' && !allNonOwnerPaid && nonOwnerCount > 0) || (paymentOption === 'individual' && !allNonOwnerPaid && nonOwnerCount > 0)}
+              className={`w-full py-4 rounded-2xl text-white text-base font-extrabold shadow-lg active:scale-[0.98] transition-all duration-300 flex items-center justify-center gap-2 disabled:cursor-not-allowed ${
+                !isAllMembersReady || (paymentOption === 'individual' && !allNonOwnerPaid && nonOwnerCount > 0)
+                  ? 'bg-gray-300 shadow-none'
+                  : 'bg-gradient-to-r from-green-600 to-emerald-500 hover:from-green-700 hover:to-emerald-600 disabled:opacity-50'
+              }`}
             >
               {placeOrderLoading ? (
                 <><Loader2 className="w-5 h-5 animate-spin" /> Processing...</>
@@ -1164,19 +1202,19 @@ export default function GroupOrderActivePage() {
               )}
             </button>
           )}
-          {paymentOption === 'individual' && (
+          {isAllMembersReady && paymentOption === 'individual' && allNonOwnerPaid && (
             <p className="text-center text-xs text-gray-400 -mt-1">
               You are paying for your selected items only
             </p>
           )}
-          {paymentOption === 'equal_split' && !allNonOwnerPaid && nonOwnerCount > 0 && (
+          {isAllMembersReady && paymentOption === 'individual' && !allNonOwnerPaid && nonOwnerCount > 0 && (
             <p className="text-center text-xs text-amber-500 font-medium -mt-1">
-              ⚠ {members.filter((m) => m.role !== 'owner' && !m.walletPaid).length}/{nonOwnerCount} members haven't contributed yet
+              ⚠ Waiting for {members.filter((m) => m.role !== 'owner' && !m.walletPaid).length}/{nonOwnerCount} members to deposit their share
             </p>
           )}
-          {!allOrdered && !(paymentOption === 'equal_split' && !allNonOwnerPaid) && (
+          {isAllMembersReady && paymentOption === 'equal_split' && !allNonOwnerPaid && nonOwnerCount > 0 && (
             <p className="text-center text-xs text-amber-500 font-medium -mt-1">
-              ⚠ {members.filter((m) => !m.isReady).length} members haven't chosen items yet
+              ⚠ {members.filter((m) => m.role !== 'owner' && !m.walletPaid).length}/{nonOwnerCount} members haven't contributed yet
             </p>
           )}
 

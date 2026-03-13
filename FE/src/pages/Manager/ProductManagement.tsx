@@ -29,13 +29,14 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { toast } from 'sonner';
 import { useProducts } from '../../hooks/useProducts';
 import { useCategories } from '../../hooks/useCategories';
-import { Product } from '../../services/productService';
+import { Product, productService } from '../../services/productService';
 
 // Form validation helper
 const validateProductForm = (data: any) => {
   const errors: Record<string, string> = {};
   
   if (!data.name?.trim()) errors.name = 'Product name is required';
+  if (!data.description?.trim()) errors.description = 'Description is required';
   if (!data.category) errors.category = 'Category is required';
   if (!data.price || data.price <= 0) errors.price = 'Valid price is required';
   if (!data.stock || data.stock < 0) errors.stock = 'Valid stock quantity is required';
@@ -60,6 +61,9 @@ export default function AdminProductManagement() {
   } = useProducts();
   
   const { categories, fetchCategories } = useCategories();
+
+  // All-products stats (independent of pagination)
+  const [allProductStats, setAllProductStats] = useState({ total: 0, inStock: 0, lowStock: 0, outOfStock: 0 });
 
   // Local state
   const [searchQuery, setSearchQuery] = useState('');
@@ -92,11 +96,33 @@ export default function AdminProductManagement() {
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // Load all-products stats (not affected by pagination/filters)
+  const loadStats = async () => {
+    try {
+      const res = await productService.getProductStats();
+      if (res.success) {
+        const d = res.data;
+        setAllProductStats({
+          total: d.totalProducts,
+          inStock: d.totalProducts - d.lowStockProducts - d.outOfStockProducts,
+          lowStock: d.lowStockProducts,
+          outOfStock: d.outOfStockProducts,
+        });
+      }
+    } catch {
+      // silently ignore stats error
+    }
+  };
+
   // Load initial data
   useEffect(() => {
     loadProducts();
     fetchCategories({ isActive: true });
   }, [currentPage, selectedCategory, selectedStatus, searchQuery]);
+
+  useEffect(() => {
+    loadStats();
+  }, []);
 
   // Load products with filters
   const loadProducts = async () => {
@@ -186,6 +212,7 @@ export default function AdminProductManagement() {
         setIsAddDialogOpen(false);
         resetForm();
         loadProducts();
+        loadStats();
       }
     } catch (error: any) {
       toast.error(error.message || 'Failed to create product');
@@ -222,6 +249,7 @@ export default function AdminProductManagement() {
         setSelectedProduct(null);
         resetForm();
         loadProducts();
+        loadStats();
       }
     } catch (error: any) {
       toast.error(error.message || 'Failed to update product');
@@ -241,6 +269,7 @@ export default function AdminProductManagement() {
         setIsDeleteDialogOpen(false);
         setSelectedProduct(null);
         loadProducts();
+        loadStats();
       }
     } catch (error: any) {
       toast.error(error.message || 'Failed to delete product');
@@ -255,6 +284,7 @@ export default function AdminProductManagement() {
       if (result) {
         toast.success(`Product ${result.isActive ? 'activated' : 'deactivated'} successfully`);
         loadProducts();
+        loadStats();
       }
     } catch (error: any) {
       toast.error(error.message || 'Failed to toggle status');
@@ -310,18 +340,8 @@ export default function AdminProductManagement() {
       : { label: 'Inactive', className: 'bg-gray-100 text-gray-800' };
   };
 
-  // Stats calculation
-  const stats = useMemo(() => {
-    return {
-      total: products.length,
-      inStock: products.filter(p => (p.stock || 0) > 20).length,
-      lowStock: products.filter(p => {
-        const stock = p.stock || 0;
-        return stock > 0 && stock <= 20;
-      }).length,
-      outOfStock: products.filter(p => (p.stock || 0) === 0).length,
-    };
-  }, [products]);
+  // Stats: use server-side all-products stats
+  const stats = allProductStats;
 
   return (
     <div className="space-y-4 p-4 bg-gradient-to-br from-gray-50 to-gray-100 min-h-screen">
@@ -336,7 +356,7 @@ export default function AdminProductManagement() {
         <div className="flex gap-3">
           <Button
             variant="outline"
-            onClick={() => loadProducts()}
+            onClick={() => { loadProducts(); loadStats(); }}
             disabled={loading}
             className="gap-2"
           >
@@ -765,9 +785,6 @@ export default function AdminProductManagement() {
                               <div className="flex-1 min-w-0">
                                 <p className="text-sm font-medium text-gray-900 hover:text-green-600 transition-colors truncate">
                                   {product.name}
-                                </p>
-                                <p className="text-[10px] text-gray-500 line-clamp-1">
-                                  {product.description || 'No description'}
                                 </p>
                                 {product.isOrganic && (
                                   <Badge variant="outline" className="mt-0.5 bg-green-50 text-green-700 text-[9px] px-1 py-0">

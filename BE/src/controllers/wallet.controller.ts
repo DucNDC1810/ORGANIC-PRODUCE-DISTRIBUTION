@@ -73,7 +73,7 @@ export class WalletController {
         amount: Math.floor(amount),
         type: 'topup',
         status: 'pending',
-        description: `Top-up to FreshMarket Wallet`,
+        description: safeGroupId ? `Nạp tiền cho đơn nhóm` : `Nạp tiền ví FreshMarket`,
         metadata: safeGroupId ? { groupId: safeGroupId } : {}
       });
 

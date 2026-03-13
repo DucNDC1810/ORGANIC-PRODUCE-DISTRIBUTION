@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { X, Minus, Plus, ShoppingBag } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
+import { X, Minus, Plus, ShoppingBag, AlertCircle } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Link, useNavigate } from 'react-router-dom';
 import { useCart } from '../context/CartContext';
@@ -45,6 +45,7 @@ export default function MiniCart() {
 
   const [editingQtyId, setEditingQtyId] = useState<string | null>(null);
   const [editingQtyValue, setEditingQtyValue] = useState<string>('');
+  const activeInputRef = useRef<HTMLInputElement>(null);
   const fmt = (n: number) => n.toLocaleString('vi-VN') + ' ₫';
 
   const commitQtyEdit = async (itemId: string) => {
@@ -68,7 +69,7 @@ export default function MiniCart() {
     if (pasted) setEditingQtyValue(pasted);
   };
 
-  const handleQtyKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+  const handleQtyKeyDown = (e: React.KeyboardEvent<HTMLInputElement>, _itemId: string) => {
     if (['e', 'E', '+', '-', '.'].includes(e.key)) {
       e.preventDefault();
       return;
@@ -205,44 +206,38 @@ export default function MiniCart() {
 
                         <div className="flex items-center justify-between">
                           {/* Quantity Controls */}
-                          <div className="flex items-center gap-2 bg-white rounded-lg p-1">
+                          <div className="flex items-center gap-1 bg-white rounded-lg px-1 py-0.5 border border-border/50">
                             <button
                               onClick={() => updateQuantity(item.id, item.quantity - 1)}
                               disabled={item.quantity <= 1}
                               className="p-1 hover:bg-muted rounded transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                             >
-                              <Minus className="w-4 h-4 text-muted-foreground" />
+                              <Minus className="w-3.5 h-3.5 text-muted-foreground" />
                             </button>
-                            {editingQtyId === item.id ? (
-                              <input
-                                type="text"
-                                inputMode="numeric"
-                                pattern="[0-9]*"
-                                maxLength={2}
-                                value={editingQtyValue}
-                                autoFocus
-                                onFocus={(e) => e.target.select()}
-                                onChange={handleQtyChange}
-                                onBlur={() => commitQtyEdit(item.id)}
-                                onKeyDown={handleQtyKeyDown}
-                                onPaste={handleQtyPaste}
-                                className="w-8 text-center font-medium text-foreground bg-transparent outline-none border-none"
-                              />
-                            ) : (
-                              <span
-                                className="w-8 text-center font-medium text-foreground hover:bg-muted cursor-text rounded transition-colors"
-                                onClick={() => { setEditingQtyId(item.id); setEditingQtyValue(String(item.quantity)); }}
-                                title="Click to edit quantity"
-                              >
-                                {item.quantity}
-                              </span>
-                            )}
+                            <input
+                              ref={editingQtyId === item.id ? activeInputRef : null}
+                              type="text"
+                              inputMode="numeric"
+                              pattern="[0-9]*"
+                              maxLength={3}
+                              value={editingQtyId === item.id ? editingQtyValue : String(item.quantity)}
+                              onFocus={() => { setEditingQtyId(item.id); setEditingQtyValue(String(item.quantity)); setTimeout(() => activeInputRef.current?.select(), 0); }}
+                              onChange={handleQtyChange}
+                              onBlur={() => commitQtyEdit(item.id)}
+                              onKeyDown={(e) => handleQtyKeyDown(e, item.id)}
+                              onPaste={handleQtyPaste}
+                              className={`w-9 text-center text-sm font-semibold bg-transparent outline-none border-b-2 ${
+                                editingQtyId === item.id ? 'border-primary' : 'border-transparent'
+                              } focus:border-primary transition-colors [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none ${
+                                (() => { const s = (item as any).stock; return s !== undefined && item.quantity > s ? 'text-red-500' : 'text-foreground'; })()
+                              }`}
+                            />
                             <button
                               onClick={() => updateQuantity(item.id, item.quantity + 1)}
                               disabled={item.quantity >= ((item as any).stock ?? QTY_MAX)}
                               className="p-1 hover:bg-muted rounded transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                             >
-                              <Plus className="w-4 h-4 text-muted-foreground" />
+                              <Plus className="w-3.5 h-3.5 text-muted-foreground" />
                             </button>
                           </div>
 
@@ -258,6 +253,16 @@ export default function MiniCart() {
                             )}
                           </div>
                         </div>
+                        {/* Stock warning */}
+                        {(() => {
+                          const s = (item as any).stock;
+                          return s !== undefined && item.quantity >= s ? (
+                            <p className="text-xs text-red-500 mt-1 flex items-center gap-1">
+                              <AlertCircle className="w-3 h-3 flex-shrink-0" />
+                               {s} products left in stock
+                            </p>
+                          ) : null;
+                        })()}
                       </div>
                     </motion.div>
                   ))}

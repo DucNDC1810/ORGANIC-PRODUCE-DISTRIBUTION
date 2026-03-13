@@ -136,7 +136,7 @@ export class GroupController {
       const group = await groupService.cancelGroup(groupId, userId);
 
       try {
-        getIO().to(`group:${groupId}`).emit('group:cancelled', { groupId });
+        getIO().to(`group:${groupId}`).emit('group:deleted', { groupId });
       } catch (_) {}
 
       res.json({ success: true, message: 'Đã hủy đơn nhóm và hoàn tiền cho các thành viên', data: group });

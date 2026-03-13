@@ -116,20 +116,21 @@ export class CategoryService {
 
     const categories = await categoryQuery.lean().exec();
 
-    // Calculate real productCount from Product collection for each category
-    const categoriesWithCount = await Promise.all(
-      categories.map(async (category: any) => {
-        // Remove isActive filter to count all products in this category
-        const productCount = await Product.countDocuments({ 
-          category: category.slug
-        });
-        console.log(`[getAllCategories] Category "${category.slug}" has ${productCount} products`);
-        return {
-          ...category,
-          productCount
-        };
-      })
-    );
+    // Get product counts for all categories in a single aggregation query (avoids N+1)
+    const slugs = categories.map((c: any) => c.slug);
+    const productCountsAgg = await Product.aggregate([
+      { $match: { category: { $in: slugs } } },
+      { $group: { _id: '$category', count: { $sum: 1 } } }
+    ]);
+    const productCountMap: Record<string, number> = {};
+    productCountsAgg.forEach((item: any) => {
+      productCountMap[item._id] = item.count;
+    });
+
+    const categoriesWithCount = categories.map((category: any) => ({
+      ...category,
+      productCount: productCountMap[category.slug] ?? 0
+    }));
 
     return {
       categories: categoriesWithCount as ICategory[],
@@ -165,10 +166,9 @@ export class CategoryService {
       throw AppError.notFound('Category');
     }
 
-    // Calculate real productCount from Product collection
+    // Calculate real productCount from Product collection (all products, not just active)
     const productCount = await Product.countDocuments({ 
-      category: category.slug,
-      isActive: true 
+      category: category.slug
     });
 
     return { ...category, productCount } as unknown as ICategory;
@@ -191,10 +191,9 @@ export class CategoryService {
       throw AppError.notFound('Category');
     }
 
-    // Calculate real productCount from Product collection
+    // Calculate real productCount from Product collection (all products, not just active)
     const productCount = await Product.countDocuments({ 
-      category: category.slug,
-      isActive: true 
+      category: category.slug
     });
 
     return { ...category, productCount } as unknown as ICategory;
@@ -292,9 +291,19 @@ export class CategoryService {
       }
     }
 
+    const oldSlug = category.slug;
+
     // Update category
     Object.assign(category, data);
     await category.save();
+
+    // If slug changed, cascade-update all products referencing the old slug
+    if (data.slug && data.slug !== oldSlug) {
+      await Product.updateMany(
+        { category: oldSlug },
+        { $set: { category: data.slug } }
+      );
+    }
 
     return category;
   }
@@ -377,19 +386,21 @@ export class CategoryService {
       })
       .lean();
 
-    // Calculate real productCount from Product collection for each category
-    const categoriesWithCount = await Promise.all(
-      categories.map(async (category: any) => {
-        const productCount = await Product.countDocuments({ 
-          category: category.slug,
-          isActive: true 
-        });
-        return {
-          ...category,
-          productCount
-        };
-      })
-    );
+    // Get product counts for all root categories in a single aggregation query
+    const slugs = categories.map((c: any) => c.slug);
+    const productCountsAgg = await Product.aggregate([
+      { $match: { category: { $in: slugs } } },
+      { $group: { _id: '$category', count: { $sum: 1 } } }
+    ]);
+    const productCountMap: Record<string, number> = {};
+    productCountsAgg.forEach((item: any) => {
+      productCountMap[item._id] = item.count;
+    });
+
+    const categoriesWithCount = categories.map((category: any) => ({
+      ...category,
+      productCount: productCountMap[category.slug] ?? 0
+    }));
 
     return categoriesWithCount as ICategory[];
   }
@@ -402,16 +413,21 @@ export class CategoryService {
       .sort({ sortOrder: 1 })
       .lean();
 
-    // Calculate real productCount for each category
-    const categoriesWithCount = await Promise.all(
-      categories.map(async (cat: any) => {
-        const productCount = await Product.countDocuments({ 
-          category: cat.slug,
-          isActive: true 
-        });
-        return { ...cat, productCount };
-      })
-    );
+    // Get product counts for all categories in a single aggregation query
+    const slugs = categories.map((c: any) => c.slug);
+    const productCountsAgg = await Product.aggregate([
+      { $match: { category: { $in: slugs } } },
+      { $group: { _id: '$category', count: { $sum: 1 } } }
+    ]);
+    const productCountMap: Record<string, number> = {};
+    productCountsAgg.forEach((item: any) => {
+      productCountMap[item._id] = item.count;
+    });
+
+    const categoriesWithCount = categories.map((cat: any) => ({
+      ...cat,
+      productCount: productCountMap[cat.slug] ?? 0
+    }));
 
     // Build tree structure
     const categoryMap = new Map();
@@ -445,8 +461,7 @@ export class CategoryService {
    */
   async updateProductCount(categorySlug: string): Promise<void> {
     const productCount = await Product.countDocuments({ 
-      category: categorySlug,
-      isActive: true 
+      category: categorySlug
     });
 
     await Category.findOneAndUpdate(
@@ -460,13 +475,19 @@ export class CategoryService {
    */
   async updateAllProductCounts(): Promise<{ message: string; updated: number }> {
     const categories = await Category.find({});
-    let updated = 0;
 
+    // Get all product counts in a single aggregation query
+    const productCountsAgg = await Product.aggregate([
+      { $group: { _id: '$category', count: { $sum: 1 } } }
+    ]);
+    const productCountMap: Record<string, number> = {};
+    productCountsAgg.forEach((item: any) => {
+      productCountMap[item._id] = item.count;
+    });
+
+    let updated = 0;
     for (const category of categories) {
-      const productCount = await Product.countDocuments({ 
-        category: category.slug,
-        isActive: true 
-      });
+      const productCount = productCountMap[category.slug] ?? 0;
 
       if (category.productCount !== productCount) {
         category.productCount = productCount;
@@ -514,11 +535,19 @@ export class CategoryService {
     withProducts: number;
     empty: number;
   }> {
-    const [total, active, withProducts] = await Promise.all([
+    const [total, active, categoriesWithProducts] = await Promise.all([
       Category.countDocuments({}),
       Category.countDocuments({ isActive: true }),
-      Category.countDocuments({ productCount: { $gt: 0 } })
+      // Use real product counts from Product collection, not stale cached field
+      Product.aggregate([
+        { $group: { _id: '$category' } },
+        { $lookup: { from: 'categories', localField: '_id', foreignField: 'slug', as: 'cat' } },
+        { $match: { 'cat.0': { $exists: true } } },
+        { $count: 'total' }
+      ])
     ]);
+
+    const withProducts = categoriesWithProducts[0]?.total ?? 0;
 
     return {
       total,

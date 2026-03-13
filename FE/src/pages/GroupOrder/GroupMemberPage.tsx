@@ -19,6 +19,7 @@ import {
   X,
   AlertTriangle,
   UserPlus,
+  Truck,
 } from "lucide-react";
 import { io, type Socket } from "socket.io-client";
 import { motion, AnimatePresence } from "framer-motion";
@@ -26,6 +27,7 @@ import { toast } from "sonner";
 import { groupService, type Group, type GroupMember, type GroupCartItem } from "../../services/groupService";
 import { useGroup } from "../../context/GroupContext";
 import { useAuth } from "../../context/AuthContext";
+import { useCart } from "../../context/CartContext";
 import walletService from "../../services/walletService";
 
 // ── Constants ──────────────────────────────────────────────────────────────────
@@ -39,8 +41,10 @@ const TIERS = [
 const AVATARS = ["🧑‍🌾", "👩‍🍳", "🧑‍💼", "👩‍🌾", "👨‍🍳", "🧑‍🦱", "👩‍🦰", "🧑‍🦳"];
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
-function fmtVND(n: number) {
-  return n.toLocaleString("vi-VN") + "đ";
+function fmtVND(n: number | undefined | null) {
+  const v = Number(n);
+  if (!isFinite(v) || isNaN(v)) return '0đ';
+  return v.toLocaleString("vi-VN") + "đ";
 }
 
 function getMemberName(m: GroupMember): string {
@@ -185,6 +189,7 @@ export default function GroupMemberPage() {
   const navigate = useNavigate();
   const { groupSession, clearGroupSession } = useGroup();
   const { user } = useAuth();
+  const { clearCart } = useCart();
 
   const [group,           setGroup]           = useState<Group | null>(null);
   const [members,         setMembers]         = useState<GroupMember[]>([]);
@@ -203,8 +208,11 @@ export default function GroupMemberPage() {
   // Wallet balance for deposit check
   const [walletBalance,  setWalletBalance] = useState<number>(0);
   const [showTopupModal, setShowTopupModal] = useState(false);
+  const [topupShortfall, setTopupShortfall] = useState<number>(0);
 
-  const socketRef = useRef<Socket | null>(null);
+  const socketRef      = useRef<Socket | null>(null);
+  // true while a cart-sync API call is in-flight → block socket from overwriting local edits
+  const isEditingRef   = useRef(false);
 
   // Refs to always have fresh state inside socket callbacks
   const myCartRef  = useRef<GroupCartItem[]>([]);
@@ -257,11 +265,12 @@ export default function GroupMemberPage() {
     );
     socket.on("member:updated", (m: GroupMember) => {
       setMembers((prev) => prev.map((x) => (x._id === m._id ? m : x)));
-      if (m._id === memberId) setMyCart(m.cartItems ?? []);
+      // Không ghi đè myCart nếu đang có cart-sync đang bay (tránh stale overwrite)
+      if (m._id === memberId && !isEditingRef.current) setMyCart(m.cartItems ?? []);
     });
     socket.on("member:item_added", (m: GroupMember) => {
       setMembers((prev) => prev.map((x) => (x._id === m._id ? m : x)));
-      if (m._id === memberId) setMyCart(m.cartItems ?? []);
+      if (m._id === memberId && !isEditingRef.current) setMyCart(m.cartItems ?? []);
       // Nếu là Owner cập nhật món, tự động mở rộng để Members thấy
       if (m.role === 'owner' && m.cartItems?.length > 0) {
         setExpandedMember(m._id);
@@ -283,15 +292,14 @@ export default function GroupMemberPage() {
         duration: 6000,
       });
     });
-    socket.on("group:cancelled", () => {
+    socket.on("group:deleted", () => {
       const isOwnerPays = (groupRef.current?.paymentOption ?? 'owner_only') === 'owner_only';
-      if (isOwnerPays) {
-        toast.info("Group order was cancelled by the owner.", { duration: 5000 });
-      } else {
-        toast.info("Group order was cancelled. Your deposit has been refunded to your wallet.", { duration: 6000 });
-      }
+      const msg = isOwnerPays
+        ? "The group order has been cancelled by the owner."
+        : "The group order has been cancelled by the owner. Your deposit has been refunded to your wallet.";
+      toast.info(msg, { duration: 6000 });
       clearGroupSession();
-      navigate("/products");
+      navigate("/");
     });
 
     // ── Owner đã chốt đơn → chuyển member sang trang xác nhận thành công ──
@@ -309,6 +317,7 @@ export default function GroupMemberPage() {
       const tierIdx      = TIERS.reduce((acc, t, i) => (orderedCount >= t.members ? i : acc), -1);
       const pct          = tierIdx >= 0 ? TIERS[tierIdx].pct : 0;
 
+      clearCart(true);
       navigate("/group-order/success", {
         replace: true,
         state: {
@@ -325,15 +334,43 @@ export default function GroupMemberPage() {
       clearGroupSession();
     });
 
+    // ── Giao hàng nhóm hoàn tất → thông báo cho tất cả thành viên ──
+    socket.on("group:order_delivered", (data: { groupId: string; address: string; ownerName: string }) => {
+      toast.success(`Đơn hàng nhóm đã được giao đến địa chỉ của ${data.ownerName || 'Owner'}!`, {
+        description: data.address ? `Địa chỉ: ${data.address}` : 'Đơn hàng đã được giao thành công.',
+        icon: '🚚',
+        duration: 8000,
+      });
+    });
+
     return () => { socket.disconnect(); };
   }, [groupId, memberId]);
 
   // ── Cart management ────────────────────────────────────────────────────────
+
+  /** Xóa 1 món và đồng bộ ngay lên server để tránh socket ghi đè stale data */
+  const removeItem = async (productId: string) => {
+    if (!groupId || !memberId || isReady) return;
+    const prevCart = myCartRef.current;
+    const newCart  = prevCart.filter((i) => i.productId !== productId);
+    setMyCart(newCart);
+    isEditingRef.current = true;
+    try {
+      await groupService.syncGroupItems(groupId, memberId, newCart);
+    } catch {
+      setMyCart(prevCart); // rollback nếu lỗi
+      toast.error("Could not remove item.");
+    } finally {
+      isEditingRef.current = false;
+    }
+  };
+
   const updateQty = async (item: GroupCartItem, delta: number) => {
     if (!groupId || !memberId || isReady) return;
     const newQty = item.qty + delta;
     if (newQty <= 0) {
-      setMyCart((prev) => prev.filter((i) => i.productId !== item.productId));
+      // Delegate sang removeItem để đảm bảo API được gọi
+      await removeItem(item.productId);
       return;
     }
     setMyCart((prev) =>
@@ -349,19 +386,20 @@ export default function GroupMemberPage() {
     }
   };
 
-  const removeItem = (productId: string) => {
-    if (isReady) return;
-    setMyCart((prev) => prev.filter((i) => i.productId !== productId));
-  };
-
   // ── Confirm ready ──────────────────────────────────────────────────────────
   const handleConfirmReady = async () => {
     if (!groupId || !memberId) return;
     setConfirming(true);
     try {
+      // Đồng bộ giỏ hàng hiện tại lên server trước khi đánh dấu ready
+      // (tránh trường hợp user xóa món nhưng server vẫn còn stale data)
+      isEditingRef.current = true;
+      await groupService.syncGroupItems(groupId, memberId, myCartRef.current);
+      isEditingRef.current = false;
       await groupService.setMemberReady(groupId, memberId, true);
       toast.success("Confirmed! Waiting for the owner to place the order.");
     } catch {
+      isEditingRef.current = false;
       toast.error("An error occurred. Please try again.");
     } finally {
       setConfirming(false);
@@ -411,8 +449,17 @@ export default function GroupMemberPage() {
       );
       setHoldConfirm(false);
     } catch (err: any) {
-      const msg = err?.response?.data?.message || 'Deposit failed. Please try again.';
-      toast.error(msg);
+      const msg: string = err?.response?.data?.message || 'Deposit failed. Please try again.';
+      // Extract shortfall from server message "Cần thêm Xđ" or "need Xđ more"
+      const match = msg.match(/[\d.,]+(?=đ)/g);
+      const serverShortfall = match ? parseInt(match[0].replace(/[.,]/g, ''), 10) : Math.max(0, myShare - walletBalance);
+      if (serverShortfall > 0 && groupId) {
+        setHoldConfirm(false);
+        setTopupShortfall(serverShortfall);
+        setShowTopupModal(true);
+      } else {
+        toast.error(msg);
+      }
     } finally {
       setHoldLoading(false);
     }
@@ -432,10 +479,10 @@ export default function GroupMemberPage() {
   const nextTier      = TIERS[activeTierIdx + 1];
   const progress      = calcProgress(orderedCount);
 
-  const mySubtotal  = myCart.reduce((s, i) => s + i.price * i.qty, 0);
+  const mySubtotal  = myCart.reduce((s, i) => s + (Number(i.price) || 0) * (Number(i.qty) || 0), 0);
   const groupTotal  = members.reduce((s, m) => {
     const items = m._id === memberId ? myCart : (m.cartItems ?? []);
-    return s + items.reduce((si, i) => si + i.price * i.qty, 0);
+    return s + items.reduce((si, i) => si + (Number(i.price) || 0) * (Number(i.qty) || 0), 0);
   }, 0);
 
   // Per-member share based on paymentOption
@@ -1072,6 +1119,19 @@ export default function GroupMemberPage() {
 
                 {/* Payment button / paid status – only for non-owner_only */}
                 {paymentOpt !== 'owner_only' && (
+                  <>
+                    {/* Delivery note: items go to owner's address */}
+                    <div className="mt-3 flex items-start gap-2 bg-blue-50 border border-blue-100 rounded-xl px-4 py-3">
+                      <Truck className="w-4 h-4 text-blue-500 flex-shrink-0 mt-0.5" />
+                      <p className="text-xs text-blue-700 leading-relaxed">
+                        Your items will be delivered together to the group owner's address to save shipping costs.
+                      </p>
+                    </div>
+                  </>
+                )}
+
+                {/* Payment button / paid status – only for non-owner_only */}
+                {paymentOpt !== 'owner_only' && (
                   myMember?.walletPaid ? (
                     <div className="mt-3 flex items-center gap-2 bg-teal-50 border border-teal-200 rounded-xl px-4 py-3">
                       <Wallet className="w-4 h-4 text-teal-600 flex-shrink-0" />
@@ -1102,7 +1162,7 @@ export default function GroupMemberPage() {
                       {/* Conditional: topup or deposit button */}
                       {myShare > 0 && isReady && walletBalance < myShare ? (
                         <button
-                          onClick={() => setShowTopupModal(true)}
+                          onClick={() => { setTopupShortfall(0); setShowTopupModal(true); }}
                           className="mt-2 w-full py-3 rounded-xl bg-gradient-to-r from-pink-500 to-rose-500 text-white text-sm font-bold shadow hover:from-pink-600 hover:to-rose-600 active:scale-[0.98] transition-all flex items-center justify-center gap-2"
                         >
                           <Wallet className="w-4 h-4" />
@@ -1231,9 +1291,9 @@ export default function GroupMemberPage() {
       {/* ══════════════ HOLD WALLET MODAL ══════════════ */}
       {showTopupModal && groupId && (
         <MemberQuickTopupModal
-          shortfall={Math.max(0, myShare - walletBalance)}
+          shortfall={topupShortfall > 0 ? topupShortfall : Math.max(0, myShare - walletBalance)}
           groupId={groupId}
-          onClose={() => setShowTopupModal(false)}
+          onClose={() => { setShowTopupModal(false); setTopupShortfall(0); }}
         />
       )}
 

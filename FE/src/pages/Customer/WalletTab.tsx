@@ -50,7 +50,11 @@ function resolveOrderId(orderId: any, description?: string): string | null {
 }
 
 function txLabel(tx: Transaction) {
-  if (tx.type === 'topup')   return 'Top-up to FreshMarket Wallet';
+  if (tx.type === 'topup') {
+    const desc = tx.description ?? '';
+    if (/nh.m/i.test(desc)) return 'Top-up cho đơn nhóm';
+    return 'Nạp tiền ví FreshMarket';
+  }
   if (tx.type === 'bonus')   return 'First top-up bonus (+10,000₫)';
   if (tx.type === 'payment') {
     const desc = tx.description ?? '';

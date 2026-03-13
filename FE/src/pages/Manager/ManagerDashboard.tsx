@@ -69,7 +69,7 @@ export default function ManagerDashboard() {
   const renderContent = () => {
     switch (activeTab) {
       case 'dashboard':
-        return <ManagerOverview />;
+        return <ManagerOverview onNavigate={setActiveTab} />;
       case 'products':
         return <ManagerProductManagement />;
       case 'categories':
@@ -81,7 +81,7 @@ export default function ManagerDashboard() {
       case 'orders':
         return <OrderConfirmation />;
       default:
-        return <ManagerOverview />;
+        return <ManagerOverview onNavigate={setActiveTab} />;
     }
   };
 

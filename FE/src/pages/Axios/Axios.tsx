@@ -556,6 +556,8 @@ export interface OrderItem {
 export interface Order {
   _id: string;
   userId: string | { _id: string; name: string; email: string; phone?: string; avatar?: string };
+  orderType?: 'regular' | 'group_buy' | 'subscription';
+  groupId?: string;
   addressId?: string | Record<string, any>;
   voucherId?: string;
   groupBuyId?: string;
@@ -630,6 +632,15 @@ export interface PendingSummary {
 }
 
 export const orderAPI = {
+  /**
+   * Get all orders belonging to a group (owner + member sub-orders)
+   * GET /api/orders?groupId=:groupId
+   */
+  getOrdersByGroupId: async (groupId: string): Promise<Order[]> => {
+    const response: any = await api.get('/orders', { params: { groupId, limit: 50, sortBy: 'createdAt', sortOrder: 'asc' } });
+    return Array.isArray(response?.data) ? response.data : [];
+  },
+
   /**
    * Get all orders with filters (manager/admin)
    * GET /api/orders

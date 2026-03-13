@@ -3,6 +3,7 @@ import { Order } from '../models/Order.model';
 import { AuthRequest } from '../middlewares/auth.middleware';
 import { AppError } from '../utils/AppError';
 import { createNotification } from '../models/Notification.model';
+import { getIO } from '../socket';
 
 export class ShipperController {
     /**
@@ -326,6 +327,14 @@ export class ShipperController {
                 if (order.paymentMethod === 'cod') {
                     order.paymentStatus = 'paid';
                 }
+
+                // Cascade: mark all member sub-orders as delivered too
+                if (order.groupId) {
+                    await Order.updateMany(
+                        { groupId: order.groupId, _id: { $ne: order._id }, status: { $ne: 'delivered' } },
+                        { $set: { status: 'delivered', deliveredAt: new Date() } }
+                    );
+                }
             }
 
             await order.save();
@@ -346,6 +355,20 @@ export class ShipperController {
             if (status === 'delivered') {
                 notificationTitle = 'Đơn hàng đã giao';
                 notificationMessage = `Đơn hàng #${order._id?.toString().slice(-6).toUpperCase()} đã được giao thành công`;
+
+                // For group orders, broadcast delivery notification to all group members via socket
+                if (order.groupId) {
+                    try {
+                        const deliveryAddr = (order.deliveryInfo as any)?.address || '';
+                        const ownerUserName = (order as any).userId?.name || 'chủ nhóm';
+                        getIO().to(`group:${order.groupId}`).emit('group:order_delivered', {
+                            groupId:  order.groupId.toString(),
+                            orderId:  order._id,
+                            address:  deliveryAddr,
+                            ownerName: ownerUserName,
+                        });
+                    } catch (_) {}
+                }
             } else if (status === 'cancelled') {
                 notificationTitle = 'Shipper hủy đơn';
                 notificationMessage = `Shipper đã hủy giao đơn hàng #${order._id?.toString().slice(-6).toUpperCase()}. Lý do: ${cancelReason}. Chúng tôi đang tìm shipper khác cho đơn hàng của bạn.`;

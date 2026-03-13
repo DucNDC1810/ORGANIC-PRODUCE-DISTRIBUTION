@@ -28,7 +28,11 @@ import {
   type CategoryWithCount,
 } from '../../services/dashboardService';
 
-export default function ManagerOverview() {
+interface ManagerOverviewProps {
+  onNavigate?: (tab: string) => void;
+}
+
+export default function ManagerOverview({ onNavigate }: ManagerOverviewProps = {}) {
   const [orderStats, setOrderStats] = useState<OrderStats | null>(null);
   const [productStats, setProductStats] = useState<ProductStats | null>(null);
   const [userStats, setUserStats] = useState<UserStats | null>(null);
@@ -316,7 +320,7 @@ export default function ManagerOverview() {
                 <CardTitle className="text-lg font-semibold text-gray-900">Recent Orders</CardTitle>
                 <CardDescription>Latest customer orders</CardDescription>
               </div>
-              <Button variant="outline" size="sm">View All</Button>
+              <Button variant="outline" size="sm" onClick={() => onNavigate?.('orders')}>View All</Button>
             </div>
           </CardHeader>
           <CardContent>

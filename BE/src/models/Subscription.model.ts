@@ -67,6 +67,7 @@ export interface ISubscription extends Document {
   pausedAt?: Date;
 
   totalPrice?: number;
+  shippingCost?: number;
   notes?: string;
 
   createdAt: Date;
@@ -140,6 +141,11 @@ const subscriptionSchema = new Schema<ISubscription>(
     totalPrice: {
       type: Number,
       min: 0
+    },
+    shippingCost: {
+      type: Number,
+      min: 0,
+      default: 25000
     },
     notes: {
       type: String,
