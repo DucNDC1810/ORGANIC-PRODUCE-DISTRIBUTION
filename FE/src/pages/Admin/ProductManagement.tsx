@@ -34,12 +34,14 @@ import { Product } from '../../services/productService';
 // Form validation helper
 const validateProductForm = (data: any) => {
   const errors: Record<string, string> = {};
+  const price = Number(data.price);
+  const stock = Number(data.stock);
   
   if (!data.name?.trim()) errors.name = 'Product name is required';
   if (!data.description?.trim()) errors.description = 'Description is required';
   if (!data.category) errors.category = 'Category is required';
-  if (!data.price || data.price <= 0) errors.price = 'Valid price is required';
-  if (!data.stock || data.stock < 0) errors.stock = 'Valid stock quantity is required';
+  if (!Number.isFinite(price) || price <= 0) errors.price = 'Valid price is required';
+  if (!Number.isFinite(stock) || stock < 0) errors.stock = 'Valid stock quantity is required';
   if (!data.thumbnail?.trim()) errors.thumbnail = 'Product image is required';
   if (!data.unit?.trim()) errors.unit = 'Unit is required';
   if (!data.origin?.trim()) errors.origin = 'Origin is required';
@@ -91,11 +93,15 @@ export default function AdminProductManagement() {
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Load initial data
+  // Load products when query/paging changes
   useEffect(() => {
     loadProducts();
-    fetchCategories({ isActive: true });
   }, [currentPage, selectedCategory, selectedStatus, searchQuery]);
+
+  // Load categories once
+  useEffect(() => {
+    fetchCategories({ isActive: true, limit: 1000 });
+  }, []);
 
   // Load products with filters
   const loadProducts = async () => {
@@ -121,12 +127,24 @@ export default function AdminProductManagement() {
         product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
         product.description?.toLowerCase().includes(searchQuery.toLowerCase());
       
-      const matchesCategory = selectedCategory === 'all' || 
-        product.category === selectedCategory;
+      const productCategoryValue =
+        typeof product.category === 'object' && product.category !== null
+          ? ((product.category as { slug?: string; _id?: string }).slug ||
+             (product.category as { slug?: string; _id?: string })._id || '')
+          : String(product.category || '');
+
+      const matchedCategory = categories.find(
+        (c) => c.slug === productCategoryValue || c._id === productCategoryValue,
+      );
+
+      const matchesCategory =
+        selectedCategory === 'all' ||
+        productCategoryValue === selectedCategory ||
+        matchedCategory?.slug === selectedCategory;
       
       return matchesSearch && matchesCategory;
     });
-  }, [products, searchQuery, selectedCategory]);
+  }, [products, searchQuery, selectedCategory, categories]);
 
   // Form handlers
   const resetForm = () => {
@@ -262,7 +280,7 @@ export default function AdminProductManagement() {
       description: product.description || '',
       price: product.price.toString(),
       stock: product.stock?.toString() || '0',
-      category: product.category || '',
+      category: getCategoryFormValue(product.category),
       thumbnail: product.thumbnail || product.images?.[0] || '',
       unit: product.unit || 'kg',
       origin: product.origin || '',
@@ -301,6 +319,40 @@ export default function AdminProductManagement() {
       : { label: 'Inactive', className: 'bg-gray-100 text-gray-800' };
   };
 
+  const getCategoryName = (categoryValue: unknown) => {
+    if (!categoryValue) return 'Unknown';
+
+    if (typeof categoryValue === 'object' && categoryValue !== null) {
+      const categoryObj = categoryValue as { name?: string; slug?: string; _id?: string };
+      if (categoryObj.name) return categoryObj.name;
+      const resolved = categories.find(
+        (c) => c.slug === categoryObj.slug || c._id === categoryObj._id,
+      );
+      return resolved?.name || 'Unknown';
+    }
+
+    const value = String(categoryValue);
+    const resolved = categories.find((c) => c.slug === value || c._id === value);
+    return resolved?.name || 'Unknown';
+  };
+
+  const getCategoryFormValue = (categoryValue: unknown) => {
+    if (!categoryValue) return '';
+
+    if (typeof categoryValue === 'object' && categoryValue !== null) {
+      const categoryObj = categoryValue as { slug?: string; _id?: string };
+      if (categoryObj.slug) return categoryObj.slug;
+      if (categoryObj._id) {
+        const resolved = categories.find((c) => c._id === categoryObj._id);
+        return resolved?.slug || categoryObj._id;
+      }
+    }
+
+    const value = String(categoryValue);
+    const resolved = categories.find((c) => c.slug === value || c._id === value);
+    return resolved?.slug || value;
+  };
+
   // Stats calculation
   const stats = useMemo(() => {
     return {
@@ -314,17 +366,35 @@ export default function AdminProductManagement() {
     };
   }, [products]);
 
+  const visiblePageNumbers = useMemo(() => {
+    if (!pagination?.totalPages) return [];
+
+    const totalPages = pagination.totalPages;
+    if (totalPages <= 5) {
+      return Array.from({ length: totalPages }, (_, i) => i + 1);
+    }
+
+    const start = Math.max(1, currentPage - 2);
+    const end = Math.min(totalPages, start + 4);
+    const normalizedStart = Math.max(1, end - 4);
+
+    return Array.from(
+      { length: end - normalizedStart + 1 },
+      (_, i) => normalizedStart + i,
+    );
+  }, [pagination?.totalPages, currentPage]);
+
   return (
     <div className="space-y-4 p-4 bg-gradient-to-br from-gray-50 to-gray-100 min-h-screen">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h2 className="text-2xl font-bold bg-gradient-to-r from-green-600 to-emerald-600 bg-clip-text text-transparent">
             Product Management
           </h2>
           <p className="text-sm text-muted-foreground mt-0.5">Manage your organic produce inventory</p>
         </div>
-        <div className="flex gap-3">
+        <div className="flex flex-wrap gap-3">
           <Button
             variant="outline"
             onClick={() => loadProducts()}
@@ -376,7 +446,7 @@ export default function AdminProductManagement() {
                       </SelectTrigger>
                       <SelectContent>
                         {categories.map(cat => (
-                          <SelectItem key={cat._id} value={cat._id}>
+                          <SelectItem key={cat._id} value={cat.slug}>
                             {cat.name}
                           </SelectItem>
                         ))}
@@ -628,7 +698,7 @@ export default function AdminProductManagement() {
               <SelectContent>
                 <SelectItem value="all">All Categories</SelectItem>
                 {categories.map(cat => (
-                  <SelectItem key={cat._id} value={cat._id}>{cat.name}</SelectItem>
+                  <SelectItem key={cat._id} value={cat.slug}>{cat.name}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -677,15 +747,15 @@ export default function AdminProductManagement() {
           ) : (
             <>
               <div className="overflow-x-auto">
-                <Table>
+                <Table className="table-fixed min-w-[980px]">
                   <TableHeader>
                     <TableRow className="bg-gray-50 hover:bg-gray-50">
-                      <TableHead className="w-[300px] text-xs font-semibold">Product</TableHead>
-                      <TableHead className="text-xs font-semibold">Category</TableHead>
-                      <TableHead className="text-xs font-semibold">Price</TableHead>
-                      <TableHead className="text-xs font-semibold">Stock Status</TableHead>
-                      <TableHead className="text-xs font-semibold">Status</TableHead>
-                      <TableHead className="text-right text-xs font-semibold">Actions</TableHead>
+                      <TableHead className="w-[42%] text-sm font-semibold">Product</TableHead>
+                      <TableHead className="w-[14%] text-sm font-semibold">Category</TableHead>
+                      <TableHead className="w-[12%] text-sm font-semibold">Price</TableHead>
+                      <TableHead className="w-[14%] text-sm font-semibold">Stock Status</TableHead>
+                      <TableHead className="w-[8%] text-sm font-semibold">Status</TableHead>
+                      <TableHead className="w-[10%] text-right text-sm font-semibold">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -695,11 +765,11 @@ export default function AdminProductManagement() {
                       const imageUrl = product.thumbnail || product.images?.[0] || 'https://via.placeholder.com/64?text=No+Image';
                       
                       return (
-                        <TableRow key={product._id} className="hover:bg-gray-50 transition-colors">
-                          <TableCell>
+                        <TableRow key={product._id} className="hover:bg-gray-50 transition-colors [&>td]:py-3">
+                          <TableCell className="whitespace-normal">
                             <div className="flex items-center gap-2">
                               <div className="relative group flex-shrink-0">
-                                <div className="w-10 h-10 rounded-md overflow-hidden border border-gray-200 group-hover:border-green-400 transition-all bg-gray-100">
+                                <div className="w-14 h-14 rounded-md overflow-hidden border border-gray-200 group-hover:border-green-400 transition-all bg-gray-100">
                                   <img
                                     src={imageUrl}
                                     alt={product.name}
@@ -733,85 +803,77 @@ export default function AdminProductManagement() {
                                 )}
                               </div>
                               <div className="flex-1 min-w-0">
-                                <p className="text-sm font-medium text-gray-900 hover:text-green-600 transition-colors truncate">
+                                <p className="text-base font-semibold text-gray-900 hover:text-green-600 transition-colors truncate">
                                   {product.name}
                                 </p>
-                                <p className="text-[10px] text-gray-500 line-clamp-1">
-                                  {product.description || 'No description'}
-                                </p>
-                                {product.isOrganic && (
-                                  <Badge variant="outline" className="mt-0.5 bg-green-50 text-green-700 text-[9px] px-1 py-0">
-                                    🌱 Organic
-                                  </Badge>
-                                )}
                               </div>
                             </div>
                           </TableCell>
                           <TableCell>
-                            <Badge variant="outline" className="bg-purple-50 text-purple-700 text-[10px]">
-                              {categories.find(c => c._id === product.category)?.name || 'Unknown'}
+                            <Badge variant="outline" className="bg-purple-50 text-purple-700 text-xs">
+                              {getCategoryName(product.category)}
                             </Badge>
                           </TableCell>
                           <TableCell>
                             <div className="flex flex-col">
-                              <span className="text-sm font-bold text-gray-900">
-                                ${(product.price / 1000).toFixed(2)}
+                              <span className="text-base font-bold text-gray-900">
+                                ${product.price.toFixed(2)}
                               </span>
-                              <span className="text-[10px] text-gray-500">per {product.unit || 'unit'}</span>
+                              <span className="text-xs text-gray-500">per {product.unit || 'unit'}</span>
                             </div>
                           </TableCell>
                           <TableCell>
                             <div className="flex items-center gap-1.5">
-                              <Badge className={stockBadge.className + ' text-[10px]'}>
+                              <Badge className={stockBadge.className + ' text-xs'}>
                                 {stockBadge.label}
                               </Badge>
-                              <span className="text-xs text-gray-600">
+                              <span className="text-sm text-gray-600">
                                 ({product.stock || 0})
                               </span>
                             </div>
                           </TableCell>
                           <TableCell>
-                            <Badge className={statusBadge.className + ' text-[10px]'}>
+                            <Badge className={statusBadge.className + ' text-xs'}>
                               {statusBadge.label}
                             </Badge>
                           </TableCell>
                           <TableCell>
-                            <div className="flex items-center justify-end gap-0.5">
+                            <div className="flex items-center justify-end gap-1">
                               <Button
                                 variant="ghost"
                                 size="sm"
                                 onClick={() => openViewDialog(product)}
-                                className="h-7 w-7 p-0 hover:bg-blue-50 hover:text-blue-600 transition-colors"
+                                className="h-8 w-8 p-0 hover:bg-blue-50 hover:text-blue-600 transition-colors"
                                 title="View Details"
                               >
-                                <Eye className="w-3 h-3" />
+                                <Eye className="w-4 h-4" />
                               </Button>
                               <Button
                                 variant="ghost"
                                 size="sm"
                                 onClick={() => openEditDialog(product)}
-                                className="h-7 w-7 p-0 hover:bg-green-50 hover:text-green-600 transition-colors"
+                                className="h-8 w-8 p-0 hover:bg-green-50 hover:text-green-600 transition-colors"
                                 title="Edit Product"
                               >
-                                <Edit className="w-3 h-3" />
+                                <Edit className="w-4 h-4" />
                               </Button>
                               <Button
                                 variant="ghost"
                                 size="sm"
                                 onClick={() => handleToggleStatus(product)}
-                                className="h-7 w-7 p-0 hover:bg-yellow-50 hover:text-yellow-600 transition-colors"
+                                className="h-8 w-8 p-0 hover:bg-yellow-50 hover:text-yellow-600 transition-colors"
                                 title={product.isActive ? 'Deactivate' : 'Activate'}
                               >
-                                <CheckCircle2 className="w-3 h-3" />
+                                <CheckCircle2 className="w-4 h-4" />
                               </Button>
                               <Button
                                 variant="ghost"
                                 size="sm"
                                 onClick={() => openDeleteDialog(product)}
-                                className="h-7 w-7 p-0 hover:bg-red-50 hover:text-red-600 transition-colors"
+                                className="h-8 w-8 p-0 hover:bg-red-50 hover:text-red-600 transition-colors"
                                 title="Delete Product"
                               >
-                                <Trash2 className="w-3 h-3" />
+                                <Trash2 className="w-4 h-4" />
                               </Button>
                             </div>
                           </TableCell>
@@ -824,7 +886,7 @@ export default function AdminProductManagement() {
 
               {/* Pagination */}
               {pagination && pagination.totalPages > 1 && (
-                <div className="flex items-center justify-between px-6 py-4 border-t bg-gray-50">
+                <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between px-6 py-4 border-t bg-gray-50">
                   <div className="text-sm text-gray-600">
                     Showing <span className="font-semibold">{((currentPage - 1) * (pagination.limit || 10)) + 1}</span> to{' '}
                     <span className="font-semibold">
@@ -844,20 +906,17 @@ export default function AdminProductManagement() {
                       Previous
                     </Button>
                     <div className="flex items-center gap-1">
-                      {Array.from({ length: Math.min(5, pagination.totalPages) }, (_, i) => {
-                        const page = i + 1;
-                        return (
-                          <Button
-                            key={page}
-                            variant={currentPage === page ? 'default' : 'outline'}
-                            size="sm"
-                            onClick={() => setCurrentPage(page)}
-                            className={currentPage === page ? 'bg-green-600 hover:bg-green-700' : ''}
-                          >
-                            {page}
-                          </Button>
-                        );
-                      })}
+                      {visiblePageNumbers.map((page) => (
+                        <Button
+                          key={page}
+                          variant={currentPage === page ? 'default' : 'outline'}
+                          size="sm"
+                          onClick={() => setCurrentPage(page)}
+                          className={currentPage === page ? 'bg-green-600 hover:bg-green-700' : ''}
+                        >
+                          {page}
+                        </Button>
+                      ))}
                     </div>
                     <Button
                       variant="outline"
@@ -913,7 +972,7 @@ export default function AdminProductManagement() {
                   </SelectTrigger>
                   <SelectContent>
                     {categories.map(cat => (
-                      <SelectItem key={cat._id} value={cat._id}>
+                      <SelectItem key={cat._id} value={cat.slug}>
                         {cat.name}
                       </SelectItem>
                     ))}
@@ -1100,7 +1159,7 @@ export default function AdminProductManagement() {
                 <div>
                   <p className="text-sm text-gray-500">Category</p>
                   <p className="text-lg font-medium text-gray-900">
-                    {categories.find(c => c._id === selectedProduct.category)?.name || 'Unknown'}
+                    {getCategoryName(selectedProduct.category)}
                   </p>
                 </div>
                 <div>
