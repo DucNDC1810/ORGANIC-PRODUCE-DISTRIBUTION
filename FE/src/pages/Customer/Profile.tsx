@@ -44,13 +44,11 @@ export default function Profile() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const skipSyncRef = useRef(false);
 
-  // Province/District/Ward state
+  // Address picker state (fixed to Ho Chi Minh City)
   const [provinces, setProvinces] = useState<{ code: number; name: string }[]>([]);
   const [districts, setDistricts] = useState<{ code: number; name: string }[]>([]);
   const [wards, setWards] = useState<{ code: number; name: string }[]>([]);
-  const [selectedProvince, setSelectedProvince] = useState<{ code: number; name: string } | null>(
-    user?.province ? { code: 0, name: user.province } : null
-  );
+  const [selectedProvince, setSelectedProvince] = useState<{ code: number; name: string } | null>(null);
   const [selectedDistrict, setSelectedDistrict] = useState<{ code: number; name: string } | null>(
     user?.district ? { code: 0, name: user.district } : null
   );
@@ -60,7 +58,7 @@ export default function Profile() {
   const [loadingDistricts, setLoadingDistricts] = useState(false);
   const [loadingWards, setLoadingWards] = useState(false);
   const [showLocationModal, setShowLocationModal] = useState(false);
-  const [locationTab, setLocationTab] = useState<'province' | 'district' | 'ward'>('province');
+  const [locationTab, setLocationTab] = useState<'district' | 'ward'>('district');
   const [locationSearch, setLocationSearch] = useState('');
   const locationSearchRef = useRef<HTMLInputElement>(null);
 
@@ -99,7 +97,6 @@ export default function Profile() {
         gender: user.gender || '',
         dateOfBirth: user.dateOfBirth ? new Date(user.dateOfBirth).toISOString().split('T')[0] : ''
       });
-      if (user.province) setSelectedProvince({ code: 0, name: user.province });
       if (user.district) setSelectedDistrict({ code: 0, name: user.district });
       if (user.ward) setSelectedWard({ code: 0, name: user.ward });
     }
@@ -112,6 +109,50 @@ export default function Profile() {
       .then((data: { code: number; name: string }[]) => setProvinces(data))
       .catch(() => setProvinces([]));
   }, []);
+
+  useEffect(() => {
+    if (provinces.length === 0) return;
+    const hcm = provinces.find((p) => normalise(p.name).includes('ho chi minh'));
+    if (!hcm) return;
+
+    setSelectedProvince({ code: hcm.code, name: hcm.name });
+    setLoadingDistricts(true);
+    fetch(`https://provinces.open-api.vn/api/p/${hcm.code}?depth=2`)
+      .then((r) => r.json())
+      .then(async (pData) => {
+        const dList: { code: number; name: string }[] = pData.districts ?? [];
+        setDistricts(dList);
+
+        const savedProvince = user?.province;
+        if (savedProvince && !normalise(savedProvince).includes('ho chi minh')) return;
+
+        const savedDistrict = user?.district;
+        if (!savedDistrict) return;
+        const matchedD = dList.find((d) => d.name === savedDistrict);
+        if (!matchedD) return;
+
+        setSelectedDistrict({ code: matchedD.code, name: matchedD.name });
+        setLoadingWards(true);
+        try {
+          const wRes = await fetch(`https://provinces.open-api.vn/api/d/${matchedD.code}?depth=2`);
+          const wData = await wRes.json();
+          const wList: { code: number; name: string }[] = wData.wards ?? [];
+          setWards(wList);
+
+          const savedWard = user?.ward;
+          if (!savedWard) return;
+          const matchedW = wList.find((w) => w.name === savedWard);
+          if (matchedW) setSelectedWard({ code: matchedW.code, name: matchedW.name });
+        } finally {
+          setLoadingWards(false);
+        }
+      })
+      .catch(() => {
+        setDistricts([]);
+      })
+      .finally(() => setLoadingDistricts(false));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [provinces]);
 
 
 
@@ -134,31 +175,13 @@ export default function Profile() {
         gender: user?.gender || '',
         dateOfBirth: user?.dateOfBirth ? new Date(user.dateOfBirth).toISOString().split('T')[0] : ''
       });
-      setSelectedProvince(user?.province ? { code: 0, name: user.province } : null);
+      const hcmProvince = provinces.find((p) => normalise(p.name).includes('ho chi minh'));
+      setSelectedProvince(hcmProvince ? { code: hcmProvince.code, name: hcmProvince.name } : null);
       setSelectedDistrict(user?.district ? { code: 0, name: user.district } : null);
       setSelectedWard(user?.ward ? { code: 0, name: user.ward } : null);
       setShowLocationModal(false);
     }
     setIsEditing(!isEditing);
-  };
-
-  const handleProvinceChange = async (code: number, name: string) => {
-    setSelectedProvince({ code, name });
-    setSelectedDistrict(null);
-    setSelectedWard(null);
-    setWards([]);
-    setLocationSearch('');
-    setLocationTab('district');
-    setLoadingDistricts(true);
-    try {
-      const res = await fetch(`https://provinces.open-api.vn/api/p/${code}?depth=2`);
-      const data = await res.json();
-      setDistricts(data.districts ?? []);
-    } catch {
-      setDistricts([]);
-    } finally {
-      setLoadingDistricts(false);
-    }
   };
 
   const handleDistrictChange = async (code: number, name: string) => {
@@ -185,7 +208,7 @@ export default function Profile() {
   };
 
   const openLocationModal = () => {
-    const tab = !selectedProvince ? 'province' : !selectedDistrict ? 'district' : 'ward';
+    const tab = !selectedDistrict ? 'district' : 'ward';
     setLocationTab(tab);
     setLocationSearch('');
     setShowLocationModal(true);
@@ -560,15 +583,30 @@ export default function Profile() {
                     <div className="group md:col-span-2 space-y-3">
                       <label className="block text-sm font-medium text-[#6A7282] mb-2">Shipping Address</label>
 
-                      {/* Specific address input (street/house number) */}
                       {isEditing ? (
-                        <input
-                          type="text"
-                          value={formData.street}
-                          onChange={(e) => handleInputChange('street', e.target.value)}
-                          className="w-full px-4 py-3 border border-[#E5E7EB] rounded-lg focus:outline-none focus:border-[#00B207] transition-colors"
-                          placeholder="Specific address (house number, street name)"
-                        />
+                        <>
+                          {/* District / Ward selector in HCMC */}
+                          <button
+                            type="button"
+                            onClick={openLocationModal}
+                            className="w-full px-4 py-3 border border-[#E5E7EB] rounded-lg text-sm text-left bg-white hover:border-[#00B207] focus:outline-none focus:border-[#00B207] transition-colors flex items-center justify-between group"
+                          >
+                            <span className={(selectedWard || selectedDistrict) ? 'text-[#101828]' : 'text-gray-400'}>
+                              {(selectedWard || selectedDistrict)
+                                ? [selectedWard?.name, selectedDistrict?.name, selectedProvince?.name || 'Thành phố Hồ Chí Minh'].filter(Boolean).join(', ')
+                                : 'Chọn Quận/Huyện, Phường/Xã (TP.HCM)'}
+                            </span>
+                            <Search className="w-4 h-4 text-gray-400 group-hover:text-[#00B207] transition-colors flex-shrink-0" />
+                          </button>
+
+                          <input
+                            type="text"
+                            value={formData.street}
+                            onChange={(e) => handleInputChange('street', e.target.value)}
+                            className="w-full px-4 py-3 border border-[#E5E7EB] rounded-lg focus:outline-none focus:border-[#00B207] transition-colors"
+                            placeholder="Specific address (house number, street name)"
+                          />
+                        </>
                       ) : (
                         <div className="flex items-start gap-3 px-4 py-3 bg-[#F9FAFB] rounded-lg border border-[#E5E7EB]">
                           <Home className="w-5 h-5 text-[#00B207] mt-0.5" />
@@ -577,26 +615,10 @@ export default function Profile() {
                               formData.street || user?.street,
                               selectedWard?.name || user?.ward,
                               selectedDistrict?.name || user?.district,
-                              selectedProvince?.name || user?.province,
+                              selectedProvince?.name || user?.province || 'Thành phố Hồ Chí Minh',
                             ].filter(Boolean).join(', ') || user?.address || 'Not set'}
                           </span>
                         </div>
-                      )}
-
-                      {/* Province / District / Ward selector */}
-                      {isEditing && (
-                        <button
-                          type="button"
-                          onClick={openLocationModal}
-                          className="w-full px-4 py-3 border border-[#E5E7EB] rounded-lg text-sm text-left bg-white hover:border-[#00B207] focus:outline-none focus:border-[#00B207] transition-colors flex items-center justify-between group"
-                        >
-                          <span className={(selectedWard || selectedDistrict || selectedProvince) ? 'text-[#101828]' : 'text-gray-400'}>
-                            {(selectedWard || selectedDistrict || selectedProvince)
-                              ? [selectedWard?.name, selectedDistrict?.name, selectedProvince?.name].filter(Boolean).join(', ')
-                              : 'Chọn Tỉnh/Thành phố, Quận/Huyện, Phường/Xã'}
-                          </span>
-                          <Search className="w-4 h-4 text-gray-400 group-hover:text-[#00B207] transition-colors flex-shrink-0" />
-                        </button>
                       )}
                     </div>
                   </div>
@@ -649,7 +671,6 @@ export default function Profile() {
             {/* Tabs */}
             <div className="flex border-b border-gray-100 px-5">
               {([
-                { key: 'province' as const, label: 'Tỉnh / Thành phố' },
                 { key: 'district' as const, label: 'Quận / Huyện' },
                 { key: 'ward' as const, label: 'Phường / Xã' },
               ]).map(({ key, label }) => (
@@ -657,7 +678,6 @@ export default function Profile() {
                   key={key}
                   type="button"
                   disabled={
-                    (key === 'district' && !selectedProvince) ||
                     (key === 'ward' && !selectedDistrict)
                   }
                   onClick={() => {
@@ -677,9 +697,9 @@ export default function Profile() {
             </div>
 
             {/* Selected breadcrumb */}
-            {(selectedProvince || selectedDistrict || selectedWard) && (
+            {(selectedDistrict || selectedWard) && (
               <div className="px-5 py-2 bg-green-50 border-b border-green-100 text-xs text-green-700 font-medium truncate">
-                {[selectedProvince?.name, selectedDistrict?.name, selectedWard?.name].filter(Boolean).join(' › ')}
+                {[selectedProvince?.name || 'Thành phố Hồ Chí Minh', selectedDistrict?.name, selectedWard?.name].filter(Boolean).join(' › ')}
               </div>
             )}
 
@@ -693,8 +713,7 @@ export default function Profile() {
                   value={locationSearch}
                   onChange={(e) => setLocationSearch(e.target.value)}
                   placeholder={
-                    locationTab === 'province' ? 'Tìm kiếm tỉnh/thành phố...'
-                      : locationTab === 'district' ? 'Tìm kiếm quận/huyện...'
+                    locationTab === 'district' ? 'Tìm kiếm quận/huyện...'
                       : 'Tìm kiếm phường/xã...'
                   }
                   className="flex-1 text-sm bg-transparent outline-none text-gray-700 placeholder-gray-400"
@@ -710,22 +729,6 @@ export default function Profile() {
 
             {/* List */}
             <div className="overflow-y-auto py-1" style={{ maxHeight: '320px' }}>
-              {locationTab === 'province' && (() => {
-                const filtered = locationSearch
-                  ? provinces.filter((p) => normalise(p.name).includes(normalise(locationSearch)))
-                  : provinces;
-                return filtered.length > 0
-                  ? filtered.map((p) => (
-                      <button key={p.code} type="button"
-                        onClick={() => handleProvinceChange(p.code, p.name)}
-                        className={`w-full text-left px-5 py-2.5 text-sm transition-colors hover:bg-gray-50 ${
-                          selectedProvince?.name === p.name ? 'text-[#00B207] font-semibold bg-green-50' : 'text-gray-700'
-                        }`}
-                      >{p.name}</button>
-                    ))
-                  : <p className="text-center py-8 text-sm text-gray-400">Không tìm thấy địa điểm phù hợp</p>;
-              })()}
-
               {locationTab === 'district' && (() => {
                 if (loadingDistricts) return <p className="text-center py-8 text-sm text-gray-400">Đang tải...</p>;
                 const filtered = locationSearch

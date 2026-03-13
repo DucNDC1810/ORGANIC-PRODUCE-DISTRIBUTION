@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import {
     Package,
     MapPin,
+    Map,
     Phone,
     Mail,
     ShoppingBag,
@@ -13,6 +14,7 @@ import {
 import api from '../../services/api';
 import { toast } from 'sonner';
 import { cn } from '../../components/ui/utils';
+import ShipperMap from '../../components/ShipperMap';
 
 interface OrderItem {
     productId: {
@@ -79,6 +81,8 @@ export default function ShipperMyOrders() {
     const [showCancelModal, setShowCancelModal] = useState(false);
     const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
     const [cancelReason, setCancelReason] = useState('');
+    const [showMapModal, setShowMapModal] = useState(false);
+    const [selectedMapOrder, setSelectedMapOrder] = useState<Order | null>(null);
 
     const fetchMyOrders = async (page = 1, status = '') => {
         try {
@@ -196,6 +200,11 @@ export default function ShipperMyOrders() {
         );
     };
 
+    const openMapModal = (order: Order) => {
+        setSelectedMapOrder(order);
+        setShowMapModal(true);
+    };
+
     return (
         <div className="space-y-6">
             {/* Header with Filters */}
@@ -310,7 +319,18 @@ export default function ShipperMyOrders() {
                                     {/* Delivery Address */}
                                     {order.deliveryInfo?.address && (
                                         <div className="space-y-2">
-                                            <h5 className="text-sm font-medium text-gray-700">Delivery Address</h5>
+                                            <div className="flex items-center justify-between">
+                                                <h5 className="text-sm font-medium text-gray-700">Delivery Address</h5>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => openMapModal(order)}
+                                                    className="inline-flex items-center justify-center p-1.5 rounded-md border border-emerald-200 text-emerald-600 hover:bg-emerald-50 transition-colors"
+                                                    title="Open map"
+                                                    aria-label="Open map"
+                                                >
+                                                    <Map className="w-4 h-4" />
+                                                </button>
+                                            </div>
                                             <div className="flex items-start gap-2 text-sm text-gray-600 bg-gray-50 p-3 rounded-lg">
                                                 <MapPin className="w-4 h-4 text-gray-400 mt-0.5 flex-shrink-0" />
                                                 <a
@@ -473,6 +493,36 @@ export default function ShipperMyOrders() {
                                 Confirm Cancel
                             </button>
                         </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Map Modal */}
+            {showMapModal && (
+                <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+                    <div className="bg-white rounded-xl p-4 md:p-6 max-w-3xl w-full shadow-2xl">
+                        <div className="flex items-start justify-between gap-4 mb-4">
+                            <div>
+                                <h3 className="text-lg font-semibold text-gray-800">Delivery Map</h3>
+                                {selectedMapOrder && (
+                                    <p className="text-sm text-gray-500 mt-1">
+                                        Order #{selectedMapOrder._id.slice(-8).toUpperCase()}
+                                    </p>
+                                )}
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setShowMapModal(false);
+                                    setSelectedMapOrder(null);
+                                }}
+                                className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm hover:bg-gray-50 transition-colors"
+                            >
+                                Close
+                            </button>
+                        </div>
+
+                        <ShipperMap customerAddress={selectedMapOrder?.deliveryInfo?.address} />
                     </div>
                 </div>
             )}

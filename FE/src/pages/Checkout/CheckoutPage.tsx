@@ -205,10 +205,10 @@ export default function CheckoutPage() {
       }
     }
     // Location picker: open panel at the first incomplete level
-    if (deliveryType === "delivery" && (!selectedProvince || !selectedDistrict || !selectedWard)) {
+    if (deliveryType === "delivery" && (!selectedDistrict || !selectedWard)) {
       setShowLocationPanel(true);
       setLocationSearch("");
-      setLocationTab(!selectedProvince ? "province" : !selectedDistrict ? "district" : "ward");
+      setLocationTab(!selectedDistrict ? "district" : "ward");
       setTimeout(() => locationSearchRef.current?.focus(), 50);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -313,7 +313,7 @@ export default function CheckoutPage() {
 
   // Tab-based location picker state
   const [showLocationPanel, setShowLocationPanel] = useState(false);
-  const [locationTab, setLocationTab] = useState<"province" | "district" | "ward">("province");
+  const [locationTab, setLocationTab] = useState<"district" | "ward">("district");
   const [locationSearch, setLocationSearch] = useState("");
   const locationPanelRef = useRef<HTMLDivElement>(null);
   const locationSearchRef = useRef<HTMLInputElement>(null);
@@ -341,13 +341,13 @@ export default function CheckoutPage() {
       .catch(() => setProvinces([]));
   }, []);
 
-  // Auto-fill province/district/ward from saved profile address once provinces are loaded
+  // Force checkout delivery area to Ho Chi Minh City and prefill district/ward if available.
   useEffect(() => {
     if (provinces.length === 0) return;
-    const savedProvince = (user as any)?.province as string | undefined;
-    if (!savedProvince) return;
-    const matchedP = provinces.find((p) => p.name === savedProvince);
+
+    const matchedP = provinces.find((p) => normalise(p.name).includes("ho chi minh"));
     if (!matchedP) return;
+
     setSelectedProvince({ code: matchedP.code, name: matchedP.name });
     setLoadingDistricts(true);
     fetch(`https://provinces.open-api.vn/api/p/${matchedP.code}?depth=2`)
@@ -355,6 +355,10 @@ export default function CheckoutPage() {
       .then(async (pData) => {
         const dList: DistrictItem[] = pData.districts ?? [];
         setDistricts(dList);
+
+        const savedProvince = (user as any)?.province as string | undefined;
+        if (savedProvince && !normalise(savedProvince).includes("ho chi minh")) return;
+
         const savedDistrict = (user as any)?.district as string | undefined;
         if (!savedDistrict) return;
         const matchedD = dList.find((d) => d.name === savedDistrict);
@@ -378,25 +382,6 @@ export default function CheckoutPage() {
       .finally(() => setLoadingDistricts(false));
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [provinces]);
-
-  const handleProvinceChange = async (code: number, name: string) => {
-    setSelectedProvince({ code, name });
-    setSelectedDistrict(null);
-    setSelectedWard(null);
-    setWards([]);
-    setLocationSearch("");
-    setLocationTab("district");
-    setLoadingDistricts(true);
-    try {
-      const res = await fetch(`https://provinces.open-api.vn/api/p/${code}?depth=2`);
-      const data = await res.json();
-      setDistricts(data.districts ?? []);
-    } catch {
-      setDistricts([]);
-    } finally {
-      setLoadingDistricts(false);
-    }
-  };
 
   const handleDistrictChange = async (code: number, name: string) => {
     setSelectedDistrict({ code, name });
@@ -454,10 +439,6 @@ export default function CheckoutPage() {
     if (deliveryType === "delivery") {
       if (!formData.address.trim()) {
         setError("Please enter specific address (house number, street name)");
-        return false;
-      }
-      if (!selectedProvince) {
-        setError("Please select Province/City");
         return false;
       }
       if (!selectedDistrict) {
@@ -1052,17 +1033,6 @@ export default function CheckoutPage() {
 
                 {deliveryType === "delivery" && (
                   <>
-                    {/* Street address */}
-                    <input
-                      type="text"
-                      name="address"
-                      value={formData.address}
-                      onChange={handleInputChange}
-                      placeholder="Specific address (house number, street name)"
-                      required
-                      className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary text-sm"
-                    />
-
                     {/* Tab-based location picker */}
                     <div className="relative" ref={locationPanelRef}>
                       {/* Trigger button, shows selected value */}
@@ -1072,8 +1042,7 @@ export default function CheckoutPage() {
                           const open = !showLocationPanel;
                           setShowLocationPanel(open);
                           if (open) {
-                            const tab = !selectedProvince ? "province"
-                              : !selectedDistrict ? "district"
+                            const tab = !selectedDistrict ? "district"
                               : "ward";
                             setLocationTab(tab);
                             setLocationSearch("");
@@ -1083,12 +1052,12 @@ export default function CheckoutPage() {
                         }}
                         className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm text-left bg-white hover:border-primary focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary transition-colors"
                       >
-                        {selectedWard && selectedDistrict && selectedProvince ? (
+                        {selectedWard && selectedDistrict ? (
                           <span className="text-gray-800">
-                            {selectedWard.name}, {selectedDistrict.name}, {selectedProvince.name}
+                            {selectedWard.name}, {selectedDistrict.name}, TP. Ho Chi Minh
                           </span>
                         ) : (
-                          <span className="text-gray-400">Province/City, District, Ward</span>
+                          <span className="text-gray-400">District, Ward (TP. Ho Chi Minh)</span>
                         )}
                       </button>
 
@@ -1098,7 +1067,6 @@ export default function CheckoutPage() {
                           {/* Tab headers */}
                           <div className="flex border-b border-gray-200">
                             {([
-                              { key: "province" as const, label: "Province / City" },
                               { key: "district" as const, label: "District" },
                               { key: "ward"     as const, label: "Ward" },
                             ]).map(({ key, label }) => (
@@ -1106,8 +1074,7 @@ export default function CheckoutPage() {
                                 key={key}
                                 type="button"
                                 disabled={
-                                  (key === "district" && !selectedProvince) ||
-                                  (key === "ward"     && !selectedDistrict)
+                                  (key === "ward" && !selectedDistrict)
                                 }
                                 onClick={() => {
                                   setLocationTab(key);
@@ -1135,9 +1102,7 @@ export default function CheckoutPage() {
                                 value={locationSearch}
                                 onChange={(e) => setLocationSearch(e.target.value)}
                                 placeholder={
-                                  locationTab === "province"
-                                    ? "Tìm kiếm tỉnh/thành phố..."
-                                    : locationTab === "district"
+                                  locationTab === "district"
                                     ? "Tìm kiếm quận/huyện..."
                                     : "Tìm kiếm phường/xã..."
                                 }
@@ -1160,28 +1125,6 @@ export default function CheckoutPage() {
 
                           {/* List */}
                           <div className="max-h-52 overflow-y-auto py-1">
-                            {locationTab === "province" && (() => {
-                              const filtered = locationSearch
-                                ? provinces.filter((p) => normalise(p.name).includes(normalise(locationSearch)))
-                                : provinces;
-                              return filtered.length > 0
-                                ? filtered.map((p) => (
-                                    <button
-                                      key={p.code}
-                                      type="button"
-                                      onClick={() => handleProvinceChange(p.code, p.name)}
-                                      className={`w-full text-left px-4 py-2 text-sm transition-colors hover:bg-gray-50 ${
-                                        selectedProvince?.code === p.code
-                                          ? "text-primary font-medium bg-green-50"
-                                          : "text-gray-700"
-                                      }`}
-                                    >
-                                      {p.name}
-                                    </button>
-                                  ))
-                                : <p className="text-center py-6 text-sm text-gray-400">Không tìm thấy địa điểm phù hợp</p>;
-                            })()}
-
                             {locationTab === "district" && (() => {
                               if (loadingDistricts) return <p className="text-center py-6 text-sm text-gray-400">Loading...</p>;
                               const filtered = locationSearch
@@ -1231,6 +1174,17 @@ export default function CheckoutPage() {
                         </div>
                       )}
                     </div>
+
+                    {/* Street address */}
+                    <input
+                      type="text"
+                      name="address"
+                      value={formData.address}
+                      onChange={handleInputChange}
+                      placeholder="Specific address (house number, street name)"
+                      required
+                      className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary text-sm"
+                    />
                   </>
                 )}
 
