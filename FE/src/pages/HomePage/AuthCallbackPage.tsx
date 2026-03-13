@@ -11,6 +11,12 @@ export default function AuthCallbackPage() {
   useEffect(() => {
     const token = searchParams.get('token');
     const error = searchParams.get('error');
+    const redirectParam = searchParams.get('redirect');
+    const storedRedirect = sessionStorage.getItem('redirectAfterLogin');
+    const redirectTarget =
+      (redirectParam ? decodeURIComponent(redirectParam) : null) ||
+      storedRedirect ||
+      '/';
 
     if (error) {
       toast.error('Google authentication failed. Please try again.');
@@ -36,10 +42,13 @@ export default function AuthCallbackPage() {
             localStorage.setItem('user', JSON.stringify(data.data));
             setStatus('success');
             toast.success('Successfully logged in with Google!');
+            if (storedRedirect) {
+              sessionStorage.removeItem('redirectAfterLogin');
+            }
             
-            // Reload page to update AuthContext
+            // Reload page to update AuthContext, then land on intended page
             setTimeout(() => {
-              window.location.href = '/';
+              window.location.href = redirectTarget;
             }, 1000);
           } else {
             throw new Error('Failed to fetch user data');
@@ -101,7 +110,7 @@ export default function AuthCallbackPage() {
           {status === 'success' && (
             <>
               <h2 className="text-2xl font-bold text-green-600 mb-2">Success!</h2>
-              <p className="text-muted-foreground">Redirecting you to the home page...</p>
+              <p className="text-muted-foreground">Redirecting you to your previous page...</p>
             </>
           )}
           {status === 'error' && (

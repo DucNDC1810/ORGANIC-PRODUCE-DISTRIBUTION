@@ -47,7 +47,7 @@ export default function ShipperDashboard() {
         clearLocalCart();
         logout();
         toast.success('Logged out successfully!');
-        navigate('/login');
+        navigate(`/login?redirect=${encodeURIComponent(location.pathname + location.search)}`);
     };
 
     const getTabDisplayName = () => {

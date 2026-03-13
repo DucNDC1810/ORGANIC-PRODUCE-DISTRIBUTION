@@ -15,6 +15,7 @@ import {
   ChevronRight,
   Loader2,
   CheckCircle2,
+  X,
 } from 'lucide-react';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
@@ -45,6 +46,10 @@ const validateProductForm = (data: any) => {
   if (!data.origin?.trim()) errors.origin = 'Origin is required';
   
   return errors;
+};
+
+const normalizeImageUrls = (urls: string[]) => {
+  return Array.from(new Set(urls.map((url) => url.trim()).filter(Boolean)));
 };
 
 export default function AdminProductManagement() {
@@ -92,6 +97,7 @@ export default function AdminProductManagement() {
     isFeatured: false,
     expiryDate: '',
     harvestDate: '',
+    imageUrls: [] as string[],
   });
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -170,6 +176,7 @@ export default function AdminProductManagement() {
       isFeatured: false,
       expiryDate: '',
       harvestDate: '',
+      imageUrls: [],
     });
     setFormErrors({});
   };
@@ -186,6 +193,40 @@ export default function AdminProductManagement() {
     }
   };
 
+  const handleImageUrlChange = (index: number, value: string) => {
+    setFormData((prev) => {
+      const nextImageUrls = [...prev.imageUrls];
+      nextImageUrls[index] = value;
+      return { ...prev, imageUrls: nextImageUrls };
+    });
+  };
+
+  const addImageField = () => {
+    setFormData((prev) => ({
+      ...prev,
+      imageUrls: [...prev.imageUrls, ''],
+    }));
+  };
+
+  const removeImageField = (index: number) => {
+    setFormData((prev) => ({
+      ...prev,
+      imageUrls: prev.imageUrls.filter((_, currentIndex) => currentIndex !== index),
+    }));
+  };
+
+  const buildProductPayload = () => {
+    const normalizedImages = normalizeImageUrls([formData.thumbnail, ...formData.imageUrls]);
+
+    return {
+      ...formData,
+      thumbnail: normalizedImages[0] || '',
+      images: normalizedImages,
+      price: parseFloat(formData.price),
+      stock: parseInt(formData.stock),
+    };
+  };
+
   // CRUD operations
   const handleCreateProduct = async () => {
     const errors = validateProductForm(formData);
@@ -197,12 +238,7 @@ export default function AdminProductManagement() {
 
     setIsSubmitting(true);
     try {
-      const productData: any = {
-        ...formData,
-        price: parseFloat(formData.price),
-        stock: parseInt(formData.stock),
-        images: [formData.thumbnail],
-      };
+      const productData: any = buildProductPayload();
       if (!productData.expiryDate) delete productData.expiryDate;
       if (!productData.harvestDate) delete productData.harvestDate;
       
@@ -233,12 +269,7 @@ export default function AdminProductManagement() {
 
     setIsSubmitting(true);
     try {
-      const updateData: any = {
-        ...formData,
-        price: parseFloat(formData.price),
-        stock: parseInt(formData.stock),
-        images: [formData.thumbnail],
-      };
+      const updateData: any = buildProductPayload();
       if (!updateData.expiryDate) delete updateData.expiryDate;
       if (!updateData.harvestDate) delete updateData.harvestDate;
       
@@ -293,6 +324,10 @@ export default function AdminProductManagement() {
 
   // Dialog handlers
   const openEditDialog = (product: Product) => {
+    const normalizedImages = normalizeImageUrls(product.images || []);
+    const primaryImage = product.thumbnail || normalizedImages[0] || '';
+    const additionalImages = normalizedImages.filter((image) => image !== primaryImage);
+
     setSelectedProduct(product);
     setFormData({
       name: product.name,
@@ -300,13 +335,14 @@ export default function AdminProductManagement() {
       price: product.price.toString(),
       stock: product.stock?.toString() || '0',
       category: product.category || '',
-      thumbnail: product.thumbnail || product.images?.[0] || '',
+      thumbnail: primaryImage,
       unit: product.unit || 'kg',
       origin: product.origin || '',
       isOrganic: product.isOrganic !== false,
       isFeatured: product.isFeatured || false,
       expiryDate: product.expiryDate ? new Date(product.expiryDate).toISOString().split('T')[0] : '',
       harvestDate: product.harvestDate ? new Date(product.harvestDate).toISOString().split('T')[0] : '',
+      imageUrls: additionalImages,
     });
     setIsEditDialogOpen(true);
   };
@@ -528,7 +564,7 @@ export default function AdminProductManagement() {
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="thumbnail" className="text-sm font-semibold">
-                    Product Image URL <span className="text-red-500">*</span>
+                    Primary Image URL <span className="text-red-500">*</span>
                   </Label>
                   <div className="flex gap-2">
                     <Input
@@ -538,7 +574,7 @@ export default function AdminProductManagement() {
                       onChange={(e) => handleInputChange('thumbnail', e.target.value)}
                       className={`flex-1 ${formErrors.thumbnail ? 'border-red-500' : ''}`}
                     />
-                    <Button variant="outline" size="icon" type="button">
+                    <Button variant="outline" size="icon" type="button" onClick={addImageField}>
                       <ImagePlus className="w-4 h-4" />
                     </Button>
                   </div>
@@ -558,6 +594,46 @@ export default function AdminProductManagement() {
                           e.currentTarget.src = 'https://via.placeholder.com/128?text=Invalid+Image';
                         }}
                       />
+                    </div>
+                  )}
+                </div>
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-sm font-semibold">Additional Image URLs</Label>
+                    <Button variant="outline" type="button" size="sm" onClick={addImageField}>
+                      <Plus className="w-4 h-4 mr-2" />
+                      Add Image
+                    </Button>
+                  </div>
+                  {formData.imageUrls.length === 0 ? (
+                    <p className="text-xs text-muted-foreground">You can add multiple product images here. The primary image above will be used as thumbnail.</p>
+                  ) : (
+                    <div className="space-y-3">
+                      {formData.imageUrls.map((imageUrl, index) => (
+                        <div key={`create-image-${index}`} className="space-y-2 rounded-lg border border-gray-200 p-3">
+                          <div className="flex gap-2">
+                            <Input
+                              placeholder={`Additional image URL #${index + 1}`}
+                              value={imageUrl}
+                              onChange={(e) => handleImageUrlChange(index, e.target.value)}
+                              className="flex-1"
+                            />
+                            <Button variant="outline" size="icon" type="button" onClick={() => removeImageField(index)}>
+                              <X className="w-4 h-4" />
+                            </Button>
+                          </div>
+                          {imageUrl.trim() && (
+                            <img
+                              src={imageUrl}
+                              alt={`Additional preview ${index + 1}`}
+                              className="w-24 h-24 object-cover rounded-lg border border-gray-200"
+                              onError={(e) => {
+                                e.currentTarget.src = 'https://via.placeholder.com/96?text=Invalid+Image';
+                              }}
+                            />
+                          )}
+                        </div>
+                      ))}
                     </div>
                   )}
                 </div>
@@ -1050,7 +1126,7 @@ export default function AdminProductManagement() {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="edit-thumbnail">Product Image URL</Label>
+              <Label htmlFor="edit-thumbnail">Primary Image URL</Label>
               <Input
                 id="edit-thumbnail"
                 value={formData.thumbnail}
@@ -1065,6 +1141,46 @@ export default function AdminProductManagement() {
                     e.currentTarget.src = 'https://via.placeholder.com/128?text=Invalid+Image';
                   }}
                 />
+              )}
+            </div>
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <Label>Additional Image URLs</Label>
+                <Button variant="outline" type="button" size="sm" onClick={addImageField}>
+                  <Plus className="w-4 h-4 mr-2" />
+                  Add Image
+                </Button>
+              </div>
+              {formData.imageUrls.length === 0 ? (
+                <p className="text-xs text-muted-foreground">No additional images yet. Add more URLs if this product has multiple photos.</p>
+              ) : (
+                <div className="space-y-3">
+                  {formData.imageUrls.map((imageUrl, index) => (
+                    <div key={`edit-image-${index}`} className="space-y-2 rounded-lg border border-gray-200 p-3">
+                      <div className="flex gap-2">
+                        <Input
+                          placeholder={`Additional image URL #${index + 1}`}
+                          value={imageUrl}
+                          onChange={(e) => handleImageUrlChange(index, e.target.value)}
+                          className="flex-1"
+                        />
+                        <Button variant="outline" size="icon" type="button" onClick={() => removeImageField(index)}>
+                          <X className="w-4 h-4" />
+                        </Button>
+                      </div>
+                      {imageUrl.trim() && (
+                        <img
+                          src={imageUrl}
+                          alt={`Additional preview ${index + 1}`}
+                          className="w-24 h-24 object-cover rounded-lg border border-gray-200"
+                          onError={(e) => {
+                            e.currentTarget.src = 'https://via.placeholder.com/96?text=Invalid+Image';
+                          }}
+                        />
+                      )}
+                    </div>
+                  ))}
+                </div>
               )}
             </div>
             <div className="grid grid-cols-2 gap-4">
@@ -1124,14 +1240,31 @@ export default function AdminProductManagement() {
           {selectedProduct && (
             <div className="space-y-6 py-4">
               <div className="flex gap-6">
-                <img
-                  src={selectedProduct.thumbnail || selectedProduct.images?.[0] || 'https://via.placeholder.com/200'}
-                  alt={selectedProduct.name}
-                  className="w-48 h-48 object-cover rounded-lg border-2 border-gray-200"
-                  onError={(e) => {
-                    e.currentTarget.src = 'https://via.placeholder.com/200?text=No+Image';
-                  }}
-                />
+                <div className="space-y-3">
+                  <img
+                    src={selectedProduct.thumbnail || selectedProduct.images?.[0] || 'https://via.placeholder.com/200'}
+                    alt={selectedProduct.name}
+                    className="w-48 h-48 object-cover rounded-lg border-2 border-gray-200"
+                    onError={(e) => {
+                      e.currentTarget.src = 'https://via.placeholder.com/200?text=No+Image';
+                    }}
+                  />
+                  {selectedProduct.images && selectedProduct.images.length > 1 && (
+                    <div className="grid grid-cols-4 gap-2">
+                      {selectedProduct.images.map((imageUrl, index) => (
+                        <img
+                          key={`${selectedProduct._id}-image-${index}`}
+                          src={imageUrl}
+                          alt={`${selectedProduct.name} ${index + 1}`}
+                          className="w-16 h-16 object-cover rounded-md border border-gray-200"
+                          onError={(e) => {
+                            e.currentTarget.src = 'https://via.placeholder.com/64?text=No+Image';
+                          }}
+                        />
+                      ))}
+                    </div>
+                  )}
+                </div>
                 <div className="flex-1 space-y-3">
                   <div>
                     <h3 className="text-2xl font-bold text-gray-900">{selectedProduct.name}</h3>
