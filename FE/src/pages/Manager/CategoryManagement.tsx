@@ -25,7 +25,6 @@ const CATEGORY_STYLES: Record<string, { icon: string; color: string }> = {
   vegetables: { icon: '🥬', color: '#2D5A27' },
   fruits: { icon: '🍎', color: '#E53935' },
   herbs: { icon: '🌿', color: '#43A047' },
-  mushrooms: { icon: '🍄', color: '#8D6E63' },
   'dried-seafood': { icon: '🦐', color: '#0288D1' },
   dairy: { icon: '🥛', color: '#FDD835' },
   meat: { icon: '🥩', color: '#D32F2F' },
@@ -61,7 +60,6 @@ export default function ManagerCategoryManagement() {
   const {
     categories,
     loading,
-    pagination,
     fetchCategories,
     createCategory,
     updateCategory,
@@ -101,6 +99,8 @@ export default function ManagerCategoryManagement() {
       .replace(/[^a-z0-9]+/g, '-')
       .replace(/(^-|-$)/g, '');
   };
+
+  const visibleCategories = categories.filter((category) => category.slug !== 'mushrooms');
 
   // Reset form
   const resetForm = () => {
@@ -305,7 +305,7 @@ export default function ManagerCategoryManagement() {
 
       {/* Stats */}
       <div className="flex gap-4 text-sm text-muted-foreground">
-        <span>Total Categories: <strong className="text-foreground">{pagination?.totalCategories || categories.length}</strong></span>
+        <span>Total Categories: <strong className="text-foreground">{visibleCategories.length}</strong></span>
         <span>Total Products: <strong className="text-foreground">{totalProducts}</strong></span>
       </div>
 
@@ -318,7 +318,7 @@ export default function ManagerCategoryManagement() {
       )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {categories.map((category) => {
+        {visibleCategories.map((category) => {
           const style = getCategoryStyle(category.slug);
           return (
           <Card key={category._id} className="shadow-sm hover:shadow-md transition-all border-l-4" style={{ borderLeftColor: style.color }}>
@@ -382,7 +382,7 @@ export default function ManagerCategoryManagement() {
         })}
       </div>
 
-      {!loading && categories.length === 0 && (
+      {!loading && visibleCategories.length === 0 && (
         <div className="text-center py-12 text-muted-foreground">
           <Package className="w-12 h-12 mx-auto mb-4 opacity-50" />
           <p>No categories found</p>
