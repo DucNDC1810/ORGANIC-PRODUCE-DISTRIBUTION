@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { createContext, useContext, useState, useEffect, ReactNode, useRef } from 'react';
 import { cartService, CartItem as APICartItem } from '../services/cartService';
 import { useAuth } from './AuthContext';
 import { toast } from 'sonner';
@@ -60,15 +60,67 @@ export function CartProvider({ children }: { children: ReactNode }) {
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const { user, isAuthenticated } = useAuth();
+  const syncedUserIdRef = useRef<string | null>(null);
 
-  // Load cart when user logs in
-  useEffect(() => {
-    if (isAuthenticated && user) {
-      loadCart();
-    } else {
-      // Clear cart when user logs out
-      setCart([]);
+  const getLocalCartSnapshot = (): CartItem[] => {
+    try {
+      const savedCart = localStorage.getItem('cart');
+      if (!savedCart) return [];
+      const parsed = JSON.parse(savedCart);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch (error) {
+      console.error('Error parsing local cart:', error);
+      return [];
     }
+  };
+
+  const syncLocalCartToServer = async (): Promise<boolean> => {
+    const localItems = getLocalCartSnapshot();
+    if (!localItems.length) return false;
+
+    const syncPayload = {
+      items: localItems.map((item) => ({
+        product: item.id,
+        quantity: item.quantity,
+        price: item.price,
+        name: item.name,
+        image: item.image,
+      })),
+    };
+
+    try {
+      const apiCart = await cartService.syncCart(syncPayload);
+      if (apiCart && apiCart.items && Array.isArray(apiCart.items)) {
+        const localCart = apiCart.items
+          .map(convertAPICartItemToLocal)
+          .filter((item): item is CartItem => item !== null);
+        setCart(localCart);
+      }
+      localStorage.removeItem('cart');
+      return true;
+    } catch (error) {
+      console.error('Error syncing local cart:', error);
+      return false;
+    }
+  };
+
+  // Load/sync cart when authentication state changes
+  useEffect(() => {
+    const hydrateCart = async () => {
+      if (isAuthenticated && user) {
+        if (syncedUserIdRef.current !== user._id) {
+          await syncLocalCartToServer();
+          syncedUserIdRef.current = user._id;
+        }
+        await loadCart();
+        return;
+      }
+
+      syncedUserIdRef.current = null;
+      loadLocalCart();
+    };
+
+    hydrateCart();
   }, [isAuthenticated, user]);
 
   const loadCart = async () => {
@@ -97,9 +149,12 @@ export function CartProvider({ children }: { children: ReactNode }) {
       const savedCart = localStorage.getItem('cart');
       if (savedCart) {
         setCart(JSON.parse(savedCart));
+      } else {
+        setCart([]);
       }
     } catch (error) {
       console.error('Error loading local cart:', error);
+      setCart([]);
     }
   };
 

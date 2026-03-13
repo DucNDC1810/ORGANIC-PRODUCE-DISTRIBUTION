@@ -35,18 +35,24 @@ interface JWTPayload {
 class AuthService {
   async login(credentials: LoginCredentials): Promise<AuthResponse> {
     const response: any = await api.post('/auth/login', credentials);
-    if (response.data?.token) {
-      localStorage.setItem('token', response.data.token);
-      localStorage.setItem('user', JSON.stringify(response.data.user));
+    const authData = response?.data ?? response;
+    const token = authData?.token;
+    const user = authData?.user;
+    if (token && user) {
+      localStorage.setItem('token', token);
+      localStorage.setItem('user', JSON.stringify(user));
     }
     return response;
   }
 
   async register(userData: RegisterData): Promise<AuthResponse> {
     const response: any = await api.post('/auth/register', userData);
-    if (response.data?.token) {
-      localStorage.setItem('token', response.data.token);
-      localStorage.setItem('user', JSON.stringify(response.data.user));
+    const authData = response?.data ?? response;
+    const token = authData?.token;
+    const user = authData?.user;
+    if (token && user) {
+      localStorage.setItem('token', token);
+      localStorage.setItem('user', JSON.stringify(user));
     }
     return response;
   }

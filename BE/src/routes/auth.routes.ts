@@ -1,4 +1,4 @@
-import { Router } from 'express';
+import { Router, Request, Response, NextFunction } from 'express';
 import { UserController } from '../controllers/user.controller';
 import passport from 'passport';
 
@@ -21,11 +21,28 @@ router.get('/google', passport.authenticate('google', {
   session: false 
 }));
 
-router.get('/google/callback', 
-  passport.authenticate('google', { 
-    session: false,
-    failureRedirect: '/login' 
-  }),
+router.get(
+  '/google/callback',
+  (req: Request, res: Response, next: NextFunction) => {
+    passport.authenticate('google', { session: false }, (err: any, user: any) => {
+      const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+
+      if (err) {
+        const errorCode = err.statusCode === 409 ? 'google_account_exists' : 'authentication_failed';
+        const message = encodeURIComponent(err.message || 'Google authentication failed');
+        res.redirect(`${frontendUrl}/login?error=${errorCode}&message=${message}`);
+        return;
+      }
+
+      if (!user) {
+        res.redirect(`${frontendUrl}/login?error=authentication_failed`);
+        return;
+      }
+
+      req.user = user;
+      next();
+    })(req, res, next);
+  },
   userController.googleCallback
 );
 

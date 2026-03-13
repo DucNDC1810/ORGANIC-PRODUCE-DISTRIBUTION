@@ -212,4 +212,53 @@ export class CartService {
       throw new AppError(error.message || 'Error clearing cart', 500);
     }
   }
+
+  /**
+   * Sync guest (local) cart items into the user's server cart.
+   * Quantities are merged: if product already exists, quantities are summed (capped at stock).
+   */
+  async syncCart(userId: string, items: { product: string; quantity: number }[]): Promise<ICart> {
+    try {
+      let cart = await Cart.findOne({ user: userId });
+      if (!cart) {
+        cart = new Cart({ user: userId, items: [] });
+      }
+
+      for (const guestItem of items) {
+        const product = await Product.findById(guestItem.product);
+        if (!product || !product.isActive) continue; // skip unavailable products
+
+        const existingIndex = cart.items.findIndex(
+          (item: any) => item.product.toString() === guestItem.product
+        );
+
+        if (existingIndex > -1) {
+          const merged = cart.items[existingIndex].quantity + guestItem.quantity;
+          cart.items[existingIndex].quantity = Math.min(merged, product.stock);
+          cart.items[existingIndex].price = product.price;
+          cart.items[existingIndex].name = product.name;
+          cart.items[existingIndex].image = product.images?.[0] || product.thumbnail || '';
+        } else {
+          const qty = Math.min(guestItem.quantity, product.stock);
+          if (qty < 1) continue;
+          const newItem: any = {
+            product: new Types.ObjectId(guestItem.product),
+            quantity: qty,
+            price: product.price,
+            name: product.name,
+            image: product.images?.[0] || product.thumbnail || ''
+          };
+          cart.items.push(newItem);
+        }
+      }
+
+      await cart.save();
+      await cart.populate('items.product', 'name price images thumbnail stock isActive');
+
+      return cart;
+    } catch (error: any) {
+      if (error instanceof AppError) throw error;
+      throw new AppError(error.message || 'Error syncing cart', 500);
+    }
+  }
 }

@@ -31,26 +31,112 @@ import RecurringDeliveryModal, {
 } from "../../components/RecurringDeliveryModal";
 
 export default function CheckoutPage() {
-  const { cart, removeFromCart } = useCart();
+  const { cart, removeFromCart, loading: cartLoading } = useCart();
   const { user } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const { groupSession } = useGroup();
 
   // Buy Now: single item passed directly from ProductDetailPage (does not touch cart)
-  const buyNowItem = (location.state as any)?.buyNowItem as {
+  const isBuyNowIntent = new URLSearchParams(location.search).get('intent') === 'buynow';
+
+  const locationBuyNowItem = (location.state as any)?.buyNowItem as {
     id: string; name: string; price: number; image: string; category: string; quantity: number;
   } | undefined;
 
+  // Only read sessionStorage buyNow item when intent=buynow (login-redirect case).
+  // Using a ref so we read sessionStorage exactly once at mount, then clear it.
+  const storedBuyNowItemRef = useRef<{
+    id: string; name: string; price: number; image: string; category: string; quantity: number; stock?: number;
+  } | undefined>((() => {
+    if (!isBuyNowIntent) return undefined; // never use storage unless intent matches
+    try {
+      const raw = sessionStorage.getItem('buyNowCheckoutItem');
+      if (!raw) return undefined;
+      const parsed = JSON.parse(raw);
+      if (!parsed?.id || !parsed?.name) return undefined;
+      return parsed;
+    } catch { return undefined; }
+  })());
+
+  const buyNowItem = locationBuyNowItem || storedBuyNowItemRef.current;
+
+  // Persist buyNowItem for the login-redirect round-trip; always clear otherwise.
+  useEffect(() => {
+    if (isBuyNowIntent && locationBuyNowItem) {
+      sessionStorage.setItem('buyNowCheckoutItem', JSON.stringify(locationBuyNowItem));
+    } else {
+      sessionStorage.removeItem('buyNowCheckoutItem');
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // Items selected in CartPage (undefined = all items)
-  const selectedItemIds = (location.state as any)?.selectedItemIds as string[] | undefined;
+  const isMiniCartIntent = new URLSearchParams(location.search).get('intent') === 'minicart';
+
+  const storedSelectedItemIds = (() => {
+    try {
+      const raw = sessionStorage.getItem('checkoutSelectedItemIds');
+      if (!raw) return undefined;
+      const parsed = JSON.parse(raw);
+      if (!Array.isArray(parsed)) return undefined;
+      const ids = parsed.map((id) => String(id).trim()).filter(Boolean);
+      return ids.length > 0 ? ids : undefined;
+    } catch {
+      return undefined;
+    }
+  })();
+
+  const querySelectedItemIds = (() => {
+    const itemsParam = new URLSearchParams(location.search).get('items');
+    if (!itemsParam) return undefined;
+    const ids = itemsParam.split(',').map((id) => id.trim()).filter(Boolean);
+    return ids.length > 0 ? ids : undefined;
+  })();
+  const stateSelectedItemIds = ((location.state as any)?.selectedItemIds as string[] | undefined)
+    ?.map((id) => String(id).trim())
+    .filter(Boolean);
+
+  const selectedItemIds =
+    stateSelectedItemIds && stateSelectedItemIds.length > 0
+      ? stateSelectedItemIds
+      : querySelectedItemIds && querySelectedItemIds.length > 0
+      ? querySelectedItemIds
+      : isMiniCartIntent
+      ? storedSelectedItemIds
+      : undefined;
+
+  useEffect(() => {
+    // Only persist IDs that survive a login redirect (query params or already in storage).
+    // State-sourced IDs do NOT survive redirect so we never need to re-save them.
+    if ((querySelectedItemIds && querySelectedItemIds.length > 0) || isMiniCartIntent) {
+      if (selectedItemIds && selectedItemIds.length > 0) {
+        sessionStorage.setItem('checkoutSelectedItemIds', JSON.stringify(selectedItemIds));
+        return;
+      }
+    }
+    // For any other flow (cart page navigation, buy now) clear the key immediately.
+    sessionStorage.removeItem('checkoutSelectedItemIds');
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const checkoutItems = buyNowItem
     ? [{ ...buyNowItem }]
     : selectedItemIds
     ? cart.filter((i) => selectedItemIds.includes(i.id))
     : cart;
 
-  // Local quantity state — isolated from CartContext so minicart is unaffected
+  // Track whether the cart has been populated at least once (to distinguish
+  // "still loading" from "genuinely empty" after login redirect).
+  const cartHydratedRef = useRef(false);
+  useEffect(() => {
+    if (!cartLoading && cart.length > 0) cartHydratedRef.current = true;
+  }, [cartLoading, cart]);
+  const isCartPending =
+    !buyNowItem &&
+    !cartHydratedRef.current &&
+    (cartLoading || (checkoutItems.length === 0 && (isMiniCartIntent || isBuyNowIntent || (selectedItemIds && selectedItemIds.length > 0))));
+
   const [localQty, setLocalQty] = useState<Record<string, number>>(() =>
     Object.fromEntries(checkoutItems.map((i) => [i.id, i.quantity]))
   );
@@ -1441,7 +1527,13 @@ export default function CheckoutPage() {
                 </h3>
 
                 <div className="space-y-4">
-                  {checkoutItems.map((item) => (
+                  {isCartPending ? (
+                    <div className="flex items-center justify-center py-8 text-gray-400">
+                      <Loader className="w-5 h-5 animate-spin mr-2" />
+                      <span className="text-sm">Loading cart...</span>
+                    </div>
+                  ) : (
+                  checkoutItems.map((item) => (
                     <div key={item.id} className="flex gap-3">
                       <div className="w-14 h-14 bg-gray-100 rounded-lg overflow-hidden flex-shrink-0">
                         <img
@@ -1514,7 +1606,7 @@ export default function CheckoutPage() {
                         })()}
                       </div>
                     </div>
-                  ))}
+                  )))}
                 </div>
 
                 <div className="mt-4 pt-4 border-t border-gray-200">

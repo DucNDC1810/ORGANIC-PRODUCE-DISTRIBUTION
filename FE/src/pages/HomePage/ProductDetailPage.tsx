@@ -127,17 +127,21 @@ export default function ProductDetailPage() {
 
   const handleBuyNow = () => {
     if (!selectedProduct) return;
-    navigate('/checkout', {
+    const buyNowItem = {
+      id: selectedProduct._id,
+      name: selectedProduct.name,
+      price: selectedProduct.price,
+      image: selectedProduct.images?.[0] || selectedProduct.thumbnail || '',
+      category: selectedProduct.category,
+      quantity,
+      stock: selectedProduct.stock,
+    };
+
+    sessionStorage.setItem('buyNowCheckoutItem', JSON.stringify(buyNowItem));
+
+    navigate('/checkout?intent=buynow', {
       state: {
-        buyNowItem: {
-          id: selectedProduct._id,
-          name: selectedProduct.name,
-          price: selectedProduct.price,
-          image: selectedProduct.images?.[0] || selectedProduct.thumbnail || '',
-          category: selectedProduct.category,
-          quantity,
-          stock: selectedProduct.stock,
-        },
+        buyNowItem,
       },
     });
   };
