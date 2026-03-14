@@ -585,7 +585,7 @@ function OrderDetailModal({
                         <div className="flex items-start gap-2 pt-2 border-t border-blue-200">
                           <Truck className="w-3.5 h-3.5 text-blue-500 flex-shrink-0 mt-0.5" />
                           <p className="text-xs text-blue-700 leading-relaxed">
-                            Đây là địa chỉ của chủ nhóm — tất cả sản phẩm trong nhóm sẽ được giao đến đây.
+                            This is the group's main address — all products in the group will be delivered here.
                           </p>
                         </div>
                       )}
