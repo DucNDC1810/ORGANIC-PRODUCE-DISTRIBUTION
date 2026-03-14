@@ -190,8 +190,7 @@ export default function LoginPage() {
       sessionStorage.setItem('redirectAfterLogin', pendingRedirect);
     }
 
-    const apiBaseUrl = import.meta.env.VITE_API_URL || 'https://organic-produce-be.onrender.com/api';
-    window.location.href = `${apiBaseUrl}/auth/google`;
+    navigate('/auth/google');
   };
 
   return (

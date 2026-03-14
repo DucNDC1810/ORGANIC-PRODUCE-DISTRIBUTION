@@ -17,6 +17,7 @@ const LoginPage            = lazy(() => import('./pages/HomePage/LoginPage'));
 const SignUpPage           = lazy(() => import('./pages/HomePage/SignUpPage'));
 const ForgotPasswordPage   = lazy(() => import('./pages/HomePage/ForgotPasswordPage'));
 const ResetPasswordPage    = lazy(() => import('./pages/HomePage/ResetPasswordPage'));
+const GoogleAuthLoadingPage = lazy(() => import('./pages/HomePage/GoogleAuthLoadingPage'));
 const AuthCallbackPage     = lazy(() => import('./pages/HomePage/AuthCallbackPage'));
 const VerifyEmailPage      = lazy(() => import('./pages/HomePage/VerifyEmailPage'));
 const FarmStories          = lazy(() => import('./pages/HomePage/FarmStories'));
@@ -52,6 +53,7 @@ export default function App() {
               <Route path="/signup" element={<SignUpPage />} />
               <Route path="/forgot-password" element={<ForgotPasswordPage />} />
               <Route path="/reset-password" element={<ResetPasswordPage />} />
+              <Route path="/auth/google" element={<GoogleAuthLoadingPage />} />
               <Route path="/auth/callback" element={<AuthCallbackPage />} />
               <Route path="/verify-email" element={<VerifyEmailPage />} />
               <Route path="/blogs/green-living" element={<BlogsPage />} />
