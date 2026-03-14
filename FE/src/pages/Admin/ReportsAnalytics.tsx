@@ -80,9 +80,6 @@ export default function ReportsAnalytics() {
           break;
       }
 
-      const startDateStr = startDate.toISOString().split('T')[0];
-      const endDateStr = endDate.toISOString().split('T')[0];
-
       // Fetch all data in parallel - temporarily remove date filter to get all data
       const [ordersRes, productsRes, categoriesRes, orderStatsRes] = await Promise.all([
         orderService.getAllOrders({ 
@@ -167,7 +164,6 @@ export default function ReportsAnalytics() {
 
       // Calculate summary stats
       const orderStats = (orderStatsRes as any)?.data || {};
-      const totalOrders = orderStats.totalOrders || filteredOrders.length;
       const totalRevenue = orderStats.totalRevenue || filteredOrders.reduce((sum: number, o: any) => sum + (o.totalAmount || 0), 0);
       
       // Find highest order value from filtered orders
