@@ -166,25 +166,12 @@ export default function CustomerManagement() {
     }
   };
 
-  // Calculate password strength
+  // Calculate password strength by length only (policy: min 6 chars)
   const calculatePasswordStrength = (password: string) => {
-    let score = 0;
     if (!password) return { score: 0, text: '', color: '' };
-    
-    // Length
-    if (password.length >= 6) score++;
-    if (password.length >= 10) score++;
-    
-    // Character variety
-    if (/[a-z]/.test(password)) score++;
-    if (/[A-Z]/.test(password)) score++;
-    if (/[0-9]/.test(password)) score++;
-    if (/[^a-zA-Z0-9]/.test(password)) score++;
-    
-    // Return strength assessment
-    if (score <= 2) return { score, text: 'Weak', color: 'bg-red-500' };
-    if (score <= 4) return { score, text: 'Medium', color: 'bg-yellow-500' };
-    return { score, text: 'Strong', color: 'bg-green-500' };
+    if (password.length < 6) return { score: 2, text: 'Weak', color: 'bg-red-500' };
+    if (password.length < 10) return { score: 4, text: 'Medium', color: 'bg-yellow-500' };
+    return { score: 6, text: 'Strong', color: 'bg-green-500' };
   };
 
   // Handle create user
@@ -240,25 +227,13 @@ export default function CustomerManagement() {
     }
   };
 
-  // Validate password in real-time
+  // Validate password with minimum length only
   const validatePassword = (password: string): string => {
     if (!password) {
       return 'Password is required';
     }
     if (password.length < 6) {
       return 'Password must be at least 6 characters';
-    }
-    if (password.length > 50) {
-      return 'Password must be less than 50 characters';
-    }
-    if (!/[A-Z]/.test(password)) {
-      return 'Password must contain at least one uppercase letter';
-    }
-    if (!/[a-z]/.test(password)) {
-      return 'Password must contain at least one lowercase letter';
-    }
-    if (!/[0-9]/.test(password)) {
-      return 'Password must contain at least one number';
     }
     return '';
   };
@@ -798,7 +773,7 @@ export default function CustomerManagement() {
                         setPasswordStrength(calculatePasswordStrength(e.target.value));
                       }} 
                       className="pl-10 pr-10 border-gray-300 focus:border-green-500 focus:ring-green-500 transition-all"
-                      placeholder="Min 6 chars, 1 uppercase, 1 number"
+                      placeholder="Minimum 6 characters"
                       type={showCreatePassword ? 'text' : 'password'}
                       required
                     />
@@ -828,7 +803,7 @@ export default function CustomerManagement() {
                           {passwordStrength.text}
                         </span>
                       </div>
-                      <p className="text-xs text-gray-500">Use uppercase, lowercase, numbers & symbols</p>
+                      <p className="text-xs text-gray-500">Password must be at least 6 characters</p>
                     </div>
                   )}
                 </div>
@@ -1072,23 +1047,8 @@ export default function CustomerManagement() {
               <p className="text-xs font-semibold text-blue-800 mb-2">Password Requirements:</p>
               <ul className="text-xs text-blue-700 space-y-1">
                 <li className="flex items-center gap-1">
-                  <span className={newPassword.length >= 6 && newPassword.length <= 50 ? 'text-green-600' : ''}>
-                    • 6-50 characters
-                  </span>
-                </li>
-                <li className="flex items-center gap-1">
-                  <span className={/[A-Z]/.test(newPassword) ? 'text-green-600' : ''}>
-                    • At least one uppercase letter
-                  </span>
-                </li>
-                <li className="flex items-center gap-1">
-                  <span className={/[a-z]/.test(newPassword) ? 'text-green-600' : ''}>
-                    • At least one lowercase letter
-                  </span>
-                </li>
-                <li className="flex items-center gap-1">
-                  <span className={/[0-9]/.test(newPassword) ? 'text-green-600' : ''}>
-                    • At least one number
+                  <span className={newPassword.length >= 6 ? 'text-green-600' : ''}>
+                    • At least 6 characters
                   </span>
                 </li>
               </ul>
