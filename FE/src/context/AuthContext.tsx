@@ -16,8 +16,21 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-const INACTIVITY_TIMEOUT = 10 * 60 * 1000; // 10 minutes in milliseconds
+const DEFAULT_INACTIVITY_TIMEOUT = 10 * 60 * 1000;
+const ADMIN_SESSION_TIMEOUT_KEY = 'admin_session_timeout_minutes';
+const ADMIN_SESSION_TIMEOUT_UPDATED_EVENT = 'admin-session-timeout-updated';
 const AUTH_PAGES = ['/login', '/signup', '/forgot-password', '/reset-password', '/verify-email'];
+
+const getAdminInactivityTimeout = () => {
+  const rawValue = localStorage.getItem(ADMIN_SESSION_TIMEOUT_KEY);
+  const parsedMinutes = Number(rawValue);
+
+  if (!Number.isFinite(parsedMinutes) || parsedMinutes < 1 || parsedMinutes > 1440) {
+    return DEFAULT_INACTIVITY_TIMEOUT;
+  }
+
+  return parsedMinutes * 60 * 1000;
+};
 
 export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
@@ -50,11 +63,15 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
     // Only set timer if user is logged in
     if (user) {
+      const timeoutDuration = user.role === 'admin'
+        ? getAdminInactivityTimeout()
+        : DEFAULT_INACTIVITY_TIMEOUT;
+
       inactivityTimerRef.current = setTimeout(() => {
         toast.error('Your session has expired due to inactivity. Please log in again..');
         logout();
         window.location.href = `/login?redirect=${encodeURIComponent(`${window.location.pathname}${window.location.search}`)}`;
-      }, INACTIVITY_TIMEOUT);
+      }, timeoutDuration);
     }
   }, [user, logout]);
 
@@ -110,6 +127,20 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       if (inactivityTimerRef.current) {
         clearTimeout(inactivityTimerRef.current);
       }
+    };
+  }, [user, resetInactivityTimer]);
+
+  useEffect(() => {
+    const handleTimeoutUpdated = () => {
+      if (user?.role === 'admin') {
+        resetInactivityTimer();
+      }
+    };
+
+    window.addEventListener(ADMIN_SESSION_TIMEOUT_UPDATED_EVENT, handleTimeoutUpdated);
+
+    return () => {
+      window.removeEventListener(ADMIN_SESSION_TIMEOUT_UPDATED_EVENT, handleTimeoutUpdated);
     };
   }, [user, resetInactivityTimer]);
 
