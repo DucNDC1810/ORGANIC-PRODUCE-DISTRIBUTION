@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Users, TrendingUp, Eye, Search, Edit, Trash2, UserCheck, UserX, RefreshCw, ChevronLeft, ChevronRight, Shield, AlertTriangle, Lock, UserPlus, EyeOff, Mail, User as UserIcon, Phone, MapPin, KeyRound, Briefcase } from 'lucide-react';
+import { Users, TrendingUp, Eye, Search, Edit, Trash2, UserCheck, UserX, RefreshCw, ChevronLeft, ChevronRight, Shield, AlertTriangle, Lock, UserPlus, EyeOff, Mail, User as UserIcon, Phone, MapPin, KeyRound, Briefcase, UserCog } from 'lucide-react';
 import { Button } from '../../components/ui/button';
 import { Badge } from '../../components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
@@ -87,8 +87,8 @@ export default function CustomerManagement() {
         search: search || undefined,
         role: roleFilter !== 'all' ? roleFilter : undefined,
         isActive: statusFilter === 'active' ? true : statusFilter === 'inactive' ? false : undefined,
-        sortBy: 'createdAt',
-        sortOrder: 'desc'
+        sortBy: 'name',
+        sortOrder: 'asc'
       });
       setUsers(response.data);
       setPagination(response.pagination);
@@ -241,6 +241,13 @@ export default function CustomerManagement() {
   // Handle reset password
   const handleResetPassword = async () => {
     if (!selectedUser) return;
+
+    if (selectedUser.role !== 'admin') {
+      const message = 'Admin chỉ được đổi mật khẩu cho tài khoản admin';
+      setPasswordError(message);
+      toast.error(message);
+      return;
+    }
     
     // Validate new password
     const passwordValidationError = validatePassword(newPassword);
@@ -300,6 +307,11 @@ export default function CustomerManagement() {
 
   // Open password dialog
   const openPasswordDialog = (user: User) => {
+    if (user.role !== 'admin') {
+      toast.error('Không thể đổi mật khẩu cho tài khoản không phải admin');
+      return;
+    }
+
     setSelectedUser(user);
     setNewPassword('');
     setConfirmPassword('');
@@ -485,11 +497,17 @@ export default function CustomerManagement() {
                           <Button variant="ghost" size="sm" onClick={() => openEditDialog(user)} title="Edit User">
                             <Edit className="w-4 h-4" />
                           </Button>
-                          <Button variant="ghost" size="sm" onClick={() => openPasswordDialog(user)} title="Reset Password">
-                            <Lock className="w-4 h-4 text-orange-500" />
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => openPasswordDialog(user)}
+                            title={user.role === 'admin' ? 'Reset Password Admin' : 'Chỉ hỗ trợ đổi mật khẩu cho Admin'}
+                            disabled={user.role !== 'admin'}
+                          >
+                            <KeyRound className={`w-4 h-4 ${user.role === 'admin' ? 'text-orange-500' : 'text-gray-300'}`} />
                           </Button>
                           <Button variant="ghost" size="sm" onClick={() => openRoleDialog(user)} title="Change Role">
-                            <Shield className="w-4 h-4" />
+                            <UserCog className="w-4 h-4 text-indigo-600" />
                           </Button>
                           <Button variant="ghost" size="sm" onClick={() => { setSelectedUser(user); setStatusDialogOpen(true); }} title="Toggle Status">
                             {user.isActive ? <UserX className="w-4 h-4 text-red-500" /> : <UserCheck className="w-4 h-4 text-green-500" />}
