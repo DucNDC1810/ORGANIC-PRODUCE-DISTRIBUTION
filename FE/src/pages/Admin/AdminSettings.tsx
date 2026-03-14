@@ -9,6 +9,7 @@ import api from '../../services/api';
 const SESSION_TIMEOUT_KEY = 'admin_session_timeout_minutes';
 const DEFAULT_TIMEOUT = 30;
 const SESSION_TIMEOUT_TOAST_ID = 'admin-session-timeout-toast';
+const SESSION_TIMEOUT_UPDATED_EVENT = 'admin-session-timeout-updated';
 
 interface LockedUser {
   _id: string;
@@ -94,6 +95,7 @@ export default function AdminSettings() {
     }
     localStorage.setItem(SESSION_TIMEOUT_KEY, String(timeoutDraft));
     setSessionTimeout(timeoutDraft);
+    window.dispatchEvent(new Event(SESSION_TIMEOUT_UPDATED_EVENT));
     toast.success(`Session timeout set to ${timeoutDraft} minutes`, {
       id: SESSION_TIMEOUT_TOAST_ID,
     });
@@ -555,7 +557,7 @@ export default function AdminSettings() {
               </div>
               
               <p className="text-xs text-gray-500 leading-relaxed">
-                Session timeout is stored <span className="font-semibold">locally</span> and applies on next login. Range: 1–1440 minutes.
+                Session timeout is stored <span className="font-semibold">locally</span> and applies immediately to the current admin session. Range: 1–1440 minutes.
               </p>
             </div>
 
