@@ -275,7 +275,13 @@ export class OrderController {
       const limitNum = parseInt(limit as string) || 10;
       const skip = (pageNum - 1) * limitNum;
 
-      const filter: any = { userId };
+      const userObjectId = new mongoose.Types.ObjectId(userId);
+      const filter: any = {
+        $or: [
+          { userId: userObjectId },
+          { memberIds: userObjectId },
+        ],
+      };
 
       if (status) {
         filter.status = status;
@@ -324,10 +330,11 @@ export class OrderController {
         throw new AppError('Order not found', 404);
       }
 
-      // Check if user is owner or admin
-      // After populate(), userId becomes a User object, so use _id to get the actual ID
+      // Check if user is owner, a group member, or admin
       const orderUserId = (order.userId as any)?._id?.toString() ?? order.userId.toString();
-      if (req.user?.role !== 'admin' && req.user?.id !== orderUserId) {
+      const memberIds: string[] = ((order as any).memberIds ?? []).map((id: any) => id?.toString());
+      const isGroupMember = memberIds.includes(req.user?.id ?? '');
+      if (req.user?.role !== 'admin' && req.user?.id !== orderUserId && !isGroupMember) {
         throw new AppError('You do not have permission to view this order', 403);
       }
 
