@@ -8,6 +8,7 @@ import api from '../../services/api';
 // ─── Session timeout stored in localStorage ───────────────────────────────────
 const SESSION_TIMEOUT_KEY = 'admin_session_timeout_minutes';
 const DEFAULT_TIMEOUT = 30;
+const SESSION_TIMEOUT_TOAST_ID = 'admin-session-timeout-toast';
 
 interface LockedUser {
   _id: string;
@@ -86,12 +87,16 @@ export default function AdminSettings() {
 
   const handleSaveTimeout = () => {
     if (timeoutDraft < 1 || timeoutDraft > 1440) {
-      toast.error('Session timeout must be between 1 and 1440 minutes');
+      toast.error('Session timeout must be between 1 and 1440 minutes', {
+        id: SESSION_TIMEOUT_TOAST_ID,
+      });
       return;
     }
     localStorage.setItem(SESSION_TIMEOUT_KEY, String(timeoutDraft));
     setSessionTimeout(timeoutDraft);
-    toast.success(`Session timeout set to ${timeoutDraft} minutes`);
+    toast.success(`Session timeout set to ${timeoutDraft} minutes`, {
+      id: SESSION_TIMEOUT_TOAST_ID,
+    });
   };
 
   const handleUnlockUser = async (userId: string) => {

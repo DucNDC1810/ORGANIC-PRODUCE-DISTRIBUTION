@@ -4,10 +4,21 @@ export class EmailService {
   private transporter: nodemailer.Transporter;
 
   constructor() {
+    const port = parseInt(process.env.EMAIL_PORT || '587');
+    const secure = process.env.EMAIL_SECURE
+      ? process.env.EMAIL_SECURE === 'true'
+      : port === 465;
+
     this.transporter = nodemailer.createTransport({
       host: process.env.EMAIL_HOST || 'smtp.gmail.com',
-      port: parseInt(process.env.EMAIL_PORT || '587'),
-      secure: false, // true for 465, false for other ports
+      port,
+      secure,
+      pool: true,
+      maxConnections: parseInt(process.env.EMAIL_MAX_CONNECTIONS || '5'),
+      maxMessages: parseInt(process.env.EMAIL_MAX_MESSAGES || '100'),
+      connectionTimeout: parseInt(process.env.EMAIL_CONNECTION_TIMEOUT || '10000'),
+      greetingTimeout: parseInt(process.env.EMAIL_GREETING_TIMEOUT || '10000'),
+      socketTimeout: parseInt(process.env.EMAIL_SOCKET_TIMEOUT || '20000'),
       auth: {
         user: process.env.EMAIL_USER,
         pass: process.env.EMAIL_PASSWORD,
