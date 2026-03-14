@@ -34,7 +34,7 @@ interface UseCategoriesReturn {
   fetchCategoryStats: () => Promise<void>;
   createCategory: (data: CreateCategoryData) => Promise<Category | null>;
   updateCategory: (id: string, data: UpdateCategoryData) => Promise<Category | null>;
-  deleteCategory: (id: string, force?: boolean) => Promise<boolean>;
+  deleteCategory: (id: string) => Promise<boolean>;
   toggleCategoryStatus: (id: string) => Promise<Category | null>;
   checkSlugExists: (slug: string, excludeId?: string) => Promise<boolean>;
   reorderCategories: (orderedIds: string[]) => Promise<boolean>;
@@ -223,11 +223,11 @@ export const useCategories = (): UseCategoriesReturn => {
   }, []);
 
   // Delete category
-  const deleteCategory = useCallback(async (id: string, force: boolean = false): Promise<boolean> => {
+  const deleteCategory = useCallback(async (id: string): Promise<boolean> => {
     setLoading(true);
     setError(null);
     try {
-      const response = await categoryService.deleteCategory(id, force);
+      const response = await categoryService.deleteCategory(id);
       if (response.success) {
         setCategories(prev => prev.filter(c => c._id !== id));
         toast.success('Category deleted successfully!');

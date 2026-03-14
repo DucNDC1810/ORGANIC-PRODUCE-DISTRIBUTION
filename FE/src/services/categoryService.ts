@@ -193,8 +193,8 @@ export const categoryService = {
   /**
    * Delete a category
    */
-  deleteCategory: async (id: string, force: boolean = false): Promise<MessageResponse> => {
-    const response = await api.delete(`/categories/${id}?force=${force}`);
+  deleteCategory: async (id: string): Promise<MessageResponse> => {
+    const response = await api.delete(`/categories/${id}`);
     return response as unknown as MessageResponse;
   },
 

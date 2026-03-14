@@ -321,19 +321,19 @@ export class CategoryService {
       throw AppError.notFound('Category');
     }
 
+    // Never allow deleting a category that still has products.
+    const productsCount = await Product.countDocuments({ category: category.slug });
+    if (productsCount > 0) {
+      throw AppError.conflict(
+        `Cannot delete category. It has ${productsCount} products. Please move or delete products first.`
+      );
+    }
+
     // Check if category has subcategories
     const subcategoriesCount = await Category.countDocuments({ parentCategory: id });
     if (subcategoriesCount > 0 && !force) {
       throw AppError.conflict(
         `Cannot delete category. It has ${subcategoriesCount} subcategories. Use force=true to delete anyway.`
-      );
-    }
-
-    // Check if category has products
-    const productsCount = await Product.countDocuments({ category: category.slug });
-    if (productsCount > 0 && !force) {
-      throw AppError.conflict(
-        `Cannot delete category. It has ${productsCount} products. Use force=true to delete anyway.`
       );
     }
 
@@ -580,6 +580,31 @@ export class CategoryService {
    */
   async bulkDeleteCategories(ids: string[]): Promise<{ deletedCount: number }> {
     const objectIds = ids.map(id => new mongoose.Types.ObjectId(id));
+
+    const categories = await Category.find({ _id: { $in: objectIds } })
+      .select('name slug')
+      .lean();
+
+    if (categories.length === 0) {
+      return { deletedCount: 0 };
+    }
+
+    const slugs = categories.map(category => category.slug);
+    const productCounts = await Product.aggregate<{ _id: string; count: number }>([
+      { $match: { category: { $in: slugs } } },
+      { $group: { _id: '$category', count: { $sum: 1 } } }
+    ]);
+
+    if (productCounts.length > 0) {
+      const countBySlug = new Map(productCounts.map(item => [item._id, item.count]));
+      const blockedCategories = categories
+        .filter(category => countBySlug.has(category.slug))
+        .map(category => `${category.name} (${countBySlug.get(category.slug)} products)`);
+
+      throw AppError.conflict(
+        `Cannot delete categories that still have products: ${blockedCategories.join(', ')}.`
+      );
+    }
     
     const result = await Category.deleteMany({ _id: { $in: objectIds } });
 
