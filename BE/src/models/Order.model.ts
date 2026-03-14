@@ -6,6 +6,7 @@ export interface IOrder extends Document {
   addressId?: mongoose.Types.ObjectId;
   voucherId?: mongoose.Types.ObjectId;
   groupId?: mongoose.Types.ObjectId;
+  memberIds?: mongoose.Types.ObjectId[];
   subscriptionId?: mongoose.Types.ObjectId;
   shipperId?: mongoose.Types.ObjectId;
   cancelledByShipperId?: mongoose.Types.ObjectId;
@@ -78,6 +79,11 @@ const orderSchema = new Schema<IOrder>(
       ref: 'Group',
       default: null
     },
+    memberIds: [{
+      type: Schema.Types.ObjectId,
+      ref: 'User',
+      default: undefined
+    }],
     subscriptionId: {
       type: Schema.Types.ObjectId,
       ref: 'Subscription',
@@ -249,5 +255,6 @@ orderSchema.index({ shipperId: 1, status: 1 });
 orderSchema.index({ orderType: 1 });
 orderSchema.index({ groupId: 1 });
 orderSchema.index({ subscriptionId: 1 });
+orderSchema.index({ memberIds: 1 });
 
 export const Order = mongoose.model<IOrder>('Order', orderSchema);

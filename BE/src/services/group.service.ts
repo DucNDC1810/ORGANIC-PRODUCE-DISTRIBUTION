@@ -310,11 +310,14 @@ export class GroupService {
             type: 'delivery' as const,
           };
 
-    // Tạo đơn hàng chính thức (pending – chờ manager duyệt trước khi ship)
+    // Tạo 1 đơn hàng tổng duy nhất (pending – chờ manager duyệt trước khi ship)
     const order = await Order.create({
       userId: ownerId,
       orderType: 'group_buy',
       groupId: new mongoose.Types.ObjectId(groupId),
+      memberIds: regularMembers
+        .filter((m) => m.userId)
+        .map((m) => m.userId as mongoose.Types.ObjectId),
       totalAmount: total,
       status: 'pending',
       paymentMethod: 'wallet',
@@ -336,41 +339,6 @@ export class GroupService {
         orderId: order._id,
         description: `Group order leader payment for "${group.groupName}"`,
         metadata: { groupId },
-      });
-    }
-
-    // Tạo đơn hàng lịch sử cho từng thành viên (không phải owner) có giỏ hàng
-    const sharedShippingPerMember = members.length > 0 ? Math.round(SHIPPING / members.length) : 0;
-    const memberDiscountPct = members.length > 0 ? activePct / members.length : 0;
-
-    for (const m of regularMembers) {
-      if (!m.userId || m.cartItems.length === 0) continue;
-
-      const memberName = (m.userId as any)?.name || m.tempName || 'Member';
-      const mSubtotal  = m.cartItems.reduce((s, i) => s + i.price * i.qty, 0);
-      const mDiscount  = Math.round(mSubtotal * memberDiscountPct / 100);
-      const mTotal     = m.walletPaid
-        ? m.walletHoldAmount  // use exact amount already charged
-        : mSubtotal + sharedShippingPerMember - mDiscount;
-
-      await Order.create({
-        userId:         m.userId,
-        orderType:      'group_buy',
-        groupId:        new mongoose.Types.ObjectId(groupId),
-        totalAmount:    mTotal,
-        status:         'pending',
-        paymentMethod:  'wallet',
-        paymentStatus:  m.walletPaid ? 'paid' : 'unpaid',
-        shippingCost:   sharedShippingPerMember,
-        discountAmount: mDiscount,
-        items: m.cartItems.map((i) => ({
-          productId: new mongoose.Types.ObjectId(i.productId),
-          quantity:  i.qty,
-          price:     i.price,
-          subtotal:  i.price * i.qty,
-        })),
-        deliveryInfo: canonicalDeliveryInfo,  // always owner's address
-        notes: `[member: ${memberName}] Đơn nhóm: ${group.groupName}`,
       });
     }
 
