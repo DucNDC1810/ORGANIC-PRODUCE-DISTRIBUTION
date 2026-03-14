@@ -195,7 +195,6 @@ export default function Overview() {
           })
         );
       } catch (err) {
-        console.error('Failed to load overview data:', err);
       } finally {
         setLoading(false);
       }

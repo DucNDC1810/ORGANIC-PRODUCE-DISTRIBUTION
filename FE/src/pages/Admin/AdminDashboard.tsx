@@ -3,8 +3,6 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { 
   Leaf, 
 
-  LogOut,
-  ChevronDown,
   Bell,
   Store,
   Package,
@@ -50,11 +48,9 @@ export default function AdminDashboard() {
     setSearchParams({ tab }, { replace: true });
   };
   const [sidebarOpen, setSidebarOpen] = useState(true);
-  const [dropdownOpen, setDropdownOpen] = useState(false);
   const [notificationOpen, setNotificationOpen] = useState(false);
   const [notifications, setNotifications] = useState<AdminNotification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
-  const dropdownRef = useRef<HTMLDivElement>(null);
   const notificationRef = useRef<HTMLDivElement>(null);
   const { user, logout } = useAuth();
   const { clearLocalCart } = useCart();
@@ -108,9 +104,6 @@ export default function AdminDashboard() {
   // Close dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
-        setDropdownOpen(false);
-      }
       if (notificationRef.current && !notificationRef.current.contains(event.target as Node)) {
         setNotificationOpen(false);
       }
@@ -331,85 +324,26 @@ export default function AdminDashboard() {
             {/* Divider */}
             <div className="h-8 w-px bg-gray-200"></div>
 
-            {/* User Dropdown */}
-            <div className="relative" ref={dropdownRef}>
-              <button
-                onClick={() => setDropdownOpen(!dropdownOpen)}
-                className="flex items-center gap-3 hover:bg-gray-100 px-3 py-2 rounded-xl transition-all duration-200 group"
-                aria-label="User menu"
-              >
-                <div className="flex items-center gap-3">
-                  <div className="hidden md:block text-right">
-                    <p className="text-sm font-semibold text-gray-800">{user?.name || 'Admin User'}</p>
-                    <p className="text-xs text-gray-500">Administrator</p>
-                  </div>
-                  <div className="relative">
-                    {user?.avatar ? (
-                      <img
-                        src={user.avatar}
-                        alt={user?.name || 'Admin'}
-                        className="w-10 h-10 rounded-full object-cover shadow-md ring-2 ring-white"
-                        onError={(e) => { e.currentTarget.style.display = 'none'; e.currentTarget.nextElementSibling?.classList.remove('hidden'); }}
-                      />
-                    ) : null}
-                    <div className={`w-10 h-10 rounded-full bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center text-white font-bold shadow-md ring-2 ring-white ${user?.avatar ? 'hidden' : ''}`}>
-                      {user?.name?.charAt(0).toUpperCase() || 'A'}
-                    </div>
-                    <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-green-500 rounded-full border-2 border-white"></div>
-                  </div>
+            {/* User Info */}
+            <div className="flex items-center gap-3 px-3 py-2 rounded-xl">
+              <div className="hidden md:block text-right">
+                <p className="text-sm font-semibold text-gray-800">{user?.name || 'Admin User'}</p>
+                <p className="text-xs text-gray-500">Administrator</p>
+              </div>
+              <div className="relative">
+                {user?.avatar ? (
+                  <img
+                    src={user.avatar}
+                    alt={user?.name || 'Admin'}
+                    className="w-10 h-10 rounded-full object-cover shadow-md ring-2 ring-white"
+                    onError={(e) => { e.currentTarget.style.display = 'none'; e.currentTarget.nextElementSibling?.classList.remove('hidden'); }}
+                  />
+                ) : null}
+                <div className={`w-10 h-10 rounded-full bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center text-white font-bold shadow-md ring-2 ring-white ${user?.avatar ? 'hidden' : ''}`}>
+                  {user?.name?.charAt(0).toUpperCase() || 'A'}
                 </div>
-                <ChevronDown className={`w-4 h-4 text-gray-500 transition-transform duration-200 ${dropdownOpen ? 'rotate-180' : ''}`} />
-              </button>
-
-              {/* Dropdown Menu */}
-              {dropdownOpen && (
-                <div className="absolute right-0 mt-3 w-64 bg-white border border-gray-200 rounded-xl shadow-xl py-2 z-[100] animate-in fade-in slide-in-from-top-2 duration-200">
-                  {/* User Info */}
-                  <div className="px-4 py-3 border-b border-gray-100">
-                    <div className="flex items-center gap-3 mb-2">
-                      {user?.avatar ? (
-                        <img
-                          src={user.avatar}
-                          alt={user?.name || 'Admin'}
-                          className="w-12 h-12 rounded-full object-cover shadow-md"
-                          onError={(e) => { e.currentTarget.style.display = 'none'; e.currentTarget.nextElementSibling?.classList.remove('hidden'); }}
-                        />
-                      ) : null}
-                      <div className={`w-12 h-12 rounded-full bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center text-white font-bold shadow-md ${user?.avatar ? 'hidden' : ''}`}>
-                        {user?.name?.charAt(0).toUpperCase() || 'A'}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-bold text-gray-900 truncate">{user?.name || 'Admin User'}</p>
-                        <p className="text-xs text-gray-500 truncate">{user?.email || 'admin@example.com'}</p>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-1.5 px-2 py-1 bg-emerald-50 rounded-md">
-                      <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full"></div>
-                      <span className="text-xs font-medium text-emerald-700">Active Now</span>
-                    </div>
-                  </div>
-
-                  {/* Menu Items */}
-                  <div className="py-2">
-                  </div>
-
-                  {/* Logout */}
-                  <div className="border-t border-gray-100 pt-2 mt-2">
-                    <button
-                      onClick={handleLogout}
-                      className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 transition-colors group"
-                    >
-                      <div className="w-8 h-8 rounded-lg bg-red-50 flex items-center justify-center group-hover:bg-red-100 transition-colors">
-                        <LogOut className="w-4 h-4 text-red-600" />
-                      </div>
-                      <div className="flex-1 text-left">
-                        <p className="font-medium">Logout</p>
-                        <p className="text-xs text-red-400">Sign out of account</p>
-                      </div>
-                    </button>
-                  </div>
-                </div>
-              )}
+                <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-green-500 rounded-full border-2 border-white"></div>
+              </div>
             </div>
           </div>
         </div>

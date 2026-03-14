@@ -195,7 +195,6 @@ export default function AdminProductManagement() {
       
       const result = await createProduct(productData);
       if (result) {
-        toast.success('Product created successfully! 🎉');
         setIsAddDialogOpen(false);
         resetForm();
         loadProducts();
@@ -228,7 +227,6 @@ export default function AdminProductManagement() {
       
       const result = await updateProduct(selectedProduct._id, updateData);
       if (result) {
-        toast.success('Product updated successfully! ✨');
         setIsEditDialogOpen(false);
         setSelectedProduct(null);
         resetForm();
@@ -248,7 +246,6 @@ export default function AdminProductManagement() {
     try {
       const success = await deleteProduct(selectedProduct._id, true);
       if (success) {
-        toast.success('Product deleted successfully');
         setIsDeleteDialogOpen(false);
         setSelectedProduct(null);
         loadProducts();
@@ -264,7 +261,6 @@ export default function AdminProductManagement() {
     try {
       const result = await toggleProductStatus(product._id);
       if (result) {
-        toast.success(`Product ${result.isActive ? 'activated' : 'deactivated'} successfully`);
         loadProducts();
       }
     } catch (error: any) {
