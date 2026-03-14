@@ -264,7 +264,7 @@ export class UserService {
     }
     // Send emails (fire-and-forget for user, awaited for admin)
     this.emailService.sendUnlockRequestConfirmation(user.email, user.name).catch(() => {});
-    await this.emailService.sendUnlockRequestToAdmin(user.name, user.email);
+    this.emailService.sendUnlockRequestToAdmin(user.name, user.email).catch(() => {});
     // Create admin notification
     createNotification(
       'unlock_request',
