@@ -13,6 +13,7 @@ const HomePage             = lazy(() => import('./pages/HomePage/Home'));
 const CartPage             = lazy(() => import('./pages/HomePage/CartPage'));
 const CheckoutPage         = lazy(() => import('./pages/Checkout/CheckoutPage'));
 const OrderSuccessPage     = lazy(() => import('./pages/Checkout/OrderSuccessPage'));
+const OrderFailurePage     = lazy(() => import('./pages/Checkout/OrderFailurePage'));
 const LoginPage            = lazy(() => import('./pages/HomePage/LoginPage'));
 const SignUpPage           = lazy(() => import('./pages/HomePage/SignUpPage'));
 const ForgotPasswordPage   = lazy(() => import('./pages/HomePage/ForgotPasswordPage'));
