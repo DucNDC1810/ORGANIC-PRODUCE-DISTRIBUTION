@@ -207,7 +207,6 @@ export default function AdminCategoryManagement() {
   const [isAddOpen, setIsAddOpen]       = useState(false);
   const [isEditOpen, setIsEditOpen]     = useState(false);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
-  const [forceDelete, setForceDelete]   = useState(false);
   const [selectedCat, setSelectedCat]   = useState<Category | null>(null);
   const [formData, setFormData]         = useState<FormData>(EMPTY_FORM);
   const [formErrors, setFormErrors]     = useState<Partial<Record<keyof FormData, string>>>({});
@@ -310,12 +309,12 @@ export default function AdminCategoryManagement() {
     if (result) { setIsEditOpen(false); setSelectedCat(null); resetForm(); fetchCategoryStats(); }
   };
 
-  const handleDeleteOpen = (cat: Category) => { setSelectedCat(cat); setForceDelete(false); setIsDeleteOpen(true); };
+  const handleDeleteOpen = (cat: Category) => { setSelectedCat(cat); setIsDeleteOpen(true); };
 
   const handleDeleteConfirm = async () => {
-    if (!selectedCat) return;
+    if (!selectedCat || selectedCat.productCount > 0) return;
     setIsDeleting(true);
-    const ok = await deleteCategory(selectedCat._id, forceDelete);
+    const ok = await deleteCategory(selectedCat._id);
     setIsDeleting(false);
     if (ok) { setIsDeleteOpen(false); setSelectedCat(null); fetchCategoryStats(); }
   };
@@ -867,21 +866,13 @@ export default function AdminCategoryManagement() {
                     <div className="rounded-lg bg-amber-50 border border-amber-200 p-3.5">
                       <div className="flex gap-2.5 items-start">
                         <AlertCircle className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" />
-                        <div className="space-y-2">
+                        <div className="space-y-1">
                           <p className="font-medium text-amber-900 text-[13px]">
                             This category has <strong>{selectedCat.productCount}</strong> product(s) linked to it.
                           </p>
-                          <label className="flex items-start gap-2 cursor-pointer group">
-                            <input
-                              type="checkbox"
-                              checked={forceDelete}
-                              onChange={e => setForceDelete(e.target.checked)}
-                              className="mt-0.5 rounded border-amber-300 accent-amber-600"
-                            />
-                            <span className="text-xs text-amber-700 group-hover:text-amber-900 transition-colors leading-relaxed">
-                              I understand - force delete and unlink all products from this category
-                            </span>
-                          </label>
+                          <p className="text-xs text-amber-700 leading-relaxed">
+                            You must remove or move all products before this category can be deleted.
+                          </p>
                         </div>
                       </div>
                     </div>
@@ -894,10 +885,10 @@ export default function AdminCategoryManagement() {
               <AlertDialogAction
                 className="bg-red-600 hover:bg-red-700 gap-1.5"
                 onClick={handleDeleteConfirm}
-                disabled={isDeleting || ((selectedCat?.productCount ?? 0) > 0 && !forceDelete)}
+                disabled={isDeleting || (selectedCat?.productCount ?? 0) > 0}
               >
                 {isDeleting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
-                Delete
+                {(selectedCat?.productCount ?? 0) > 0 ? 'Cannot Delete' : 'Delete'}
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>

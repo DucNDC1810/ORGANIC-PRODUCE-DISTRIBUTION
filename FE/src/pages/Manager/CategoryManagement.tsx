@@ -179,11 +179,10 @@ export default function ManagerCategoryManagement() {
 
   // Handle Delete - Confirm
   const handleDeleteConfirm = async () => {
-    if (!selectedCategory) return;
+    if (!selectedCategory || selectedCategory.productCount > 0) return;
     
     setIsSubmitting(true);
-    const hasProducts = selectedCategory.productCount > 0;
-    const success = await deleteCategory(selectedCategory._id, hasProducts);
+    const success = await deleteCategory(selectedCategory._id);
     setIsSubmitting(false);
     
     if (success) {
@@ -202,6 +201,7 @@ export default function ManagerCategoryManagement() {
 
   // Calculate totals
   const totalProducts = categories.reduce((sum, cat) => sum + cat.productCount, 0);
+  const isDeleteBlocked = (selectedCategory?.productCount ?? 0) > 0;
 
   return (
     <div className="space-y-6">
@@ -469,7 +469,7 @@ export default function ManagerCategoryManagement() {
               This will permanently delete the category "{selectedCategory?.name}". 
               {selectedCategory && selectedCategory.productCount > 0 && (
                 <span className="text-red-600 font-medium block mt-2">
-                  Warning: This category has {selectedCategory.productCount} products associated with it.
+                  This category has {selectedCategory.productCount} products. Remove or move all products before deleting this category.
                 </span>
               )}
             </AlertDialogDescription>
@@ -479,7 +479,7 @@ export default function ManagerCategoryManagement() {
             <AlertDialogAction 
               className="bg-red-600 hover:bg-red-700 text-white"
               onClick={handleDeleteConfirm}
-              disabled={isSubmitting}
+              disabled={isSubmitting || isDeleteBlocked}
             >
               {isSubmitting ? (
                 <>
@@ -487,7 +487,7 @@ export default function ManagerCategoryManagement() {
                   Deleting...
                 </>
               ) : (
-                'Delete'
+                isDeleteBlocked ? 'Cannot Delete' : 'Delete'
               )}
             </AlertDialogAction>
           </AlertDialogFooter>

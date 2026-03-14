@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useCart } from '../../context/CartContext';
 import { 
   CheckCircle, 
@@ -43,6 +43,7 @@ function getDeliveryScheduleLabel(config: any): string {
 
 export default function OrderSuccessPage() {
   const location = useLocation();
+  const navigate = useNavigate();
   const { refreshCart, clearCart } = useCart();
   const [orderData, setOrderData] = useState<any>(null);
   const [subscriptionConfig, setSubscriptionConfig] = useState<any>(null);
@@ -66,6 +67,7 @@ export default function OrderSuccessPage() {
   
   // Get orderId from URL params (MoMo) or location state
   const searchParams = new URLSearchParams(location.search);
+  const momoResultCode = searchParams.get('resultCode');
   const orderIdFromUrl = searchParams.get('orderId');
   const orderId = orderIdFromUrl || location.state?.orderId;
   
@@ -76,6 +78,16 @@ export default function OrderSuccessPage() {
   const isZaloPayReturn = searchParams.get('apptransid') !== null || searchParams.get('status') !== null;
 
   useEffect(() => {
+    // If MoMo returns a non-zero resultCode, render the dedicated failure page.
+    if (momoResultCode && momoResultCode !== '0') {
+      sessionStorage.removeItem('pendingMoMoOrder');
+      navigate(`/order-failed${location.search ? location.search : ''}`, {
+        replace: true,
+        state: location.state,
+      });
+      return;
+    }
+
     const verifyAndLoadOrder = async () => {
       try {
         setLoading(true);
@@ -338,7 +350,7 @@ export default function OrderSuccessPage() {
     };
 
     verifyAndLoadOrder();
-  }, []);
+  }, [momoResultCode, location.search, location.state, navigate]);
 
   const isPickup = orderData?.deliveryInfo?.type === 'pickup';
 

@@ -77,6 +77,7 @@ export default function App() {
               <Route path="/cart" element={<ProtectedRoute><CartPage /></ProtectedRoute>} />
               <Route path="/checkout" element={<ProtectedRoute><CheckoutPage /></ProtectedRoute>} />
               <Route path="/order-success" element={<ProtectedRoute><OrderSuccessPage /></ProtectedRoute>} />
+              <Route path="/order-failed" element={<ProtectedRoute><OrderFailurePage /></ProtectedRoute>} />
               <Route path="/payment-result" element={<ProtectedRoute><OrderSuccessPage /></ProtectedRoute>} />
               {/* Profile - accessible by all authenticated users */}
               <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
