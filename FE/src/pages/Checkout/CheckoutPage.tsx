@@ -88,6 +88,8 @@ export default function CheckoutPage() {
   const [deliveryType, setDeliveryType] = useState<"delivery" | "pickup">(
     "delivery",
   );
+  const isDeliveryMode = deliveryType === "delivery";
+  const isGroupOrderActive = isGroupOrder && isDeliveryMode;
   const [showRecurringModal, setShowRecurringModal] = useState(false);
   const [recurringData, setRecurringData] = useState<RecurringData | null>(null);
   const isRecurringOrder = recurringData !== null;
@@ -338,17 +340,19 @@ export default function CheckoutPage() {
 
   const baseSubtotal = checkoutItems.reduce((sum, i) => sum + i.price * (localQty[i.id] ?? i.quantity), 0);
   // For group orders, honour the subtotal/shipping/discount from the Active Group page
-  const subtotal = isGroupOrder && navGroupData ? navGroupData.subtotal : baseSubtotal;
-  const shipping = isGroupOrder
+  const subtotal = isGroupOrderActive && navGroupData ? navGroupData.subtotal : baseSubtotal;
+  const shipping = isGroupOrderActive
     ? (navGroupData?.shipping ?? 25000)
     : deliveryType === "pickup" ? 0 : 25000;
-  const groupDiscount = isGroupOrder && navGroupData
+  const groupDiscount = isGroupOrderActive && navGroupData
     ? navGroupData.discount
-    : Math.round(baseSubtotal * groupDiscountPct / 100);
+    : isGroupOrderActive
+      ? Math.round(baseSubtotal * groupDiscountPct / 100)
+      : 0;
   const recurringDiscount = isRecurringOrder ? subtotal * 0.05 : 0;
   // Group orders use the exact total from Active Group page (no separate VAT)
-  const vat = isGroupOrder ? 0 : (subtotal + shipping - recurringDiscount) * 0.0476;
-  const total = isGroupOrder && navGroupData
+  const vat = isGroupOrderActive ? 0 : (subtotal + shipping - recurringDiscount) * 0.0476;
+  const total = isGroupOrderActive && navGroupData
     ? navGroupData.total - recurringDiscount - voucherDiscount
     : subtotal + shipping - groupDiscount - recurringDiscount - voucherDiscount + vat;
 
@@ -383,7 +387,7 @@ export default function CheckoutPage() {
         return false;
       }
     }
-    if (isGroupOrder && navGroupData && !navGroupData.groupName?.trim()) {
+    if (isGroupOrderActive && navGroupData && !navGroupData.groupName?.trim()) {
       setError("Please enter a group name");
       return false;
     }
@@ -538,7 +542,7 @@ export default function CheckoutPage() {
           amount: total,
           description: `Order payment from FreshMarket - ${formData.fullName}`,
           ...(appliedVoucher ? { voucherCode: appliedVoucher, discountAmount: groupDiscount + recurringDiscount + voucherDiscount } : {}),
-          ...(activeGroupId
+          ...(isGroupOrderActive && activeGroupId
             ? { groupId: activeGroupId, isGroupOrder: true, groupDiscount, groupDiscountPct }
             : {}),
         };
@@ -640,7 +644,7 @@ export default function CheckoutPage() {
           ...(appliedVoucher ? { voucherCode: appliedVoucher, discountAmount: groupDiscount + recurringDiscount + voucherDiscount } : {}),
           isRecurring: isRecurringOrder,
           discountAmount: recurringDiscount > 0 ? recurringDiscount : undefined,
-          ...(activeGroupId
+          ...(isGroupOrderActive && activeGroupId
             ? {
                 groupId: activeGroupId,
                 isGroupOrder: true,
@@ -1172,69 +1176,71 @@ export default function CheckoutPage() {
               </div>
             </div>
 
-            {/* Đặt theo nhóm — Clickable card */}
-            <button
-              type="button"
-              onClick={() =>
-                isGroupOrder
-                  ? navigate('/group-order/active', {
-                      state: {
-                        groupId: activeGroupId,
-                        groupName: navGroupData?.groupName ?? groupSession?.groupName,
-                        cartItems: cart,
-                      },
-                    })
-                  : navigate('/group-order', { state: { cartItems: cart } })
-              }
-              className={`w-full text-left bg-white rounded-lg p-5 shadow-sm border-2 transition-all duration-150 hover:shadow-md ${
-                isGroupOrder
-                  ? "border-green-400 bg-green-50"
-                  : "border-transparent hover:border-gray-200"
-              }`}
-            >
-              <div className="flex items-start justify-between gap-3">
-                <div className="flex items-center gap-3">
-                  <div
-                    className={`w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 ${
-                      isGroupOrder ? "bg-green-100" : "bg-gray-100"
-                    }`}
-                  >
-                    <Users
-                      className={`w-4 h-4 ${
-                        isGroupOrder ? "text-green-600" : "text-gray-500"
+            {/* Đặt theo nhóm — chỉ áp dụng cho Home delivery */}
+            {isDeliveryMode && (
+              <button
+                type="button"
+                onClick={() =>
+                  isGroupOrder
+                    ? navigate('/group-order/active', {
+                        state: {
+                          groupId: activeGroupId,
+                          groupName: navGroupData?.groupName ?? groupSession?.groupName,
+                          cartItems: cart,
+                        },
+                      })
+                    : navigate('/group-order', { state: { cartItems: cart } })
+                }
+                className={`w-full text-left bg-white rounded-lg p-5 shadow-sm border-2 transition-all duration-150 hover:shadow-md ${
+                  isGroupOrder
+                    ? "border-green-400 bg-green-50"
+                    : "border-transparent hover:border-gray-200"
+                }`}
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex items-center gap-3">
+                    <div
+                      className={`w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 ${
+                        isGroupOrder ? "bg-green-100" : "bg-gray-100"
                       }`}
-                    />
-                  </div>
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <h2 className="text-sm font-semibold text-gray-800">
-                        Group Order
-                      </h2>
-                      {isGroupOrder && (
-                        <span className="px-2 py-0.5 bg-green-100 text-green-700 text-xs font-medium rounded-full">
-                          🎉 Set up
-                        </span>
+                    >
+                      <Users
+                        className={`w-4 h-4 ${
+                          isGroupOrder ? "text-green-600" : "text-gray-500"
+                        }`}
+                      />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <h2 className="text-sm font-semibold text-gray-800">
+                          Group Order
+                        </h2>
+                        {isGroupOrder && (
+                          <span className="px-2 py-0.5 bg-green-100 text-green-700 text-xs font-medium rounded-full">
+                            🎉 Set up
+                          </span>
+                        )}
+                      </div>
+                      {isGroupOrder && navGroupData ? (
+                        <div className="mt-1 space-y-0.5">
+                          <p className="text-xs text-gray-700">
+                            <span className="font-medium">Group:</span>{" "}
+                            {navGroupData.groupName}
+                          </p>
+                        </div>
+                      ) : (
+                        <p className="text-xs text-gray-500 mt-0.5">
+                          Save more when ordering with friends &amp; get free shipping
+                        </p>
                       )}
                     </div>
-                    {isGroupOrder && navGroupData ? (
-                      <div className="mt-1 space-y-0.5">
-                        <p className="text-xs text-gray-700">
-                          <span className="font-medium">Group:</span>{" "}
-                          {navGroupData.groupName}
-                        </p>
-                      </div>
-                    ) : (
-                      <p className="text-xs text-gray-500 mt-0.5">
-                        Save more when ordering with friends &amp; get free shipping
-                      </p>
-                    )}
                   </div>
+                  <span className="text-xs text-primary font-medium mt-0.5 flex-shrink-0">
+                    {isGroupOrder ? "Edit" : "Set up"} ›
+                  </span>
                 </div>
-                <span className="text-xs text-primary font-medium mt-0.5 flex-shrink-0">
-                  {isGroupOrder ? "Edit" : "Set up"} ›
-                </span>
-              </div>
-            </button>
+              </button>
+            )}
 
             {/* Scheduled Recurring Delivery — Clickable card */}
             <button
@@ -1419,7 +1425,7 @@ export default function CheckoutPage() {
             <div className="bg-white rounded-lg p-5 shadow-sm sticky top-6 space-y-5">
 
               {/* Group order badge */}
-              {isGroupOrder && (
+              {isGroupOrderActive && (
                 <div className="flex items-center gap-2 px-3 py-2.5 bg-green-50 border border-green-200 rounded-lg">
                   <Users className="w-4 h-4 text-green-600 flex-shrink-0" />
                   <div className="flex-1 min-w-0">
@@ -1692,7 +1698,7 @@ export default function CheckoutPage() {
                       {shipping === 0 ? "Free" : `${shipping.toLocaleString("vi-VN")}₫`}
                     </span>
                   </div>
-                  {isGroupOrder && groupDiscount > 0 && (
+                  {isGroupOrderActive && groupDiscount > 0 && (
                     <div className="flex justify-between text-sm">
                       <span className="text-green-600">Group discount ({groupDiscountPct}%)</span>
                       <span className="font-medium text-green-600">
@@ -1727,7 +1733,7 @@ export default function CheckoutPage() {
                         {total.toLocaleString("vi-VN")}₫
                       </span>
                     </div>
-                    {!isGroupOrder && (
+                    {!isGroupOrderActive && (
                       <p className="text-xs text-gray-400 text-right">
                         Price includes VAT {vat.toLocaleString("vi-VN")}₫
                       </p>
