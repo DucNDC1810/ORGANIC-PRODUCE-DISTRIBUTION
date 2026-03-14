@@ -197,7 +197,7 @@ export default function ProductsPage() {
                   <SelectItem value="vegetables">Vegetables</SelectItem>
                   <SelectItem value="fruits">Fruits</SelectItem>
                   <SelectItem value="grains">Grains</SelectItem>
-                  <SelectItem value="dairy">Dairy</SelectItem>
+                  <SelectItem value="Milk & Dairy">Milk & Dairy</SelectItem>
                 </SelectContent>
               </Select>
 
