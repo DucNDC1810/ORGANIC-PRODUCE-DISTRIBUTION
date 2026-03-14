@@ -79,6 +79,7 @@ async function processSubscriptionOrders(): Promise<void> {
     try {
       const user = sub.userId as any;
       const address = sub.addressId as any;
+      const scheduledDeliveryDate = new Date(sub.nextDeliveryDate);
 
       // ── Tính tổng tiền ──────────────────────────────────
       const orderItems = sub.items.map((item) => {
@@ -110,24 +111,24 @@ async function processSubscriptionOrders(): Promise<void> {
       // ── Delivery info từ address ─────────────────────────
       const deliveryInfo = address
         ? {
-            fullName: address.fullName ?? user?.name,
-            phone: address.phone ?? user?.phone,
-            email: user?.email,
-            address: [
-              address.addressLine1,
-              address.ward,
-              address.district,
-              address.city
-            ]
-              .filter(Boolean)
-              .join(', '),
-            type: 'delivery' as const
-          }
+          fullName: address.fullName ?? user?.name,
+          phone: address.phone ?? user?.phone,
+          email: user?.email,
+          address: [
+            address.addressLine1,
+            address.ward,
+            address.district,
+            address.city
+          ]
+            .filter(Boolean)
+            .join(', '),
+          type: 'delivery' as const
+        }
         : {
-            fullName: user?.name,
-            email: user?.email,
-            type: 'delivery' as const
-          };
+          fullName: user?.name,
+          email: user?.email,
+          type: 'delivery' as const
+        };
 
       // ── Tạo Order ────────────────────────────────────────
       // Lấy userId._id vì sau populate userId là object
@@ -138,7 +139,7 @@ async function processSubscriptionOrders(): Promise<void> {
         orderType: 'subscription',
         addressId: sub.addressId,
         subscriptionId: sub._id,
-        orderDate: new Date(),
+        orderDate: scheduledDeliveryDate,
         totalAmount,
         discountAmount: discount,
         items: orderItems,
@@ -221,7 +222,7 @@ async function sendPaymentReminders(): Promise<void> {
     subscriptionId: { $ne: null },
     paymentStatus: 'unpaid',
     status: 'pending',
-    orderDate: { $gte: today, $lt: tomorrow }
+    orderDate: { $gte: tomorrow, $lt: dayAfter }
   })
     .populate('userId', 'name email')
     .populate('items.productId', 'name');
