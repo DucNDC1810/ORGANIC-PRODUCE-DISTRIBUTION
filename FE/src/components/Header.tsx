@@ -17,7 +17,7 @@ const productsDropdown: DropdownItem[] = [
   { icon: <Carrot className="w-5 h-5" />, label: 'Vegetables', href: '/products?category=vegetables' },
   { icon: <Apple className="w-5 h-5" />, label: 'Fruits', href: '/products?category=fruits' },
   { icon: <Wheat className="w-5 h-5" />, label: 'Grains', href: '/products?category=grains' },
-  { icon: <Milk className="w-5 h-5" />, label: 'Milk & Dairy', href: '/products?category=Milk%20%26%20Dairy' },
+  { icon: <Milk className="w-5 h-5" />, label: 'Milk & Dairy', href: '/products?category=milk-dairy' },
 ];
 
 const blogsDropdown: DropdownItem[] = [
