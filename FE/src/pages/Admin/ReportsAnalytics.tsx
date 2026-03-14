@@ -83,8 +83,6 @@ export default function ReportsAnalytics() {
       const startDateStr = startDate.toISOString().split('T')[0];
       const endDateStr = endDate.toISOString().split('T')[0];
 
-      console.log('Fetching data from', startDateStr, 'to', endDateStr);
-
       // Fetch all data in parallel - temporarily remove date filter to get all data
       const [ordersRes, productsRes, categoriesRes, orderStatsRes] = await Promise.all([
         orderService.getAllOrders({ 
@@ -103,24 +101,15 @@ export default function ReportsAnalytics() {
         orderService.getOrderStats() // Get all stats without date filter
       ]);
 
-      console.log('Orders Response:', ordersRes);
-      console.log('Products Response:', productsRes);
-      console.log('Categories Response:', categoriesRes);
-      console.log('Order Stats Response:', orderStatsRes);
-
       // Process monthly revenue data
       const monthlyDataMap = new Map<string, { revenue: number; orders: number }>();
       const allOrders = (ordersRes as any)?.data || [];
-      
-      console.log('Total orders fetched:', allOrders.length);
       
       // Filter orders by date range after fetching (since we removed API filter)
       const filteredOrders = allOrders.filter((order: any) => {
         const orderDate = new Date(order.orderDate);
         return orderDate >= startDate && orderDate <= endDate;
       });
-      
-      console.log('Filtered orders:', filteredOrders.length, 'from', startDateStr, 'to', endDateStr);
       
       filteredOrders.forEach((order: any) => {
         if (order.status !== 'cancelled' && order.status !== 'refunded') {
@@ -152,7 +141,6 @@ export default function ReportsAnalytics() {
           };
         });
 
-      console.log('Processed monthly data:', sortedMonthlyData);
       setRevenueData(sortedMonthlyData);
 
       // Process top products
@@ -163,7 +151,6 @@ export default function ReportsAnalytics() {
         revenue: (product.soldCount || 0) * (product.price || 0)
       }));
       
-      console.log('Top products:', topProductsData);
       setTopProducts(topProductsData);
 
       // Process category distribution
@@ -176,12 +163,10 @@ export default function ReportsAnalytics() {
           color: CATEGORY_COLORS[index % CATEGORY_COLORS.length]
         }));
       
-      console.log('Category distribution:', categoryDataProcessed);
       setCategoryData(categoryDataProcessed);
 
       // Calculate summary stats
       const orderStats = (orderStatsRes as any)?.data || {};
-      console.log('Order stats:', orderStats);
       const totalOrders = orderStats.totalOrders || filteredOrders.length;
       const totalRevenue = orderStats.totalRevenue || filteredOrders.reduce((sum: number, o: any) => sum + (o.totalAmount || 0), 0);
       
@@ -199,17 +184,7 @@ export default function ReportsAnalytics() {
         highestOrderId: highestOrder?._id || 'N/A'
       });
 
-      console.log('Summary stats calculated:', {
-        totalOrders,
-        totalRevenue,
-        validOrders: validOrders.length,
-        avgRevenuePerOrder: validOrders.length > 0 ? totalRevenue / validOrders.length : 0,
-        highestOrderValue: highestOrder?.totalAmount || 0,
-        highestOrderId: highestOrder?._id
-      });
-
     } catch (error) {
-      console.error('Error fetching analytics data:', error);
     } finally {
       setLoading(false);
     }

@@ -93,7 +93,6 @@ export default function CustomerManagement() {
       setUsers(response.data);
       setPagination(response.pagination);
     } catch (error) {
-      console.error('Failed to fetch users:', error);
     } finally {
       setLoading(false);
     }
@@ -105,7 +104,6 @@ export default function CustomerManagement() {
       const data = await userAPI.getUserStats();
       setStats(data);
     } catch (error) {
-      console.error('Failed to fetch stats:', error);
     }
   };
 
@@ -134,7 +132,6 @@ export default function CustomerManagement() {
       fetchUsers();
       fetchStats();
     } catch (error) {
-      console.error('Failed to toggle status:', error);
       toast.error('Failed to toggle user status');
     }
   };
@@ -150,7 +147,6 @@ export default function CustomerManagement() {
       fetchUsers();
       fetchStats();
     } catch (error) {
-      console.error('Failed to delete user:', error);
       toast.error('Failed to delete user');
     }
   };
@@ -165,7 +161,6 @@ export default function CustomerManagement() {
       setSelectedUser(null);
       fetchUsers();
     } catch (error: any) {
-      console.error('Failed to update user:', error);
       const errorMessage = error?.response?.data?.message || 'Failed to update user information';
       toast.error(errorMessage);
     }
@@ -224,7 +219,6 @@ export default function CustomerManagement() {
       fetchUsers();
       fetchStats();
     } catch (error: any) {
-      console.error('Failed to create user:', error);
       const errorMessage = error?.response?.data?.message || 'Failed to create user';
       toast.error(errorMessage);
     }
@@ -242,7 +236,6 @@ export default function CustomerManagement() {
       fetchUsers();
       fetchStats();
     } catch (error) {
-      console.error('Failed to change role:', error);
       toast.error('Failed to change user role');
     }
   };
@@ -304,7 +297,6 @@ export default function CustomerManagement() {
       setConfirmPassword('');
       setPasswordError('');
     } catch (error: any) {
-      console.error('Failed to reset password:', error);
       const errorMessage = error?.response?.data?.message || 'Failed to reset password';
       toast.error(errorMessage);
       setPasswordError(errorMessage);
