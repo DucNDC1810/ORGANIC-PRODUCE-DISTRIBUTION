@@ -1,9 +1,12 @@
 import nodemailer from 'nodemailer';
 import SMTPTransport from 'nodemailer/lib/smtp-transport';
+import dns from 'node:dns';
 import { buildFrontendUrl } from '../utils/frontendUrl';
 
 export class EmailService {
   private transporter: nodemailer.Transporter;
+
+  private static dnsOrderInitialized = false;
 
   private readonly smtpPort: number;
 
@@ -150,6 +153,13 @@ export class EmailService {
   }
 
   constructor() {
+    const forceIpv4 = process.env.EMAIL_FORCE_IPV4 !== 'false';
+    if (forceIpv4 && !EmailService.dnsOrderInitialized) {
+      dns.setDefaultResultOrder('ipv4first');
+      EmailService.dnsOrderInitialized = true;
+      console.log('[EMAIL][SMTP][CONFIG] DNS result order set to ipv4first');
+    }
+
     const port = parseInt(process.env.EMAIL_PORT || '587');
     const secure = process.env.EMAIL_SECURE
       ? process.env.EMAIL_SECURE === 'true'
