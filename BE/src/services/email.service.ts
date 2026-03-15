@@ -1,4 +1,6 @@
 import nodemailer from 'nodemailer';
+import SMTPTransport from 'nodemailer/lib/smtp-transport';
+import { buildFrontendUrl } from '../utils/frontendUrl';
 
 export class EmailService {
   private transporter: nodemailer.Transporter;
@@ -8,14 +10,11 @@ export class EmailService {
     const secure = process.env.EMAIL_SECURE
       ? process.env.EMAIL_SECURE === 'true'
       : port === 465;
-
-    this.transporter = nodemailer.createTransport({
+    const transportOptions: SMTPTransport.Options = {
+      service: process.env.EMAIL_SERVICE || undefined,
       host: process.env.EMAIL_HOST || 'smtp.gmail.com',
       port,
       secure,
-      pool: true,
-      maxConnections: parseInt(process.env.EMAIL_MAX_CONNECTIONS || '5'),
-      maxMessages: parseInt(process.env.EMAIL_MAX_MESSAGES || '100'),
       connectionTimeout: parseInt(process.env.EMAIL_CONNECTION_TIMEOUT || '10000'),
       greetingTimeout: parseInt(process.env.EMAIL_GREETING_TIMEOUT || '10000'),
       socketTimeout: parseInt(process.env.EMAIL_SOCKET_TIMEOUT || '20000'),
@@ -23,11 +22,13 @@ export class EmailService {
         user: process.env.EMAIL_USER,
         pass: process.env.EMAIL_PASSWORD,
       },
-    });
+    };
+
+    this.transporter = nodemailer.createTransport(transportOptions);
   }
 
   async sendVerificationEmail(to: string, token: string, name: string): Promise<void> {
-    const verificationUrl = `${process.env.FRONTEND_URL}/verify-email?token=${token}`;
+    const verificationUrl = buildFrontendUrl(`/verify-email?token=${encodeURIComponent(token)}`);
 
     const mailOptions = {
       from: `"Organic Produce Distribution" <${process.env.EMAIL_USER}>`,
@@ -128,7 +129,7 @@ export class EmailService {
   }
 
   async sendPasswordResetEmail(to: string, token: string, name: string): Promise<void> {
-    const resetUrl = `${process.env.FRONTEND_URL}/reset-password?token=${token}`;
+    const resetUrl = buildFrontendUrl(`/reset-password?token=${encodeURIComponent(token)}`);
 
     const mailOptions = {
       from: `"Organic Produce Distribution" <${process.env.EMAIL_USER}>`,
@@ -261,7 +262,7 @@ export class EmailService {
     const formattedDate = deliveryDate.toLocaleDateString('vi-VN', {
       weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
     });
-    const paymentUrl = `${process.env.FRONTEND_URL}/profile?tab=orders&highlight=${orderId}`;
+    const paymentUrl = buildFrontendUrl(`/profile?tab=orders&highlight=${encodeURIComponent(orderId)}`);
     const methodLabel = paymentMethod?.toLowerCase() === 'momo' ? 'MoMo' : paymentMethod;
 
     const mailOptions = {
@@ -323,7 +324,7 @@ export class EmailService {
     paymentMethod: string
   ): Promise<void> {
     const formattedAmount = totalAmount.toLocaleString('vi-VN') + ' ₫';
-    const paymentUrl = `${process.env.FRONTEND_URL}/profile?tab=orders&highlight=${orderId}`;
+    const paymentUrl = buildFrontendUrl(`/profile?tab=orders&highlight=${encodeURIComponent(orderId)}`);
     const methodLabel = paymentMethod?.toLowerCase() === 'momo' ? 'MoMo' : paymentMethod;
 
     const mailOptions = {
