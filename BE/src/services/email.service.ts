@@ -1,18 +1,14 @@
-import nodemailer from 'nodemailer';
-import SMTPTransport from 'nodemailer/lib/smtp-transport';
-import dns from 'node:dns';
 import { google } from 'googleapis';
 import { buildFrontendUrl } from '../utils/frontendUrl';
 
+interface MailPayload {
+  from?: string;
+  to: string | string[];
+  subject: string;
+  html: string;
+}
+
 export class EmailService {
-  private transporter: nodemailer.Transporter;
-
-  private static dnsOrderInitialized = false;
-
-  private readonly smtpPort: number;
-
-  private readonly smtpSecure: boolean;
-
   private isResendConfigured(): boolean {
     return Boolean(process.env.RESEND_API_KEY && process.env.RESEND_FROM_EMAIL);
   }
@@ -118,14 +114,18 @@ export class EmailService {
     console.log(`[EMAIL][GMAIL_API][SUCCESS] to=${to} subject="${subject}"`);
   }
 
+  private getDefaultSenderEmail(): string {
+    return process.env.GMAIL_API_SENDER || process.env.EMAIL_USER || '';
+  }
+
   private async sendViaApiProviders(
-    mailOptions: nodemailer.SendMailOptions,
+    mailOptions: MailPayload,
     logLabel: string,
     preferredProvider: string = 'gmail_api'
   ): Promise<void> {
-    const to = this.getLogMailTarget((mailOptions.to || '') as string | string[]);
-    const subject = typeof mailOptions.subject === 'string' ? mailOptions.subject : '';
-    const html = typeof mailOptions.html === 'string' ? mailOptions.html : '';
+    const to = this.getLogMailTarget(mailOptions.to);
+    const subject = mailOptions.subject;
+    const html = mailOptions.html;
     const normalizedProvider = preferredProvider.toLowerCase();
     const useGmailApiFirst = normalizedProvider !== 'resend' && this.isGmailApiConfigured();
     const useResendFirst = normalizedProvider === 'resend' && this.isResendConfigured();
@@ -181,122 +181,11 @@ export class EmailService {
     throw new Error(`Failed to send ${logLabel}: no API email provider succeeded`);
   }
 
-  private createSmtpTransport(port: number, secure: boolean): nodemailer.Transporter {
-    const host = process.env.EMAIL_HOST || 'smtp.gmail.com';
-    const requireTls = process.env.EMAIL_REQUIRE_TLS
-      ? process.env.EMAIL_REQUIRE_TLS === 'true'
-      : !secure && port === 587;
-
-    const transportOptions: SMTPTransport.Options = {
-      service: process.env.EMAIL_SERVICE || undefined,
-      host,
-      port,
-      secure,
-      connectionTimeout: parseInt(process.env.EMAIL_CONNECTION_TIMEOUT || '10000'),
-      greetingTimeout: parseInt(process.env.EMAIL_GREETING_TIMEOUT || '10000'),
-      socketTimeout: parseInt(process.env.EMAIL_SOCKET_TIMEOUT || '20000'),
-      dnsTimeout: parseInt(process.env.EMAIL_DNS_TIMEOUT || '10000'),
-      requireTLS: requireTls,
-      auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASSWORD,
-      },
-      tls: {
-        servername: host,
-        rejectUnauthorized: process.env.EMAIL_TLS_REJECT_UNAUTHORIZED !== 'false',
-      },
-    };
-
-    return nodemailer.createTransport(transportOptions);
-  }
-
-  private isNetworkTimeoutError(error: any): boolean {
-    return (
-      error?.code === 'ETIMEDOUT' ||
-      error?.code === 'ESOCKET' ||
-      error?.code === 'ECONNECTION' ||
-      error?.code === 'EAI_AGAIN' ||
-      error?.code === 'ENOTFOUND' ||
-      error?.command === 'CONN'
-    );
-  }
-
-  private getSmtpFallbackCandidates(): Array<{ port: number; secure: boolean; label: string }> {
-    const candidates: Array<{ port: number; secure: boolean; label: string }> = [];
-
-    if (!(this.smtpPort === 465 && this.smtpSecure)) {
-      candidates.push({ port: 465, secure: true, label: 'SSL fallback (465)' });
-    }
-
-    if (!(this.smtpPort === 587 && !this.smtpSecure)) {
-      candidates.push({ port: 587, secure: false, label: 'STARTTLS fallback (587)' });
-    }
-
-    return candidates;
-  }
-
-  private async sendViaSmtpWithFallback(
-    mailOptions: nodemailer.SendMailOptions,
-    logLabel: string
-  ): Promise<void> {
-    const to = this.getLogMailTarget((mailOptions.to || '') as string | string[]);
-    const subject = typeof mailOptions.subject === 'string' ? mailOptions.subject : '';
-
-    try {
-      console.log(`[EMAIL][SMTP][SEND] type=${logLabel} to=${to} subject="${subject}"`);
-      await this.transporter.sendMail(mailOptions);
-      console.log(`[EMAIL][SMTP][SUCCESS] type=${logLabel} to=${to}`);
-      return;
-    } catch (primaryError: any) {
-      if (!this.isNetworkTimeoutError(primaryError)) {
-        throw primaryError;
-      }
-
-      console.warn(`⚠️ Primary SMTP failed for ${logLabel}, trying fallback transports:`, primaryError);
-      const candidates = this.getSmtpFallbackCandidates();
-      let lastError: unknown = primaryError;
-
-      for (const candidate of candidates) {
-        try {
-          const fallbackTransporter = this.createSmtpTransport(candidate.port, candidate.secure);
-          console.log(`[EMAIL][SMTP][FALLBACK_SEND] type=${logLabel} mode=${candidate.label} to=${to}`);
-          await fallbackTransporter.sendMail(mailOptions);
-          console.log(`[EMAIL][SMTP][FALLBACK_SUCCESS] type=${logLabel} mode=${candidate.label} to=${to}`);
-          return;
-        } catch (fallbackError) {
-          lastError = fallbackError;
-          console.error(`[EMAIL][SMTP][FALLBACK_FAILED] type=${logLabel} mode=${candidate.label} to=${to}:`, fallbackError);
-        }
-      }
-
-      throw lastError;
-    }
-  }
-
-  constructor() {
-    const forceIpv4 = process.env.EMAIL_FORCE_IPV4 !== 'false';
-    if (forceIpv4 && !EmailService.dnsOrderInitialized) {
-      dns.setDefaultResultOrder('ipv4first');
-      EmailService.dnsOrderInitialized = true;
-      console.log('[EMAIL][SMTP][CONFIG] DNS result order set to ipv4first');
-    }
-
-    const port = parseInt(process.env.EMAIL_PORT || '587');
-    const secure = process.env.EMAIL_SECURE
-      ? process.env.EMAIL_SECURE === 'true'
-      : port === 465;
-
-    this.smtpPort = port;
-    this.smtpSecure = secure;
-
-    this.transporter = this.createSmtpTransport(port, secure);
-  }
-
   async sendVerificationEmail(to: string, token: string, name: string): Promise<void> {
     const verificationUrl = buildFrontendUrl(`/verify-email?token=${encodeURIComponent(token)}`);
 
     const mailOptions = {
-      from: `"Organic Produce Distribution" <${process.env.EMAIL_USER}>`,
+      from: `"Organic Produce Distribution" <${this.getDefaultSenderEmail()}>`,
       to,
       subject: 'Xác nhận địa chỉ email của bạn',
       html: `
@@ -338,7 +227,7 @@ export class EmailService {
     };
 
     try {
-      await this.sendViaSmtpWithFallback(mailOptions, 'verification email');
+      await this.sendViaApiProviders(mailOptions, 'verification email', process.env.EMAIL_PROVIDER || 'gmail_api');
       console.log(`✅ Verification email sent to ${to}`);
     } catch (error) {
       console.error('❌ Error sending email:', error);
@@ -348,7 +237,7 @@ export class EmailService {
 
   async sendWelcomeEmail(to: string, name: string): Promise<void> {
     const mailOptions = {
-      from: `"Organic Produce Distribution" <${process.env.EMAIL_USER}>`,
+      from: `"Organic Produce Distribution" <${this.getDefaultSenderEmail()}>`,
       to,
       subject: 'Chào mừng bạn đến với Organic Produce!',
       html: `
@@ -386,7 +275,7 @@ export class EmailService {
     };
 
     try {
-      await this.sendViaSmtpWithFallback(mailOptions, 'welcome email');
+      await this.sendViaApiProviders(mailOptions, 'welcome email', process.env.EMAIL_PROVIDER || 'gmail_api');
       console.log(`✅ Welcome email sent to ${to}`);
     } catch (error) {
       console.error('❌ Error sending welcome email:', error);
@@ -398,7 +287,7 @@ export class EmailService {
     const subject = 'Đặt lại mật khẩu của bạn';
 
     const mailOptions = {
-      from: `"Organic Produce Distribution" <${process.env.EMAIL_USER}>`,
+      from: `"Organic Produce Distribution" <${this.getDefaultSenderEmail()}>`,
       to,
       subject,
       html: `
@@ -447,71 +336,9 @@ export class EmailService {
       `,
     };
 
-    const preferredProvider = (process.env.PASSWORD_RESET_EMAIL_PROVIDER || process.env.EMAIL_PROVIDER || 'gmail_api').toLowerCase();
-    const allowGmailApiFallback = process.env.EMAIL_ENABLE_GMAIL_API_FALLBACK !== 'false';
-    const allowResendFallback = process.env.EMAIL_ENABLE_RESEND_FALLBACK !== 'false';
-    const useGmailApiFirst = preferredProvider !== 'resend' && this.isGmailApiConfigured();
-    const useResendFirst = preferredProvider === 'resend' && this.isResendConfigured();
-
-    console.log(
-      `[EMAIL][RESET][ROUTING] provider=${preferredProvider} gmailApiConfigured=${this.isGmailApiConfigured()} resendConfigured=${this.isResendConfigured()} gmailApiFallback=${allowGmailApiFallback} resendFallback=${allowResendFallback} smtpDisabled=true`
-    );
-
-    if (preferredProvider === 'smtp') {
-      console.warn('[EMAIL][RESET][SMTP_DISABLED] Password reset emails no longer use SMTP, switching to API providers');
-    }
-
-    if (preferredProvider === 'gmail_api' && !this.isGmailApiConfigured()) {
-      console.warn('[EMAIL][GMAIL_API][SKIP] EMAIL_PROVIDER=gmail_api but Gmail API is not configured, trying other API providers');
-    }
-
-    if (useGmailApiFirst && this.isGmailApiConfigured()) {
-      try {
-        await this.sendViaGmailApi(to, subject, mailOptions.html);
-        console.log(`✅ Password reset email sent to ${to} via Gmail API`);
-        return;
-      } catch (error) {
-        console.error('❌ Gmail API failed for password reset email, trying other API providers:', error);
-      }
-    }
-
-    if (preferredProvider === 'resend' && !this.isResendConfigured()) {
-      console.warn('[EMAIL][RESEND][SKIP] EMAIL_PROVIDER=resend but Resend is not configured, fallback to Gmail API if available');
-    }
-
-    if (useResendFirst && this.isResendConfigured()) {
-      try {
-        await this.sendViaResendApi(to, subject, mailOptions.html);
-        console.log(`✅ Password reset email sent to ${to} via Resend API`);
-        return;
-      } catch (error) {
-        console.error('❌ Resend API failed for password reset email, trying other API providers:', error);
-      }
-    }
-
-    if (allowGmailApiFallback && this.isGmailApiConfigured() && !useGmailApiFirst) {
-      try {
-        console.warn('[EMAIL][RESET][FALLBACK] Trying Gmail API fallback for password reset email');
-        await this.sendViaGmailApi(to, subject, mailOptions.html);
-        console.log(`✅ Password reset email sent to ${to} via Gmail API fallback`);
-        return;
-      } catch (gmailApiFallbackError) {
-        console.error('❌ Gmail API fallback failed for password reset email:', gmailApiFallbackError);
-      }
-    }
-
-    if (allowResendFallback && this.isResendConfigured() && !useResendFirst) {
-      try {
-        console.warn('[EMAIL][RESET][FALLBACK] Trying Resend fallback for password reset email');
-        await this.sendViaResendApi(to, subject, mailOptions.html);
-        console.log(`✅ Password reset email sent to ${to} via Resend fallback`);
-        return;
-      } catch (resendFallbackError) {
-        console.error('❌ Resend fallback failed for password reset email:', resendFallbackError);
-      }
-    }
-
-    throw new Error('Failed to send password reset email: no API email provider succeeded');
+    const preferredProvider = process.env.PASSWORD_RESET_EMAIL_PROVIDER || process.env.EMAIL_PROVIDER || 'gmail_api';
+    await this.sendViaApiProviders(mailOptions, 'password reset email', preferredProvider);
+    console.log(`✅ Password reset email sent to ${to}`);
   }
 
   // ────────────────────────────────────────────────────────────
@@ -532,7 +359,7 @@ export class EmailService {
     });
 
     const mailOptions = {
-      from: `"Organic Produce Distribution" <${process.env.EMAIL_USER}>`,
+      from: `"Organic Produce Distribution" <${this.getDefaultSenderEmail()}>`,
       to,
       subject: `✅ Đơn hàng định kỳ #${orderId} đã được tạo tự động`,
       html: `
@@ -566,7 +393,7 @@ export class EmailService {
     };
 
     try {
-      await this.sendViaSmtpWithFallback(mailOptions, 'subscription confirmation email');
+      await this.sendViaApiProviders(mailOptions, 'subscription confirmation email', process.env.EMAIL_PROVIDER || 'gmail_api');
       console.log(`✅ Subscription confirmation email sent to ${to}`);
     } catch (error) {
       console.error('❌ Error sending subscription confirmation email:', error);
@@ -590,7 +417,7 @@ export class EmailService {
     const methodLabel = paymentMethod?.toLowerCase() === 'momo' ? 'MoMo' : paymentMethod;
 
     const mailOptions = {
-      from: `"Organic Produce Distribution" <${process.env.EMAIL_USER}>`,
+      from: `"Organic Produce Distribution" <${this.getDefaultSenderEmail()}>`,
       to,
       subject: `💳 Đơn hàng định kỳ #${orderId} — Vui lòng thanh toán trước ngày giao`,
       html: `
@@ -632,7 +459,7 @@ export class EmailService {
     };
 
     try {
-      await this.sendViaSmtpWithFallback(mailOptions, 'subscription payment request email');
+      await this.sendViaApiProviders(mailOptions, 'subscription payment request email', process.env.EMAIL_PROVIDER || 'gmail_api');
       console.log(`✅ Subscription payment request email sent to ${to}`);
     } catch (error) {
       console.error('❌ Error sending subscription payment request email:', error);
@@ -652,7 +479,7 @@ export class EmailService {
     const methodLabel = paymentMethod?.toLowerCase() === 'momo' ? 'MoMo' : paymentMethod;
 
     const mailOptions = {
-      from: `"Organic Produce Distribution" <${process.env.EMAIL_USER}>`,
+      from: `"Organic Produce Distribution" <${this.getDefaultSenderEmail()}>`,
       to,
       subject: `⏰ Nhắc nhở: Đơn hàng định kỳ #${orderId} của bạn sẽ được giao NGÀY MAI`,
       html: `
@@ -693,7 +520,7 @@ export class EmailService {
     };
 
     try {
-      await this.sendViaSmtpWithFallback(mailOptions, 'subscription payment reminder email');
+      await this.sendViaApiProviders(mailOptions, 'subscription payment reminder email', process.env.EMAIL_PROVIDER || 'gmail_api');
       console.log(`✅ Subscription payment reminder email sent to ${to}`);
     } catch (error) {
       console.error('❌ Error sending subscription payment reminder email:', error);
@@ -706,10 +533,10 @@ export class EmailService {
 
   /** Gửi email thông báo tài khoản bị khóa cho người dùng */
   async sendAccountLockedToUser(to: string, name: string, failedAttempts: number): Promise<void> {
-    const adminEmail = process.env.ADMIN_EMAIL || process.env.EMAIL_USER || '';
+    const adminEmail = process.env.ADMIN_EMAIL || this.getDefaultSenderEmail() || '';
     const provider = process.env.ACCOUNT_SECURITY_EMAIL_PROVIDER || 'gmail_api';
     const mailOptions = {
-      from: `"Organic Produce Distribution" <${process.env.EMAIL_USER}>`,
+      from: `"Organic Produce Distribution" <${this.getDefaultSenderEmail()}>`,
       to,
       subject: '🔒 Tài khoản của bạn đã bị khóa',
       html: `
@@ -749,13 +576,13 @@ export class EmailService {
 
   /** Gửi email thông báo cho admin khi có tài khoản bị khóa */
   async sendAccountLockedToAdmin(lockedUserName: string, lockedUserEmail: string, failedAttempts: number): Promise<void> {
-    const adminEmail = process.env.ADMIN_EMAIL || process.env.EMAIL_USER;
+    const adminEmail = process.env.ADMIN_EMAIL || this.getDefaultSenderEmail();
     if (!adminEmail) return;
 
     const provider = process.env.ACCOUNT_SECURITY_EMAIL_PROVIDER || 'gmail_api';
 
     const mailOptions = {
-      from: `"Organic Produce Distribution" <${process.env.EMAIL_USER}>`,
+      from: `"Organic Produce Distribution" <${this.getDefaultSenderEmail()}>`,
       to: adminEmail,
       subject: `🚨 Tài khoản bị khóa: ${lockedUserEmail}`,
       html: `
@@ -796,10 +623,10 @@ export class EmailService {
 
   /** Gửi email xác nhận yêu cầu mở khóa đã được gửi đến admin */
   async sendUnlockRequestConfirmation(to: string, name: string): Promise<void> {
-    const adminEmail = process.env.ADMIN_EMAIL || process.env.EMAIL_USER || '';
+    const adminEmail = process.env.ADMIN_EMAIL || this.getDefaultSenderEmail() || '';
     const provider = process.env.ACCOUNT_SECURITY_EMAIL_PROVIDER || 'gmail_api';
     const mailOptions = {
-      from: `"Organic Produce Distribution" <${process.env.EMAIL_USER}>`,
+      from: `"Organic Produce Distribution" <${this.getDefaultSenderEmail()}>`,
       to,
       subject: '📨 Yêu cầu mở khóa tài khoản đã được gửi',
       html: `
@@ -838,13 +665,13 @@ export class EmailService {
 
   /** Gửi email thông báo cho admin khi nhận được yêu cầu mở khóa từ người dùng */
   async sendUnlockRequestToAdmin(lockedUserName: string, lockedUserEmail: string): Promise<void> {
-    const adminEmail = process.env.ADMIN_EMAIL || process.env.EMAIL_USER;
+    const adminEmail = process.env.ADMIN_EMAIL || this.getDefaultSenderEmail();
     if (!adminEmail) return;
 
     const provider = process.env.ACCOUNT_SECURITY_EMAIL_PROVIDER || 'gmail_api';
 
     const mailOptions = {
-      from: `"Organic Produce Distribution" <${process.env.EMAIL_USER}>`,
+      from: `"Organic Produce Distribution" <${this.getDefaultSenderEmail()}>`,
       to: adminEmail,
       subject: `📩 Yêu cầu mở khóa từ: ${lockedUserEmail}`,
       html: `
