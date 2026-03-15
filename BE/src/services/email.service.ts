@@ -326,8 +326,13 @@ export class EmailService {
       `,
     };
 
-    const preferredProvider = (process.env.EMAIL_PROVIDER || '').toLowerCase();
-    const useResendFirst = preferredProvider === 'resend' || (!preferredProvider && this.isResendConfigured());
+    const preferredProvider = (process.env.EMAIL_PROVIDER || 'smtp').toLowerCase();
+    const useResendFirst = preferredProvider === 'resend' && this.isResendConfigured();
+    const allowResendTimeoutFallback = process.env.EMAIL_ENABLE_RESEND_FALLBACK !== 'false';
+
+    if (preferredProvider === 'resend' && !this.isResendConfigured()) {
+      console.warn('[EMAIL][RESEND][SKIP] EMAIL_PROVIDER=resend but Resend is not configured, fallback to SMTP');
+    }
 
     if (useResendFirst && this.isResendConfigured()) {
       try {
@@ -342,7 +347,18 @@ export class EmailService {
     try {
       await this.sendViaSmtpWithFallback(mailOptions, 'password reset email');
       console.log(`✅ Password reset email sent to ${to}`);
-    } catch (error) {
+    } catch (error: any) {
+      if (allowResendTimeoutFallback && this.isNetworkTimeoutError(error) && this.isResendConfigured()) {
+        try {
+          console.warn('[EMAIL][SMTP][TIMEOUT] Password reset email timed out, trying Resend fallback');
+          await this.sendViaResendApi(to, subject, mailOptions.html);
+          console.log(`✅ Password reset email sent to ${to} via Resend fallback after SMTP timeout`);
+          return;
+        } catch (resendFallbackError) {
+          console.error('❌ Resend fallback failed after SMTP timeout:', resendFallbackError);
+        }
+      }
+
       console.error('❌ Error sending password reset email:', error);
       throw new Error('Failed to send password reset email');
     }
