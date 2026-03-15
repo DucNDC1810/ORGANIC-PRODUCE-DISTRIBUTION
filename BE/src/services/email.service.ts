@@ -5,8 +5,16 @@ import { buildFrontendUrl } from '../utils/frontendUrl';
 export class EmailService {
   private transporter: nodemailer.Transporter;
 
+  private readonly smtpPort: number;
+
+  private readonly smtpSecure: boolean;
+
   private isResendConfigured(): boolean {
     return Boolean(process.env.RESEND_API_KEY && process.env.RESEND_FROM_EMAIL);
+  }
+
+  private getLogMailTarget(to: string | string[]): string {
+    return Array.isArray(to) ? to.join(', ') : to;
   }
 
   private async sendViaResendApi(to: string, subject: string, html: string): Promise<void> {
@@ -22,6 +30,7 @@ export class EmailService {
     const timeout = setTimeout(() => controller.abort(), timeoutMs);
 
     try {
+      console.log(`[EMAIL][RESEND][SEND] to=${to} subject="${subject}"`);
       const response = await fetch('https://api.resend.com/emails', {
         method: 'POST',
         headers: {
@@ -41,27 +50,103 @@ export class EmailService {
         const body = await response.text();
         throw new Error(`Resend API error (${response.status}): ${body}`);
       }
+
+      console.log(`[EMAIL][RESEND][SUCCESS] to=${to} subject="${subject}"`);
     } finally {
       clearTimeout(timeout);
     }
   }
 
   private createSmtpTransport(port: number, secure: boolean): nodemailer.Transporter {
+    const host = process.env.EMAIL_HOST || 'smtp.gmail.com';
+    const requireTls = process.env.EMAIL_REQUIRE_TLS
+      ? process.env.EMAIL_REQUIRE_TLS === 'true'
+      : !secure && port === 587;
+
     const transportOptions: SMTPTransport.Options = {
       service: process.env.EMAIL_SERVICE || undefined,
-      host: process.env.EMAIL_HOST || 'smtp.gmail.com',
+      host,
       port,
       secure,
       connectionTimeout: parseInt(process.env.EMAIL_CONNECTION_TIMEOUT || '10000'),
       greetingTimeout: parseInt(process.env.EMAIL_GREETING_TIMEOUT || '10000'),
       socketTimeout: parseInt(process.env.EMAIL_SOCKET_TIMEOUT || '20000'),
+      dnsTimeout: parseInt(process.env.EMAIL_DNS_TIMEOUT || '10000'),
+      requireTLS: requireTls,
       auth: {
         user: process.env.EMAIL_USER,
         pass: process.env.EMAIL_PASSWORD,
       },
+      tls: {
+        servername: host,
+        rejectUnauthorized: process.env.EMAIL_TLS_REJECT_UNAUTHORIZED !== 'false',
+      },
     };
 
     return nodemailer.createTransport(transportOptions);
+  }
+
+  private isNetworkTimeoutError(error: any): boolean {
+    return (
+      error?.code === 'ETIMEDOUT' ||
+      error?.code === 'ESOCKET' ||
+      error?.code === 'ECONNECTION' ||
+      error?.code === 'EAI_AGAIN' ||
+      error?.code === 'ENOTFOUND' ||
+      error?.command === 'CONN'
+    );
+  }
+
+  private getSmtpFallbackCandidates(): Array<{ port: number; secure: boolean; label: string }> {
+    const candidates: Array<{ port: number; secure: boolean; label: string }> = [];
+
+    if (!(this.smtpPort === 465 && this.smtpSecure)) {
+      candidates.push({ port: 465, secure: true, label: 'SSL fallback (465)' });
+    }
+
+    if (!(this.smtpPort === 587 && !this.smtpSecure)) {
+      candidates.push({ port: 587, secure: false, label: 'STARTTLS fallback (587)' });
+    }
+
+    return candidates;
+  }
+
+  private async sendViaSmtpWithFallback(
+    mailOptions: nodemailer.SendMailOptions,
+    logLabel: string
+  ): Promise<void> {
+    const to = this.getLogMailTarget((mailOptions.to || '') as string | string[]);
+    const subject = typeof mailOptions.subject === 'string' ? mailOptions.subject : '';
+
+    try {
+      console.log(`[EMAIL][SMTP][SEND] type=${logLabel} to=${to} subject="${subject}"`);
+      await this.transporter.sendMail(mailOptions);
+      console.log(`[EMAIL][SMTP][SUCCESS] type=${logLabel} to=${to}`);
+      return;
+    } catch (primaryError: any) {
+      if (!this.isNetworkTimeoutError(primaryError)) {
+        throw primaryError;
+      }
+
+      console.warn(`⚠️ Primary SMTP failed for ${logLabel}, trying fallback transports:`, primaryError);
+      const candidates = this.getSmtpFallbackCandidates();
+      let lastError: unknown = primaryError;
+
+      for (const candidate of candidates) {
+        try {
+          const fallbackTransporter = this.createSmtpTransport(candidate.port, candidate.secure);
+          console.log(`[EMAIL][SMTP][FALLBACK_SEND] type=${logLabel} mode=${candidate.label} to=${to}`);
+          await fallbackTransporter.sendMail(mailOptions);
+          console.log(`[EMAIL][SMTP][FALLBACK_SUCCESS] type=${logLabel} mode=${candidate.label} to=${to}`);
+          return;
+        } catch (fallbackError) {
+          lastError = fallbackError;
+          console.error(`[EMAIL][SMTP][FALLBACK_FAILED] type=${logLabel} mode=${candidate.label} to=${to}:`, fallbackError);
+        }
+      }
+
+      throw lastError;
+    }
   }
 
   constructor() {
@@ -69,6 +154,9 @@ export class EmailService {
     const secure = process.env.EMAIL_SECURE
       ? process.env.EMAIL_SECURE === 'true'
       : port === 465;
+
+    this.smtpPort = port;
+    this.smtpSecure = secure;
 
     this.transporter = this.createSmtpTransport(port, secure);
   }
@@ -119,7 +207,7 @@ export class EmailService {
     };
 
     try {
-      await this.transporter.sendMail(mailOptions);
+      await this.sendViaSmtpWithFallback(mailOptions, 'verification email');
       console.log(`✅ Verification email sent to ${to}`);
     } catch (error) {
       console.error('❌ Error sending email:', error);
@@ -167,7 +255,7 @@ export class EmailService {
     };
 
     try {
-      await this.transporter.sendMail(mailOptions);
+      await this.sendViaSmtpWithFallback(mailOptions, 'welcome email');
       console.log(`✅ Welcome email sent to ${to}`);
     } catch (error) {
       console.error('❌ Error sending welcome email:', error);
@@ -242,24 +330,9 @@ export class EmailService {
     }
 
     try {
-      await this.transporter.sendMail(mailOptions);
+      await this.sendViaSmtpWithFallback(mailOptions, 'password reset email');
       console.log(`✅ Password reset email sent to ${to}`);
-    } catch (error: any) {
-      const shouldRetryWithSsl =
-        (error?.code === 'ETIMEDOUT' || error?.command === 'CONN') &&
-        process.env.EMAIL_ENABLE_SSL_FALLBACK !== 'false';
-
-      if (shouldRetryWithSsl) {
-        try {
-          const sslTransporter = this.createSmtpTransport(465, true);
-          await sslTransporter.sendMail(mailOptions);
-          console.log(`✅ Password reset email sent to ${to} using SSL fallback`);
-          return;
-        } catch (fallbackError) {
-          console.error('❌ SSL fallback also failed for password reset email:', fallbackError);
-        }
-      }
-
+    } catch (error) {
       console.error('❌ Error sending password reset email:', error);
       throw new Error('Failed to send password reset email');
     }
@@ -317,7 +390,7 @@ export class EmailService {
     };
 
     try {
-      await this.transporter.sendMail(mailOptions);
+      await this.sendViaSmtpWithFallback(mailOptions, 'subscription confirmation email');
       console.log(`✅ Subscription confirmation email sent to ${to}`);
     } catch (error) {
       console.error('❌ Error sending subscription confirmation email:', error);
@@ -383,7 +456,7 @@ export class EmailService {
     };
 
     try {
-      await this.transporter.sendMail(mailOptions);
+      await this.sendViaSmtpWithFallback(mailOptions, 'subscription payment request email');
       console.log(`✅ Subscription payment request email sent to ${to}`);
     } catch (error) {
       console.error('❌ Error sending subscription payment request email:', error);
@@ -444,7 +517,7 @@ export class EmailService {
     };
 
     try {
-      await this.transporter.sendMail(mailOptions);
+      await this.sendViaSmtpWithFallback(mailOptions, 'subscription payment reminder email');
       console.log(`✅ Subscription payment reminder email sent to ${to}`);
     } catch (error) {
       console.error('❌ Error sending subscription payment reminder email:', error);
@@ -490,7 +563,7 @@ export class EmailService {
       `,
     };
     try {
-      await this.transporter.sendMail(mailOptions);
+      await this.sendViaSmtpWithFallback(mailOptions, 'account locked user email');
       console.log(`✅ Account locked notification sent to user ${to}`);
     } catch (error) {
       console.error('❌ Error sending account locked email to user:', error);
@@ -535,7 +608,7 @@ export class EmailService {
       `,
     };
     try {
-      await this.transporter.sendMail(mailOptions);
+      await this.sendViaSmtpWithFallback(mailOptions, 'account locked admin email');
       console.log(`✅ Account locked notification sent to admin for user ${lockedUserEmail}`);
     } catch (error) {
       console.error('❌ Error sending account locked email to admin:', error);
@@ -576,7 +649,7 @@ export class EmailService {
       `,
     };
     try {
-      await this.transporter.sendMail(mailOptions);
+      await this.sendViaSmtpWithFallback(mailOptions, 'unlock request confirmation email');
       console.log(`✅ Unlock request confirmation sent to ${to}`);
     } catch (error) {
       console.error('❌ Error sending unlock request confirmation email:', error);
@@ -620,7 +693,7 @@ export class EmailService {
       `,
     };
     try {
-      await this.transporter.sendMail(mailOptions);
+      await this.sendViaSmtpWithFallback(mailOptions, 'unlock request admin email');
       console.log(`✅ Unlock request forwarded to admin for user ${lockedUserEmail}`);
     } catch (error) {
       console.error('❌ Error sending unlock request to admin:', error);
