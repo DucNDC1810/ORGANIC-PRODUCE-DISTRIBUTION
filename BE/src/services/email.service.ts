@@ -5,6 +5,47 @@ import { buildFrontendUrl } from '../utils/frontendUrl';
 export class EmailService {
   private transporter: nodemailer.Transporter;
 
+  private isResendConfigured(): boolean {
+    return Boolean(process.env.RESEND_API_KEY && process.env.RESEND_FROM_EMAIL);
+  }
+
+  private async sendViaResendApi(to: string, subject: string, html: string): Promise<void> {
+    const apiKey = process.env.RESEND_API_KEY;
+    const from = process.env.RESEND_FROM_EMAIL;
+
+    if (!apiKey || !from) {
+      throw new Error('Resend is not configured');
+    }
+
+    const timeoutMs = parseInt(process.env.EMAIL_HTTP_TIMEOUT || '15000');
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), timeoutMs);
+
+    try {
+      const response = await fetch('https://api.resend.com/emails', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          from,
+          to: [to],
+          subject,
+          html,
+        }),
+        signal: controller.signal,
+      });
+
+      if (!response.ok) {
+        const body = await response.text();
+        throw new Error(`Resend API error (${response.status}): ${body}`);
+      }
+    } finally {
+      clearTimeout(timeout);
+    }
+  }
+
   private createSmtpTransport(port: number, secure: boolean): nodemailer.Transporter {
     const transportOptions: SMTPTransport.Options = {
       service: process.env.EMAIL_SERVICE || undefined,
@@ -135,11 +176,12 @@ export class EmailService {
 
   async sendPasswordResetEmail(to: string, token: string, name: string): Promise<void> {
     const resetUrl = buildFrontendUrl(`/reset-password?token=${encodeURIComponent(token)}`);
+    const subject = 'Đặt lại mật khẩu của bạn';
 
     const mailOptions = {
       from: `"Organic Produce Distribution" <${process.env.EMAIL_USER}>`,
       to,
-      subject: 'Đặt lại mật khẩu của bạn',
+      subject,
       html: `
         <!DOCTYPE html>
         <html>
@@ -185,6 +227,19 @@ export class EmailService {
         </html>
       `,
     };
+
+    const preferredProvider = (process.env.EMAIL_PROVIDER || '').toLowerCase();
+    const useResendFirst = preferredProvider === 'resend' || (!preferredProvider && this.isResendConfigured());
+
+    if (useResendFirst && this.isResendConfigured()) {
+      try {
+        await this.sendViaResendApi(to, subject, mailOptions.html);
+        console.log(`✅ Password reset email sent to ${to} via Resend API`);
+        return;
+      } catch (error) {
+        console.error('❌ Resend API failed for password reset email, fallback to SMTP:', error);
+      }
+    }
 
     try {
       await this.transporter.sendMail(mailOptions);
