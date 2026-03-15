@@ -5,11 +5,7 @@ import { buildFrontendUrl } from '../utils/frontendUrl';
 export class EmailService {
   private transporter: nodemailer.Transporter;
 
-  constructor() {
-    const port = parseInt(process.env.EMAIL_PORT || '587');
-    const secure = process.env.EMAIL_SECURE
-      ? process.env.EMAIL_SECURE === 'true'
-      : port === 465;
+  private createSmtpTransport(port: number, secure: boolean): nodemailer.Transporter {
     const transportOptions: SMTPTransport.Options = {
       service: process.env.EMAIL_SERVICE || undefined,
       host: process.env.EMAIL_HOST || 'smtp.gmail.com',
@@ -24,7 +20,16 @@ export class EmailService {
       },
     };
 
-    this.transporter = nodemailer.createTransport(transportOptions);
+    return nodemailer.createTransport(transportOptions);
+  }
+
+  constructor() {
+    const port = parseInt(process.env.EMAIL_PORT || '587');
+    const secure = process.env.EMAIL_SECURE
+      ? process.env.EMAIL_SECURE === 'true'
+      : port === 465;
+
+    this.transporter = this.createSmtpTransport(port, secure);
   }
 
   async sendVerificationEmail(to: string, token: string, name: string): Promise<void> {
@@ -184,7 +189,22 @@ export class EmailService {
     try {
       await this.transporter.sendMail(mailOptions);
       console.log(`✅ Password reset email sent to ${to}`);
-    } catch (error) {
+    } catch (error: any) {
+      const shouldRetryWithSsl =
+        (error?.code === 'ETIMEDOUT' || error?.command === 'CONN') &&
+        process.env.EMAIL_ENABLE_SSL_FALLBACK !== 'false';
+
+      if (shouldRetryWithSsl) {
+        try {
+          const sslTransporter = this.createSmtpTransport(465, true);
+          await sslTransporter.sendMail(mailOptions);
+          console.log(`✅ Password reset email sent to ${to} using SSL fallback`);
+          return;
+        } catch (fallbackError) {
+          console.error('❌ SSL fallback also failed for password reset email:', fallbackError);
+        }
+      }
+
       console.error('❌ Error sending password reset email:', error);
       throw new Error('Failed to send password reset email');
     }
