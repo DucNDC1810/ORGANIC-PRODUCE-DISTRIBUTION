@@ -128,8 +128,14 @@ export class UserService {
     if (existingUser) {
       throw new AppError('Email already exists', 400);
     }
-    
-    const user = await User.create(userData);
+
+    const user = await User.create({
+      ...userData,
+      // Users created from admin management are trusted and can login immediately.
+      isEmailVerified: true,
+      emailVerificationToken: undefined,
+      emailVerificationExpires: undefined
+    });
     return user;
   }
 
