@@ -3,6 +3,7 @@ import { UserService } from '../services/user.service';
 import { AuthRequest } from '../middlewares/auth.middleware';
 import { UserRole } from '../constants/roles';
 import { getSecurityConfig, updateSecurityConfig } from '../config/securityConfig';
+import { buildFrontendUrl } from '../utils/frontendUrl';
 
 export class UserController {
   private userService: UserService;
@@ -133,12 +134,12 @@ export class UserController {
       const authResult = req.user as any;
       
       if (!authResult) {
-        res.redirect(`${process.env.FRONTEND_URL}/login?error=authentication_failed`);
+        res.redirect(buildFrontendUrl('/login?error=authentication_failed'));
         return;
       }
 
       // Redirect to frontend with token
-      res.redirect(`${process.env.FRONTEND_URL}/auth/callback?token=${authResult.token}`);
+      res.redirect(buildFrontendUrl(`/auth/callback?token=${encodeURIComponent(authResult.token)}`));
     } catch (error) {
       next(error);
     }

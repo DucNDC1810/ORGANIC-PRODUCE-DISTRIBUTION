@@ -190,7 +190,7 @@ export default function LoginPage() {
       sessionStorage.setItem('redirectAfterLogin', pendingRedirect);
     }
 
-    window.location.href = 'http://localhost:5000/api/auth/google';
+    navigate('/auth/google');
   };
 
   return (
@@ -349,10 +349,10 @@ export default function LoginPage() {
               <div className="rounded-xl border border-red-200 bg-red-50 p-4 space-y-3">
                 <div className="flex items-center gap-2 text-red-700">
                   <Lock className="w-4 h-4 flex-shrink-0" />
-                  <p className="text-sm font-semibold">Tài khoản bị khóa</p>
+                  <p className="text-sm font-semibold">Account Locked</p>
                 </div>
                 <p className="text-xs text-red-600">
-                  Tài khoản của bạn đã bị khóa do nhập sai mật khẩu quá nhiều lần. Nhấn nút bên dưới để gửi yêu cầu mở khóa đến quản trị viên.
+                  Your account has been locked due to too many failed login attempts. Click the button below to request an unlock from the administrator.
                 </p>
                 <button
                   type="button"
@@ -361,7 +361,7 @@ export default function LoginPage() {
                   className="w-full flex items-center justify-center gap-2 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
                 >
                   <Send className="w-4 h-4" />
-                  {requestingSent ? 'Đang gửi...' : 'Gửi yêu cầu mở khóa'}
+                  {requestingSent ? 'Sending...' : 'Send Unlock Request'}
                 </button>
               </div>
             )}

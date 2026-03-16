@@ -310,7 +310,7 @@ export default function SignUpPage() {
               {/* Google */}
               <button
                 type="button"
-                onClick={() => window.location.href = 'http://localhost:5000/api/auth/google'}
+                onClick={() => navigate('/auth/google')}
                 className="w-16 h-16 bg-white border-2 border-border rounded-full hover:border-primary hover:shadow-lg transition-all flex items-center justify-center group"
                 title="Sign up with Google"
               >

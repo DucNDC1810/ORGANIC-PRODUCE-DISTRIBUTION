@@ -193,6 +193,24 @@ export default function ChatWidget() {
   const formatTime = (date: Date) =>
     date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
 
+  // Escape HTML to avoid injection, then convert simple markdown bold **text** → <strong>text</strong>
+  const escapeHtml = (str: string) =>
+    str
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+
+  const formatSimpleMarkdown = (text: string) => {
+    if (!text) return '';
+    let escaped = escapeHtml(text);
+    // Replace **bold** with <strong>bold</strong>
+    escaped = escaped.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+    // remove any remaining asterisks
+    return escaped.replace(/\*/g, '');
+  };
+
   // Don't render on non-product pages or when cart is open
   if (!isVisible || isCartOpen) return null;
 
@@ -261,9 +279,9 @@ export default function ChatWidget() {
                         ? 'bg-[#00B207] text-white rounded-tr-sm'
                         : 'bg-white text-[#1F2937] shadow-sm border border-gray-100 rounded-tl-sm'
                     }`}
-                  >
-                    {msg.text}
-                  </div>
+                    // Render simple formatted HTML (bold) while escaping other input
+                    dangerouslySetInnerHTML={{ __html: formatSimpleMarkdown(msg.text) }}
+                  />
                   <p className={`text-[10px] text-gray-400 mt-1 ${msg.sender === 'user' ? 'text-right' : 'text-left'}`}>
                     {formatTime(msg.timestamp)}
                   </p>

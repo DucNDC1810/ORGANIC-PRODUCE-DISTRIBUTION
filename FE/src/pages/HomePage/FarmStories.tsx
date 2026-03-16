@@ -29,7 +29,6 @@ export default function FarmStories() {
     }
   };
 
-
   // Calculate pagination
   const totalPages = Math.ceil(stories.length / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;

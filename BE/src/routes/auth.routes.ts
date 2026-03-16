@@ -1,6 +1,7 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { UserController } from '../controllers/user.controller';
 import passport from 'passport';
+import { getFrontendBaseUrl } from '../utils/frontendUrl';
 
 const router = Router();
 const userController = new UserController();
@@ -25,7 +26,7 @@ router.get(
   '/google/callback',
   (req: Request, res: Response, next: NextFunction) => {
     passport.authenticate('google', { session: false }, (err: any, user: any) => {
-      const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+      const frontendUrl = getFrontendBaseUrl();
 
       if (err) {
         const errorCode = err.statusCode === 409 ? 'google_account_exists' : 'authentication_failed';

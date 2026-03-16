@@ -71,9 +71,11 @@ export default function OrderSuccessPage() {
   const orderIdFromUrl = searchParams.get('orderId');
   const orderId = orderIdFromUrl || location.state?.orderId;
   
-  const [paymentType, setPaymentType] = useState<"momo" | null>(null);
+  const [paymentType, setPaymentType] = useState<"momo" | "zalopay" | null>(null);
   // Check for MoMo return by checking partnerCode or orderId in URL
   const isMoMoReturn = searchParams.get('partnerCode') === 'MOMO' || !!searchParams.get('orderId') || !!sessionStorage.getItem('pendingMoMoOrder');
+  // Check for ZaloPay return by checking apptransid or status in URL
+  const isZaloPayReturn = searchParams.get('apptransid') !== null || searchParams.get('status') !== null;
 
   useEffect(() => {
     // If MoMo returns a non-zero resultCode, render the dedicated failure page.
@@ -310,6 +312,32 @@ export default function OrderSuccessPage() {
           return;
         }
 
+        // Get pending order data from localStorage if exists (ZaloPay)
+        const pendingOrderData = localStorage.getItem("pendingZaloPayOrder");
+        if (pendingOrderData) {
+          const { orderData: data, appTransId, subscriptionConfig: zaloSubConfig } = JSON.parse(pendingOrderData);
+          // Remove immediately to prevent double-execution (React Strict Mode / double useEffect)
+          localStorage.removeItem("pendingZaloPayOrder");
+          setOrderData(data);
+          // Capture subscription config for UI display
+          if (zaloSubConfig) {
+            setSubscriptionConfig(zaloSubConfig);
+          }
+          // Create subscription if this was a recurring order
+          if (zaloSubConfig) {
+            subscriptionService.createSubscription(zaloSubConfig).catch((err) =>
+              console.warn('Subscription creation failed (ZaloPay):', err)
+            );
+          }
+          setPaymentType('zalopay');
+
+          // If coming from ZaloPay return, mark as verified
+          if (isZaloPayReturn && appTransId) {
+            setVerificationStatus("verifying");
+            setVerificationStatus("verified");
+          }
+
+        }
         // Get pending order data from localStorage if exists (legacy ZaloPay key cleanup)
         localStorage.removeItem("pendingZaloPayOrder");
         

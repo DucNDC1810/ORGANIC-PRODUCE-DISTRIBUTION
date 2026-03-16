@@ -1,9 +1,10 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Search, Filter, ChevronDown, X } from 'lucide-react';
 import { useSearchParams } from 'react-router-dom';
 import Header from '../../components/Header';
 import ProductCard from '../../components/ProductCard';
 import { useProducts } from '../../hooks/useProducts';
+import { useCategories } from '../../hooks/useCategories';
 import { Input } from '../../components/ui/input';
 import { Button } from '../../components/ui/button';
 import {
@@ -14,21 +15,109 @@ import {
   SelectValue,
 } from '../../components/ui/select';
 
+const LEGACY_CATEGORY_ALIASES: Record<string, string> = {
+  'milk & dairy': 'milk-dairy',
+  'milk and dairy': 'milk-dairy',
+  dairy: 'milk-dairy',
+  'milk-dairy': 'milk-dairy',
+  'milk_dairy': 'milk-dairy',
+};
+
+const normalizeCategoryToken = (value: string): string =>
+  value.toLowerCase().trim().replace(/[^a-z0-9]/g, '');
+
+const resolveCategoryValue = (
+  rawValue: string | null,
+  categories: Array<{ slug: string; name: string }>,
+): string => {
+  if (!rawValue) return 'all';
+
+  const trimmed = rawValue.trim();
+  if (!trimmed || trimmed.toLowerCase() === 'all') {
+    return 'all';
+  }
+
+  const aliased = LEGACY_CATEGORY_ALIASES[trimmed.toLowerCase()] || trimmed;
+
+  if (!categories.length) {
+    return aliased;
+  }
+
+  const exactSlug = categories.find(
+    (category) => category.slug.toLowerCase() === aliased.toLowerCase(),
+  );
+  if (exactSlug) {
+    return exactSlug.slug;
+  }
+
+  const exactName = categories.find(
+    (category) => category.name.toLowerCase() === aliased.toLowerCase(),
+  );
+  if (exactName) {
+    return exactName.slug;
+  }
+
+  const normalizedInput = normalizeCategoryToken(aliased);
+  if (!normalizedInput) {
+    return aliased;
+  }
+
+  const fuzzyMatch = categories.find((category) => {
+    const normalizedSlug = normalizeCategoryToken(category.slug);
+    const normalizedName = normalizeCategoryToken(category.name);
+
+    return (
+      normalizedSlug === normalizedInput ||
+      normalizedName === normalizedInput ||
+      normalizedSlug.includes(normalizedInput) ||
+      normalizedName.includes(normalizedInput) ||
+      normalizedInput.includes(normalizedSlug) ||
+      normalizedInput.includes(normalizedName)
+    );
+  });
+
+  return fuzzyMatch?.slug || aliased;
+};
+
 export default function ProductsPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const { products, loading, error, fetchProducts, pagination } = useProducts();
+  const { categories, fetchCategories } = useCategories();
+
+  const categoryOptions = useMemo(() => {
+    if (categories.length > 0) {
+      return categories.map((category) => ({
+        value: category.slug,
+        label: category.name,
+      }));
+    }
+
+    return [
+      { value: 'vegetables', label: 'Vegetables' },
+      { value: 'fruits', label: 'Fruits' },
+      { value: 'grains', label: 'Grains' },
+      { value: 'milk-dairy', label: 'Milk & Dairy' },
+    ];
+  }, [categories]);
   
   // Initialize state from URL params
   const [searchTerm, setSearchTerm] = useState(searchParams.get('search') || '');
-  const [selectedCategory, setSelectedCategory] = useState(searchParams.get('category') || 'all');
+  const [selectedCategory, setSelectedCategory] = useState(
+    resolveCategoryValue(searchParams.get('category'), categories),
+  );
   const [sortBy, setSortBy] = useState(searchParams.get('sortBy') || 'createdAt');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>((searchParams.get('sortOrder') as 'asc' | 'desc') || 'desc');
   const [currentPage, setCurrentPage] = useState(Number(searchParams.get('page')) || 1);
   const [showFilters, setShowFilters] = useState(false);
 
+  // Load active categories for filter dropdown and slug resolution
+  useEffect(() => {
+    fetchCategories({ isActive: true, limit: 100 });
+  }, [fetchCategories]);
+
   // Sync state with URL params when navigating from Header dropdown
   useEffect(() => {
-    const categoryFromUrl = searchParams.get('category') || 'all';
+    const categoryFromUrl = resolveCategoryValue(searchParams.get('category'), categories);
     const searchFromUrl = searchParams.get('search') || '';
     const sortByFromUrl = searchParams.get('sortBy') || 'createdAt';
     const sortOrderFromUrl = (searchParams.get('sortOrder') as 'asc' | 'desc') || 'desc';
@@ -58,7 +147,7 @@ export default function ProductsPage() {
     } else if (hasChanges) {
       setCurrentPage(1);
     }
-  }, [searchParams]);
+  }, [searchParams, categories]);
 
   // Fetch products when filters change
   useEffect(() => {
@@ -84,7 +173,7 @@ export default function ProductsPage() {
   // Update URL when filters change (separate from fetch to prevent loops)
   const updateUrlParams = (newCategory?: string, newSearch?: string, newSortBy?: string, newSortOrder?: string, newPage?: number) => {
     const newSearchParams = new URLSearchParams();
-    const category = newCategory ?? selectedCategory;
+    const category = resolveCategoryValue(newCategory ?? selectedCategory, categories);
     const search = newSearch ?? searchTerm;
     const sort = newSortBy ?? sortBy;
     const order = newSortOrder ?? sortOrder;
@@ -194,17 +283,11 @@ export default function ProductsPage() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Categories</SelectItem>
-                  <SelectItem value="vegetables">Vegetables</SelectItem>
-                  <SelectItem value="fruits">Fruits</SelectItem>
-                  <SelectItem value="grains">Grains</SelectItem>
-                  <SelectItem value="dairy">Dairy</SelectItem>
-                  <SelectItem value="meat">Meat</SelectItem>
-                  <SelectItem value="seafood">Seafood</SelectItem>
-                  <SelectItem value="herbs">Herbs</SelectItem>
-                  <SelectItem value="nuts">Nuts</SelectItem>
-                  <SelectItem value="beverages">Beverages</SelectItem>
-                  <SelectItem value="processed">Processed Foods</SelectItem>
-                  <SelectItem value="other">Other</SelectItem>
+                  {categoryOptions.map((category) => (
+                    <SelectItem key={category.value} value={category.value}>
+                      {category.label}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
 

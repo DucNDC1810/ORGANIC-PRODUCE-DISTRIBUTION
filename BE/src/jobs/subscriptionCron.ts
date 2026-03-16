@@ -52,8 +52,6 @@ function todayMidnight(): Date {
 // ─────────────────────────────────────────────────────────────
 async function processSubscriptionOrders(): Promise<void> {
   const today = todayMidnight();
-  const tomorrow = new Date(today);
-  tomorrow.setDate(tomorrow.getDate() + 1);
 
   console.log(`[SubscriptionCron] 🕛 Running at ${new Date().toISOString()} — looking for subscriptions due on or before ${today.toDateString()}`);
 
@@ -62,7 +60,7 @@ async function processSubscriptionOrders(): Promise<void> {
   // Lấy các gói active đến hạn hôm nay
   const dueSubscriptions = await Subscription.find({
     status: 'active',
-    nextDeliveryDate: { $lte: tomorrow }
+    nextDeliveryDate: { $lte: today }
   })
     .populate('userId', 'name email phone')
     .populate('addressId')
@@ -77,9 +75,31 @@ async function processSubscriptionOrders(): Promise<void> {
 
   for (const sub of dueSubscriptions) {
     try {
+      // Claim atomically to avoid duplicate order creation across multiple server instances.
+      // Only the first worker that matches exact nextDeliveryDate can advance and process.
+      const claimed = await Subscription.findOneAndUpdate(
+        {
+          _id: sub._id,
+          status: 'active',
+          nextDeliveryDate: sub.nextDeliveryDate
+        },
+        {
+          $set: {
+            nextDeliveryDate: advanceDate(sub.nextDeliveryDate, sub.frequency)
+          }
+        },
+        { new: false }
+      );
+
+      if (!claimed) {
+        console.log(`[SubscriptionCron] ⏭️ Skip subscription ${sub._id}: already processed by another worker.`);
+        continue;
+      }
+
       const user = sub.userId as any;
       const address = sub.addressId as any;
-      const scheduledDeliveryDate = new Date(sub.nextDeliveryDate);
+      const scheduledDeliveryDate = new Date(claimed.nextDeliveryDate);
+      const nextDate = advanceDate(claimed.nextDeliveryDate, claimed.frequency);
 
       // ── Tính tổng tiền ──────────────────────────────────
       const orderItems = sub.items.map((item) => {
@@ -147,13 +167,8 @@ async function processSubscriptionOrders(): Promise<void> {
         paymentMethod: normalizedPaymentMethod,
         paymentStatus,
         deliveryInfo,
-        notes: `Đơn hàng định kỳ tự động tạo từ gói đặt hàng. Tần suất: ${sub.frequency}.`
+        notes: `Automatic subscription order created from subscription plan. Frequency: ${sub.frequency}.`
       });
-
-      // ── Cập nhật nextDeliveryDate ─────────────────────────
-      const nextDate = advanceDate(sub.nextDeliveryDate, sub.frequency);
-      sub.nextDeliveryDate = nextDate;
-      await sub.save();
 
       // ── Thông báo / Email ─────────────────────────────────
       if (isCOD) {
@@ -182,11 +197,21 @@ async function processSubscriptionOrders(): Promise<void> {
             String(newOrder._id),
             totalAmount,
             sub.paymentMethod,
-            sub.nextDeliveryDate // ngày giao (đã cập nhật)
+            nextDate
           );
         }
       }
     } catch (err: any) {
+      // Best-effort rollback when claim succeeded but order creation failed.
+      try {
+        await Subscription.findOneAndUpdate(
+          { _id: sub._id, nextDeliveryDate: advanceDate(sub.nextDeliveryDate, sub.frequency) },
+          { $set: { nextDeliveryDate: sub.nextDeliveryDate } }
+        );
+      } catch {
+        // no-op
+      }
+
       console.error(
         `[SubscriptionCron] ❌ Failed to process subscription ${sub._id}:`,
         err.message ?? err

@@ -37,12 +37,15 @@ const app: Application = express();
 configurePassport();
 
 // Middlewares
-const corsOrigins = process.env.CORS_ORIGIN
-  ? process.env.CORS_ORIGIN.split(',').map(origin => origin.trim())
-  : ['http://localhost:5173'];
-
+const allowedOrigins = (process.env.CORS_ORIGIN || 'https://organic-produce-distribution.vercel.app').split(',').map(o => o.trim());
 app.use(cors({
-  origin: corsOrigins,
+  origin: (origin, callback) => {
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error(`CORS policy: origin ${origin} not allowed`));
+    }
+  },
   credentials: true
 }));
 // Increase payload limit for base64 images 
@@ -51,6 +54,10 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use(passport.initialize());
 
 // Routes
+app.get('/', (req: Request, res: Response) => {
+  res.json({ status: 'OK', message: 'Organic Produce API is running' });
+});
+
 app.get('/api/health', (req: Request, res: Response) => {
   res.json({ status: 'OK', message: 'Server is running' });
 });
