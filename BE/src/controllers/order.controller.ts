@@ -6,6 +6,7 @@ import { User } from '../models/User.model';
 import { Product } from '../models/Product.model';
 import { Voucher } from '../models/Voucher.model';
 import { VoucherUsage } from '../models/VoucherUsage.model';
+import { Transaction } from '../models/Transaction.model';
 import { AuthRequest } from '../middlewares/auth.middleware';
 import { AppError } from '../utils/AppError';
 import { createNotification } from '../models/Notification.model';
@@ -360,7 +361,7 @@ export class OrderController {
         throw new AppError('Status is required', 400);
       }
 
-      const validStatuses = ['pending', 'confirmed', 'processing', 'shipped', 'delivered', 'cancelled', 'refunded'];
+      const validStatuses = ['pending', 'confirmed', 'processing', 'shipped', 'delivered', 'cancelled', 'refunded', 'returned'];
       if (!validStatuses.includes(status)) {
         throw new AppError(`Invalid status. Must be one of: ${validStatuses.join(', ')}`, 400);
       }
@@ -911,6 +912,123 @@ export class OrderController {
         success: true,
         message: `Payment method updated to ${paymentMethod.toUpperCase()}`,
         data: updatedOrder
+      });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  /**
+   * Process a returned order (manager/admin only)
+   * Hàng bị customer từ chối nhận — Manager đánh giá tình trạng rồi xử lý
+   * PATCH /api/orders/:id/process-return
+   * Body: { condition: 'salvageable' | 'spoiled', note?: string }
+   */
+  processReturnedOrder = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const { id } = req.params;
+      const { condition, note } = req.body;
+      const managerId = req.user?.id;
+
+      if (!condition || !['salvageable', 'spoiled'].includes(condition)) {
+        throw new AppError("condition must be 'salvageable' or 'spoiled'", 400);
+      }
+
+      const order = await Order.findById(id)
+        .populate('userId', 'name email walletBalance')
+        .populate('items.productId', 'name price');
+
+      if (!order) throw new AppError('Order not found', 404);
+
+      if (order.status !== 'returned') {
+        throw new AppError(`Only returned orders can be processed. Current status: ${order.status}`, 400);
+      }
+
+      // Ghi nhận Manager đánh giá
+      (order as any).returnCondition = condition;
+      (order as any).returnNote = note || '';
+      (order as any).returnProcessedAt = new Date();
+      (order as any).returnProcessedBy = managerId;
+      order.status = 'refunded';
+
+      if (condition === 'salvageable') {
+        // Hàng còn dùng được → cộng lại stock để bán (manager tự điều chỉnh giá sau)
+        const restoreOps = order.items.map((item: any) => ({
+          updateOne: {
+            filter: { _id: item.productId?._id || item.productId },
+            update: { $inc: { stock: item.quantity } }
+          }
+        }));
+        await Product.bulkWrite(restoreOps);
+      }
+      // condition === 'spoiled' → KHÔNG cộng stock, ghi nhận thiệt hại
+
+      // Xử lý tiền: chỉ refund nếu đã thu tiền (online payment)
+      // COD → paymentStatus vẫn 'unpaid', tiền chưa thu → không làm gì
+      const onlinePaymentMethods = ['momo', 'wallet', 'credit_card', 'debit_card', 'bank_transfer', 'e_wallet'];
+      const wasCharged = onlinePaymentMethods.includes(order.paymentMethod || '') && order.paymentStatus === 'paid';
+
+      if (wasCharged) {
+        const refundAmount = order.totalAmount - (order.discountAmount || 0);
+        const customerId = (order.userId as any)?._id || order.userId;
+
+        if (order.paymentMethod === 'wallet') {
+          // Hoàn tiền vào ví nội bộ ngay lập tức
+          await User.findByIdAndUpdate(customerId, {
+            $inc: { walletBalance: refundAmount }
+          });
+          await Transaction.create({
+            userId: customerId,
+            amount: refundAmount,
+            type: 'refund',
+            status: 'success',
+            orderId: order._id,
+            description: `Hoàn tiền đơn #${order._id?.toString().slice(-6).toUpperCase()} — khách từ chối nhận hàng`
+          });
+        } else if (order.paymentMethod === 'momo') {
+          // Ghi nhận pending để admin xử lý hoàn tiền MoMo thủ công
+          await Transaction.create({
+            userId: customerId,
+            amount: refundAmount,
+            type: 'refund',
+            status: 'pending',
+            orderId: order._id,
+            description: `[CẦN XỬ LÝ THỦ CÔNG] Hoàn tiền MoMo đơn #${order._id?.toString().slice(-6).toUpperCase()} — khách từ chối nhận hàng`
+          });
+          createNotification(
+            'order_update',
+            'Cần hoàn tiền MoMo',
+            `Đơn #${order._id?.toString().slice(-6).toUpperCase()} cần hoàn ${refundAmount.toLocaleString('vi-VN')}đ qua MoMo. Xử lý thủ công.`,
+            { link: '?tab=orders', metadata: { orderId: order._id } }
+          );
+        }
+      }
+      // COD: không thu tiền → không hoàn tiền
+
+      await order.save();
+
+      // Notify customer
+      const customerId2 = (order.userId as any)?._id || order.userId;
+      const refundMsg = wasCharged
+        ? (order.paymentMethod === 'wallet' ? ' Tiền đã được hoàn vào ví.' : ' Tiền sẽ được hoàn trong vài ngày.')
+        : '';
+      createNotification(
+        'order_update',
+        'Đơn hàng đã được xử lý',
+        `Đơn #${order._id?.toString().slice(-6).toUpperCase()} đã xử lý xong.${refundMsg}`,
+        {
+          link: `/orders/${order._id}`,
+          metadata: { orderId: order._id },
+          userId: customerId2
+        }
+      );
+
+      res.status(200).json({
+        success: true,
+        message: condition === 'salvageable'
+          ? 'Hàng còn dùng được — đã cộng lại stock.'
+          : 'Hàng hư hỏng — đã ghi nhận thiệt hại, stock không thay đổi.',
+        data: order
       });
     } catch (error) {
       next(error);
