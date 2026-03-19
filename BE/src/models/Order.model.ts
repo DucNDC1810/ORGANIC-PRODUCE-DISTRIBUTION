@@ -14,7 +14,13 @@ export interface IOrder extends Document {
   reopenedForShipping?: boolean;
   orderDate: Date;
   totalAmount: number;
-  status: 'pending' | 'confirmed' | 'processing' | 'shipped' | 'delivered' | 'cancelled' | 'refunded';
+  status: 'pending' | 'confirmed' | 'processing' | 'shipped' | 'delivered' | 'cancelled' | 'refunded' | 'returned';
+  returnedAt?: Date;
+  returnReason?: string;
+  returnCondition?: 'salvageable' | 'spoiled';
+  returnNote?: string;
+  returnProcessedAt?: Date;
+  returnProcessedBy?: mongoose.Types.ObjectId;
   items: Array<{
     productId: mongoose.Types.ObjectId;
     quantity: number;
@@ -118,7 +124,7 @@ const orderSchema = new Schema<IOrder>(
     },
     status: {
       type: String,
-      enum: ['pending', 'confirmed', 'processing', 'shipped', 'delivered', 'cancelled', 'refunded'],
+      enum: ['pending', 'confirmed', 'processing', 'shipped', 'delivered', 'cancelled', 'refunded', 'returned'],
       default: 'pending'
     },
     items: [
@@ -230,6 +236,30 @@ const orderSchema = new Schema<IOrder>(
     },
     shippingAcceptedAt: {
       type: Date
+    },
+    returnedAt: {
+      type: Date
+    },
+    returnReason: {
+      type: String,
+      trim: true
+    },
+    returnCondition: {
+      type: String,
+      enum: ['salvageable', 'spoiled'],
+      default: null
+    },
+    returnNote: {
+      type: String,
+      trim: true
+    },
+    returnProcessedAt: {
+      type: Date
+    },
+    returnProcessedBy: {
+      type: Schema.Types.ObjectId,
+      ref: 'User',
+      default: null
     },
     isRecurring: {
       type: Boolean,

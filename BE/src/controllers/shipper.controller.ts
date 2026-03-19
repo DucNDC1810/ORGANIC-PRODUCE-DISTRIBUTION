@@ -282,7 +282,7 @@ export class ShipperController {
                 throw new AppError('Shipper not authenticated', 401);
             }
 
-            if (!['shipped', 'delivered', 'cancelled'].includes(status)) {
+            if (!['shipped', 'delivered', 'cancelled', 'returned'].includes(status)) {
                 throw new AppError('Invalid status', 400);
             }
 
@@ -299,6 +299,41 @@ export class ShipperController {
             // Validate status transitions
             if (status === 'cancelled' && !cancelReason) {
                 throw new AppError('Cancel reason is required', 400);
+            }
+
+            if (status === 'returned' && !cancelReason) {
+                throw new AppError('Return reason is required', 400);
+            }
+
+            // Khi customer từ chối nhận hàng
+            // KHÔNG đụng stock, KHÔNG đụng tiền — Manager sẽ xử lý sau
+            if (status === 'returned') {
+                order.status = 'returned' as any;
+                order.returnedAt = new Date();
+                order.returnReason = cancelReason;
+
+                await order.save();
+
+                await order.populate('userId', 'name email phone');
+                await order.populate('items.productId', 'name price images');
+
+                res.json({
+                    success: true,
+                    message: 'Order marked as returned. Manager will process the returned items.',
+                    data: order
+                });
+
+                // Notify manager để kiểm tra hàng trả
+                createNotification(
+                    'order_update',
+                    'Hàng bị từ chối nhận',
+                    `Đơn #${order._id?.toString().slice(-6).toUpperCase()} bị khách từ chối. Lý do: ${cancelReason}. Vui lòng kiểm tra hàng trả về.`,
+                    {
+                        link: '?tab=orders',
+                        metadata: { orderId: order._id }
+                    }
+                );
+                return;
             }
 
             // When shipper cancels, return order to available pool for other shippers

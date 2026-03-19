@@ -116,6 +116,14 @@ router.patch(
   orderController.updatePaymentStatus as any
 );
 
+// Process a returned order — manager/admin only
+router.patch(
+  '/:id/process-return',
+  authenticate as any,
+  checkRole(UserRole.ADMIN, UserRole.MANAGER) as any,
+  orderController.processReturnedOrder as any
+);
+
 // Delete order (admin only)
 router.delete(
   '/:id',
