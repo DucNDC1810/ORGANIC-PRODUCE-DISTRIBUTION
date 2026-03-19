@@ -573,7 +573,7 @@ export interface Order {
   subscriptionId?: string;
   orderDate: string;
   totalAmount: number;
-  status: 'pending' | 'confirmed' | 'processing' | 'shipped' | 'delivered' | 'cancelled' | 'refunded';
+  status: 'pending' | 'confirmed' | 'processing' | 'shipped' | 'delivered' | 'cancelled' | 'refunded' | 'returned';
   items: OrderItem[];
   deliveryInfo?: {
     fullName?: string;
@@ -774,6 +774,16 @@ export const orderAPI = {
    */
   deleteOrder: async (id: string): Promise<void> => {
     await api.delete(`/orders/${id}`);
+  },
+
+  /**
+   * Process a returned order — manager/admin only
+   * PATCH /api/orders/:id/process-return
+   * condition: 'salvageable' | 'spoiled'
+   */
+  processReturnedOrder: async (id: string, condition: 'salvageable' | 'spoiled', note?: string): Promise<OrderResponse> => {
+    const response: any = await api.patch(`/orders/${id}/process-return`, { condition, note });
+    return response;
   },
 };
 

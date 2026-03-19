@@ -22,6 +22,9 @@ import {
   CircleDollarSign,
   StickyNote,
   Filter,
+  RotateCcw,
+  PackageX,
+  CheckSquare,
 } from 'lucide-react';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
@@ -80,6 +83,7 @@ const STATUS_CONFIG: Record<
   delivered:  { label: 'Delivered',  className: 'bg-green-100 text-green-800 border-green-200' },
   cancelled:  { label: 'Cancelled',  className: 'bg-red-100   text-red-800   border-red-200'   },
   refunded:   { label: 'Refunded',   className: 'bg-gray-100  text-gray-800  border-gray-200'  },
+  returned:   { label: 'Returned',   className: 'bg-amber-100 text-amber-800 border-amber-200' },
 };
 
 const PAYMENT_STATUS_CONFIG: Record<
@@ -166,6 +170,7 @@ interface OrderDetailModalProps {
   onClose: () => void;
   onConfirm: (id: string) => void;
   onCancel: (id: string) => void;
+  onProcessReturn: (id: string) => void;
   loading: boolean;
   subOrders?: Order[];
 }
@@ -176,12 +181,14 @@ const OrderDetailModal = ({
   onClose,
   onConfirm,
   onCancel,
+  onProcessReturn,
   loading,
   subOrders = [],
 }: OrderDetailModalProps) => {
   if (!order) return null;
 
   const isPending = order.status === 'pending';
+  const isReturned = order.status === 'returned';
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
@@ -514,6 +521,24 @@ const OrderDetailModal = ({
               </div>
             </div>
           )}
+
+          {/* Returned info block */}
+          {isReturned && (
+            <div className="p-4 bg-amber-50 border border-amber-200 rounded-xl space-y-2">
+              <div className="flex items-center gap-2">
+                <RotateCcw className="w-4 h-4 text-amber-600" />
+                <p className="text-sm font-semibold text-amber-800">Hàng bị từ chối nhận</p>
+              </div>
+              {(order as any).returnReason && (
+                <p className="text-sm text-amber-700">
+                  <span className="font-medium">Lý do:</span> {(order as any).returnReason}
+                </p>
+              )}
+              <p className="text-xs text-amber-600 mt-1">
+                Vui lòng kiểm tra tình trạng hàng và xử lý bên dưới.
+              </p>
+            </div>
+          )}
         </div>
 
         {isPending && (
@@ -534,6 +559,29 @@ const OrderDetailModal = ({
             >
               {loading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <CheckCircle2 className="w-4 h-4 mr-2" />}
               Confirm Order
+            </Button>
+          </DialogFooter>
+        )}
+
+        {isReturned && (
+          <DialogFooter className="gap-2 pt-2">
+            <p className="text-xs text-gray-500 w-full text-center mb-1">Kiểm tra hàng trả và chọn tình trạng:</p>
+            <Button
+              variant="outline"
+              className="border-red-300 text-red-600 hover:bg-red-50 flex-1"
+              onClick={() => onProcessReturn(`${order._id}::spoiled`)}
+              disabled={loading}
+            >
+              {loading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <PackageX className="w-4 h-4 mr-2" />}
+              Hàng hư — Bỏ đi
+            </Button>
+            <Button
+              className="bg-amber-500 hover:bg-amber-600 text-white flex-1"
+              onClick={() => onProcessReturn(`${order._id}::salvageable`)}
+              disabled={loading}
+            >
+              {loading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <CheckSquare className="w-4 h-4 mr-2" />}
+              Còn dùng được
             </Button>
           </DialogFooter>
         )}
@@ -570,6 +618,7 @@ export default function OrderConfirmation() {
   const [cancelTarget, setCancelTarget] = useState<string | null>(null);
   const [cancelReason, setCancelReason] = useState('');
   const [groupSubOrders, setGroupSubOrders] = useState<Order[]>([]);
+  const [processReturnTarget, setProcessReturnTarget] = useState<{ id: string; condition: 'salvageable' | 'spoiled' } | null>(null);
 
   // ── Search debounce ───────────────────────────────────────
 
@@ -660,6 +709,34 @@ export default function OrderConfirmation() {
     }
   };
 
+  // Called from modal with format "orderId::condition"
+  const handleProcessReturnClick = (payload: string) => {
+    const [id, condition] = payload.split('::');
+    setProcessReturnTarget({ id, condition: condition as 'salvageable' | 'spoiled' });
+  };
+
+  const handleProcessReturnConfirm = async () => {
+    if (!processReturnTarget) return;
+    const { id, condition } = processReturnTarget;
+    try {
+      setActionLoading(true);
+      await orderAPI.processReturnedOrder(id, condition);
+      toast.success(
+        condition === 'salvageable'
+          ? 'Đã cộng lại stock — hàng còn dùng được.'
+          : 'Đã ghi nhận hàng hư — stock không thay đổi.',
+        { description: condition === 'salvageable' ? 'Bạn có thể điều chỉnh giá để bán nhanh.' : 'Thiệt hại đã được ghi nhận.' }
+      );
+      setProcessReturnTarget(null);
+      setIsDetailOpen(false);
+      fetchOrders();
+    } catch {
+      toast.error('Không thể xử lý hàng trả. Thử lại.');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
   const openDetail = async (order: Order) => {
     setSelectedOrder(order);
     setGroupSubOrders([]);
@@ -690,6 +767,7 @@ export default function OrderConfirmation() {
     pendingToday: pendingSummary.pendingToday,
     confirmed:    safeOrders.filter((o) => o.status === 'confirmed').length,
     cancelled:    safeOrders.filter((o) => o.status === 'cancelled').length,
+    returned:     safeOrders.filter((o) => o.status === 'returned').length,
   }), [totalItems, pendingSummary, safeOrders]);
 
   // ─────────────────────────────────────────
@@ -792,6 +870,7 @@ export default function OrderConfirmation() {
                   <SelectItem value="delivered">Delivered</SelectItem>
                   <SelectItem value="cancelled">Cancelled</SelectItem>
                   <SelectItem value="refunded">Refunded</SelectItem>
+                  <SelectItem value="returned">Returned</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -958,6 +1037,28 @@ export default function OrderConfirmation() {
                               </button>
                             </>
                           )}
+
+                          {/* Returned — quick process buttons */}
+                          {order.status === 'returned' && (
+                            <>
+                              <button
+                                onClick={() => setProcessReturnTarget({ id: order._id, condition: 'salvageable' })}
+                                title="Hàng còn dùng được — cộng lại stock"
+                                disabled={actionLoading}
+                                className="p-1.5 rounded-md hover:bg-amber-100 text-amber-600 hover:text-amber-800 transition-colors disabled:opacity-50"
+                              >
+                                <CheckSquare className="w-4 h-4" />
+                              </button>
+                              <button
+                                onClick={() => setProcessReturnTarget({ id: order._id, condition: 'spoiled' })}
+                                title="Hàng hư — bỏ đi"
+                                disabled={actionLoading}
+                                className="p-1.5 rounded-md hover:bg-red-100 text-red-500 hover:text-red-700 transition-colors disabled:opacity-50"
+                              >
+                                <PackageX className="w-4 h-4" />
+                              </button>
+                            </>
+                          )}
                         </div>
                       </TableCell>
                     </TableRow>
@@ -1013,6 +1114,7 @@ export default function OrderConfirmation() {
           setIsDetailOpen(false);
           setCancelTarget(id);
         }}
+        onProcessReturn={handleProcessReturnClick}
         loading={actionLoading}
         subOrders={groupSubOrders}
       />
@@ -1066,6 +1168,47 @@ export default function OrderConfirmation() {
                 <XCircle className="w-4 h-4 mr-2" />
               )}
               Yes, Cancel Order
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* ── Process Return Alert Dialog ───────────── */}
+      <AlertDialog
+        open={!!processReturnTarget}
+        onOpenChange={(open) => { if (!open) setProcessReturnTarget(null); }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className={`flex items-center gap-2 ${processReturnTarget?.condition === 'salvageable' ? 'text-amber-600' : 'text-red-600'}`}>
+              {processReturnTarget?.condition === 'salvageable'
+                ? <><CheckSquare className="w-5 h-5" /> Hàng còn dùng được</>
+                : <><PackageX className="w-5 h-5" /> Hàng hư hỏng — Bỏ đi</>
+              }
+            </AlertDialogTitle>
+            <AlertDialogDescription className="text-sm leading-relaxed pt-1">
+              {processReturnTarget?.condition === 'salvageable'
+                ? 'Stock sẽ được cộng lại kho. Bạn có thể vào Product Management để điều chỉnh giá bán thấp hơn.'
+                : 'Stock sẽ KHÔNG được cộng lại. Hàng hư sẽ bị loại bỏ và thiệt hại được ghi nhận. Hành động này không thể hoàn tác.'}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={actionLoading}>Hủy bỏ</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleProcessReturnConfirm}
+              disabled={actionLoading}
+              className={processReturnTarget?.condition === 'salvageable'
+                ? 'bg-amber-500 hover:bg-amber-600 text-white'
+                : 'bg-red-600 hover:bg-red-700 text-white'}
+            >
+              {actionLoading
+                ? <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                : processReturnTarget?.condition === 'salvageable'
+                  ? <CheckSquare className="w-4 h-4 mr-2" />
+                  : <PackageX className="w-4 h-4 mr-2" />
+              }
+              Xác nhận
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
