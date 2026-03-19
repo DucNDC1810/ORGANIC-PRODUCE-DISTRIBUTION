@@ -9,7 +9,9 @@ import {
     RefreshCw,
     CheckCircle,
     XCircle,
-    Truck
+    Truck,
+    RotateCcw,
+    PhoneOff
 } from 'lucide-react';
 import api from '../../services/api';
 import { toast } from 'sonner';
@@ -83,6 +85,12 @@ export default function ShipperMyOrders() {
     const [cancelReason, setCancelReason] = useState('');
     const [showMapModal, setShowMapModal] = useState(false);
     const [selectedMapOrder, setSelectedMapOrder] = useState<Order | null>(null);
+
+    // Returned (customer refused) modal state
+    const [showReturnedModal, setShowReturnedModal] = useState(false);
+    const [returnedOrderId, setReturnedOrderId] = useState<string | null>(null);
+    const [returnedReason, setReturnedReason] = useState('');
+    const [returnedReasonType, setReturnedReasonType] = useState<string>('');
 
     const fetchMyOrders = async (page = 1, status = '') => {
         try {
@@ -162,6 +170,42 @@ export default function ShipperMyOrders() {
         }
     };
 
+    const handleReturnedOrder = async () => {
+        const finalReason = returnedReasonType === 'other'
+            ? returnedReason.trim()
+            : returnedReasonType;
+
+        if (!returnedOrderId || !finalReason) {
+            toast.error('Vui lòng chọn hoặc nhập lý do');
+            return;
+        }
+
+        try {
+            setUpdatingOrderId(returnedOrderId);
+            const response: any = await api.patch(`/shipper/orders/${returnedOrderId}/status`, {
+                status: 'returned',
+                cancelReason: finalReason
+            });
+            if (response.success) {
+                toast.success('Đã ghi nhận — Manager sẽ xử lý hàng trả', {
+                    description: 'Đơn hàng đã được chuyển về trạng thái "Returned"'
+                });
+                setOrders(orders.map(order =>
+                    order._id === returnedOrderId ? response.data : order
+                ));
+                setShowReturnedModal(false);
+                setReturnedReason('');
+                setReturnedReasonType('');
+                setReturnedOrderId(null);
+            }
+        } catch (error: any) {
+            console.error('Error marking order as returned:', error);
+            toast.error(error.response?.data?.message || 'Failed to mark order as returned');
+        } finally {
+            setUpdatingOrderId(null);
+        }
+    };
+
     const formatDate = (dateString: string) => {
         const date = new Date(dateString);
         return date.toLocaleDateString('vi-VN', {
@@ -186,7 +230,8 @@ export default function ShipperMyOrders() {
 
         const statusConfig: Record<string, { bg: string; text: string; label: string; icon: any }> = {
             shipped: { bg: 'bg-orange-100', text: 'text-orange-700', label: 'Delivering', icon: Truck },
-            delivered: { bg: 'bg-emerald-100', text: 'text-emerald-700', label: 'Delivered', icon: CheckCircle }
+            delivered: { bg: 'bg-emerald-100', text: 'text-emerald-700', label: 'Delivered', icon: CheckCircle },
+            returned: { bg: 'bg-amber-100', text: 'text-amber-700', label: 'Returned', icon: RotateCcw }
         };
 
         const config = statusConfig[order.status] || { bg: 'bg-gray-100', text: 'text-gray-700', label: order.status, icon: Package };
@@ -226,6 +271,7 @@ export default function ShipperMyOrders() {
                             <option value="">All Status</option>
                             <option value="shipped">Delivering</option>
                             <option value="delivered">Delivered</option>
+                            <option value="returned">Returned</option>
                             <option value="cancelled">Cancelled</option>
                         </select>
 
@@ -397,6 +443,21 @@ export default function ShipperMyOrders() {
                                                 <span>Mark as Delivered</span>
                                             </button>
 
+                                            {/* Customer refused — triggers returned flow */}
+                                            <button
+                                                onClick={() => {
+                                                    setReturnedOrderId(order._id);
+                                                    setReturnedReasonType('');
+                                                    setReturnedReason('');
+                                                    setShowReturnedModal(true);
+                                                }}
+                                                disabled={updatingOrderId === order._id}
+                                                className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-amber-500 text-white rounded-lg hover:bg-amber-600 transition-all duration-200 shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                                            >
+                                                <RotateCcw className="w-4 h-4" />
+                                                <span>Khách không nhận</span>
+                                            </button>
+
                                             <button
                                                 onClick={() => handleUpdateStatus(order._id, 'cancelled')}
                                                 disabled={updatingOrderId === order._id}
@@ -417,6 +478,12 @@ export default function ShipperMyOrders() {
                                                     {formatDate(order.shipperCancelledAt)}
                                                 </p>
                                             )}
+                                        </div>
+                                    ) : order.status === 'returned' ? (
+                                        <div className="text-center p-4 bg-amber-50 rounded-lg border border-amber-200">
+                                            <RotateCcw className="w-8 h-8 text-amber-600 mx-auto mb-2" />
+                                            <p className="text-sm font-medium text-amber-700">Khách không nhận</p>
+                                            <p className="text-xs text-gray-500 mt-1">Đang chờ Manager xử lý hàng trả</p>
                                         </div>
                                     ) : order.status === 'delivered' && (
                                         <div className="text-center p-4 bg-emerald-50 rounded-lg">
@@ -491,6 +558,99 @@ export default function ShipperMyOrders() {
                                 className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                                 Confirm Cancel
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Returned (Customer Refused) Modal */}
+            {showReturnedModal && (
+                <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+                    <div className="bg-white rounded-xl p-6 max-w-md w-full shadow-2xl">
+                        {/* Header */}
+                        <div className="flex items-center gap-3 mb-1">
+                            <div className="w-10 h-10 bg-amber-100 rounded-full flex items-center justify-center flex-shrink-0">
+                                <RotateCcw className="w-5 h-5 text-amber-600" />
+                            </div>
+                            <div>
+                                <h3 className="text-lg font-semibold text-gray-800">Khách không nhận hàng</h3>
+                                <p className="text-xs text-gray-500">Hàng sẽ được trả về — Manager sẽ xử lý</p>
+                            </div>
+                        </div>
+
+                        <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-lg mb-4">
+                            <p className="text-xs text-amber-700 leading-relaxed">
+                                <strong>Lưu ý:</strong> Chức năng này dành cho trường hợp khách từ chối nhận hàng hoặc không liên lạc được.
+                                Hàng sẽ <strong>không</strong> tự động hoàn kho — Manager sẽ kiểm tra và xử lý.
+                            </p>
+                        </div>
+
+                        {/* Preset reason chips */}
+                        <p className="text-sm font-medium text-gray-700 mb-2">Lý do:</p>
+                        <div className="grid grid-cols-1 gap-2 mb-3">
+                            {[
+                                { value: 'Khách không nghe máy sau nhiều lần gọi', icon: <PhoneOff className="w-3.5 h-3.5" /> },
+                                { value: 'Khách từ chối nhận hàng', icon: <XCircle className="w-3.5 h-3.5" /> },
+                                { value: 'Khách yêu cầu hủy khi shipper đến nơi', icon: <RotateCcw className="w-3.5 h-3.5" /> },
+                                { value: 'Địa chỉ giao hàng không tìm thấy', icon: <MapPin className="w-3.5 h-3.5" /> },
+                                { value: 'other', icon: null },
+                            ].map((opt) => (
+                                <button
+                                    key={opt.value}
+                                    type="button"
+                                    onClick={() => setReturnedReasonType(opt.value)}
+                                    className={`flex items-center gap-2 w-full text-left px-3 py-2.5 rounded-lg border text-sm transition-all
+                                        ${returnedReasonType === opt.value
+                                            ? 'border-amber-500 bg-amber-50 text-amber-800 font-medium'
+                                            : 'border-gray-200 text-gray-600 hover:border-gray-300 hover:bg-gray-50'
+                                        }`}
+                                >
+                                    {opt.icon && <span className="text-gray-400">{opt.icon}</span>}
+                                    {opt.value === 'other' ? 'Lý do khác...' : opt.value}
+                                </button>
+                            ))}
+                        </div>
+
+                        {/* Free text for "other" */}
+                        {returnedReasonType === 'other' && (
+                            <textarea
+                                value={returnedReason}
+                                onChange={(e) => setReturnedReason(e.target.value)}
+                                placeholder="Mô tả lý do cụ thể..."
+                                rows={3}
+                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-400 focus:border-transparent resize-none text-sm mb-3"
+                                autoFocus
+                            />
+                        )}
+
+                        <div className="flex gap-3 mt-4">
+                            <button
+                                onClick={() => {
+                                    setShowReturnedModal(false);
+                                    setReturnedReason('');
+                                    setReturnedReasonType('');
+                                    setReturnedOrderId(null);
+                                }}
+                                className="flex-1 px-4 py-2.5 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors text-sm font-medium"
+                            >
+                                Hủy bỏ
+                            </button>
+                            <button
+                                onClick={handleReturnedOrder}
+                                disabled={
+                                    !returnedReasonType ||
+                                    (returnedReasonType === 'other' && !returnedReason.trim()) ||
+                                    updatingOrderId !== null
+                                }
+                                className="flex-1 px-4 py-2.5 bg-amber-500 text-white rounded-lg hover:bg-amber-600 transition-colors text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                            >
+                                {updatingOrderId ? (
+                                    <span className="w-4 h-4 border-2 border-white/50 border-t-white rounded-full animate-spin" />
+                                ) : (
+                                    <RotateCcw className="w-4 h-4" />
+                                )}
+                                Xác nhận trả hàng
                             </button>
                         </div>
                     </div>
