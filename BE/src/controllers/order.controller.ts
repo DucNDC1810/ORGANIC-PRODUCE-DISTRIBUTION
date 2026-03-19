@@ -986,21 +986,18 @@ export class OrderController {
             description: `Hoàn tiền đơn #${order._id?.toString().slice(-6).toUpperCase()} — khách từ chối nhận hàng`
           });
         } else if (order.paymentMethod === 'momo') {
-          // Ghi nhận pending để admin xử lý hoàn tiền MoMo thủ công
+          // Hoàn tiền vào ví nội bộ FreshMarket (tự động, không cần gọi Momo API)
+          await User.findByIdAndUpdate(customerId, {
+            $inc: { walletBalance: refundAmount }
+          });
           await Transaction.create({
             userId: customerId,
             amount: refundAmount,
             type: 'refund',
-            status: 'pending',
+            status: 'success',
             orderId: order._id,
-            description: `[CẦN XỬ LÝ THỦ CÔNG] Hoàn tiền MoMo đơn #${order._id?.toString().slice(-6).toUpperCase()} — khách từ chối nhận hàng`
+            description: `Hoàn tiền MoMo → Ví FreshMarket đơn #${order._id?.toString().slice(-6).toUpperCase()} — khách từ chối nhận hàng`
           });
-          createNotification(
-            'order_update',
-            'Cần hoàn tiền MoMo',
-            `Đơn #${order._id?.toString().slice(-6).toUpperCase()} cần hoàn ${refundAmount.toLocaleString('vi-VN')}đ qua MoMo. Xử lý thủ công.`,
-            { link: '?tab=orders', metadata: { orderId: order._id } }
-          );
         }
       }
       // COD: không thu tiền → không hoàn tiền
@@ -1010,7 +1007,9 @@ export class OrderController {
       // Notify customer
       const customerId2 = (order.userId as any)?._id || order.userId;
       const refundMsg = wasCharged
-        ? (order.paymentMethod === 'wallet' ? ' Tiền đã được hoàn vào ví.' : ' Tiền sẽ được hoàn trong vài ngày.')
+        ? (['wallet', 'momo'].includes(order.paymentMethod || '')
+            ? ' Tiền đã được hoàn vào ví FreshMarket.'
+            : ' Tiền sẽ được hoàn trong vài ngày.')
         : '';
       createNotification(
         'order_update',
