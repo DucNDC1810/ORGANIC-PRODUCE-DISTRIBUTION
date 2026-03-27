@@ -191,11 +191,11 @@ export default function ProductDetailPage() {
     : [selectedProduct.thumbnail || ''];
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gradient-to-b from-emerald-50/50 via-white to-white">
       <Header />
 
       {/* Breadcrumb */}
-      <div className="bg-white border-b">
+      <div className="bg-white/90 backdrop-blur border-b border-emerald-100">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <nav className="flex items-center gap-2 text-sm">
             <Link to="/" className="text-gray-500 hover:text-emerald-600">Home</Link>
@@ -209,12 +209,12 @@ export default function ProductDetailPage() {
 
       {/* Main Product Section */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
+        <div className="bg-white rounded-2xl shadow-sm border border-emerald-100 overflow-hidden">
           <div className="grid lg:grid-cols-2 gap-8 p-6 lg:p-8">
             {/* Product Images */}
             <div className="space-y-4">
               {/* Main Image */}
-              <div className="relative aspect-square bg-gray-50 rounded-xl overflow-hidden">
+              <div className="relative aspect-square bg-gradient-to-br from-gray-50 to-emerald-50/40 rounded-xl overflow-hidden border border-emerald-100">
                 <ImageWithFallback
                   src={images[selectedImageIndex]}
                   alt={selectedProduct.name}
@@ -226,13 +226,13 @@ export default function ProductDetailPage() {
                   <>
                     <button
                       onClick={prevImage}
-                      className="absolute left-4 top-1/2 -translate-y-1/2 w-10 h-10 bg-white/90 rounded-full flex items-center justify-center shadow-lg hover:bg-white transition-colors"
+                      className="absolute left-4 top-1/2 -translate-y-1/2 w-10 h-10 bg-white/90 rounded-full flex items-center justify-center shadow-lg hover:bg-white transition-colors border border-emerald-100"
                     >
                       <ChevronLeft className="w-5 h-5 text-gray-700" />
                     </button>
                     <button
                       onClick={nextImage}
-                      className="absolute right-4 top-1/2 -translate-y-1/2 w-10 h-10 bg-white/90 rounded-full flex items-center justify-center shadow-lg hover:bg-white transition-colors"
+                      className="absolute right-4 top-1/2 -translate-y-1/2 w-10 h-10 bg-white/90 rounded-full flex items-center justify-center shadow-lg hover:bg-white transition-colors border border-emerald-100"
                     >
                       <ChevronRight className="w-5 h-5 text-gray-700" />
                     </button>
@@ -260,7 +260,7 @@ export default function ProductDetailPage() {
                 {/* Wishlist Button */}
                 <button
                   onClick={() => setIsWishlisted(!isWishlisted)}
-                  className="absolute top-4 right-4 w-10 h-10 bg-white rounded-full flex items-center justify-center shadow-lg hover:bg-gray-50 transition-colors"
+                  className="absolute top-4 right-4 w-10 h-10 bg-white rounded-full flex items-center justify-center shadow-lg hover:bg-gray-50 transition-colors border border-emerald-100"
                 >
                   <Heart className={`w-5 h-5 ${isWishlisted ? 'fill-red-500 text-red-500' : 'text-gray-400'}`} />
                 </button>
@@ -295,7 +295,7 @@ export default function ProductDetailPage() {
               {/* Title & Rating */}
               <div>
                 <div className="flex items-center gap-2 mb-2">
-                  <span className="text-sm text-emerald-600 font-medium uppercase tracking-wide">
+                  <span className="text-xs text-emerald-700 font-semibold uppercase tracking-wide px-2.5 py-1 rounded-full bg-emerald-50 border border-emerald-100">
                     {selectedProduct.category}
                   </span>
                 </div>
@@ -319,7 +319,7 @@ export default function ProductDetailPage() {
               </div>
 
               {/* Price */}
-              <div className="flex items-baseline gap-3">
+              <div className="flex items-baseline gap-3 bg-emerald-50/60 border border-emerald-100 rounded-xl px-4 py-3">
                 <span className="text-3xl font-bold text-emerald-600">
                   {selectedProduct.price.toLocaleString('vi-VN')} ₫
                 </span>
@@ -332,7 +332,7 @@ export default function ProductDetailPage() {
               </div>
 
               {/* Stock Status */}
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 bg-white rounded-lg border border-emerald-100 px-3 py-2 w-fit">
                 {selectedProduct.stock > 0 ? (
                   <>
                     <Check className="w-5 h-5 text-emerald-500" />
@@ -350,7 +350,7 @@ export default function ProductDetailPage() {
               </p>
 
               {/* Origin & Certifications */}
-              <div className="space-y-2">
+              <div className="space-y-2 rounded-xl border border-gray-100 bg-gray-50/60 p-4">
                 {selectedProduct.origin && (
                   <div className="flex items-center gap-2 text-sm">
                     <span className="text-gray-500">Origin:</span>
@@ -374,10 +374,10 @@ export default function ProductDetailPage() {
               {/* Quantity Selector */}
               <div className="flex items-center gap-4">
                 <span className="text-gray-700 font-medium">Quantity:</span>
-                <div className="flex items-center border rounded-lg">
+                <div className="flex items-center border border-emerald-200 rounded-lg bg-white">
                   <button
                     onClick={() => setQuantity(Math.max(1, quantity - 1))}
-                    className="p-3 hover:bg-gray-50 transition-colors"
+                    className="p-3 hover:bg-emerald-50 transition-colors"
                     disabled={quantity <= 1}
                   >
                     <Minus className="w-4 h-4" />
@@ -400,7 +400,7 @@ export default function ProductDetailPage() {
                   ) : (
                     <button
                       onClick={startQtyEdit}
-                      className="w-12 text-center font-medium hover:bg-gray-50 rounded transition-colors py-1"
+                      className="w-12 text-center font-medium hover:bg-emerald-50 rounded transition-colors py-1"
                       title="Click to edit quantity"
                     >
                       {quantity}
@@ -408,7 +408,7 @@ export default function ProductDetailPage() {
                   )}
                   <button
                     onClick={() => setQuantity(Math.min(selectedProduct.stock, quantity + 1))}
-                    className="p-3 hover:bg-gray-50 transition-colors"
+                    className="p-3 hover:bg-emerald-50 transition-colors"
                     disabled={quantity >= selectedProduct.stock}
                   >
                     <Plus className="w-4 h-4" />
@@ -429,7 +429,7 @@ export default function ProductDetailPage() {
                   onClick={() => handleAddToCart()}
                   variant={isGroupMode ? 'default' : 'outline'}
                   size="lg"
-                  className={`flex-1 ${
+                  className={`flex-1 h-12 ${
                     isGroupMode
                       ? 'bg-orange-500 hover:bg-orange-600 text-white border-orange-500'
                       : 'border-emerald-500 text-emerald-600 hover:bg-emerald-50'
@@ -446,7 +446,7 @@ export default function ProductDetailPage() {
                   <Button
                     onClick={handleBuyNow}
                     size="lg"
-                    className="flex-1 bg-emerald-600 hover:bg-emerald-700"
+                    className="flex-1 h-12 bg-emerald-600 hover:bg-emerald-700 shadow-sm"
                     disabled={selectedProduct.stock <= 0 || quantity > selectedProduct.stock}
                   >
                     Buy Now
@@ -455,17 +455,17 @@ export default function ProductDetailPage() {
               </div>
 
               {/* Share */}
-              <div className="flex items-center gap-4 pt-4 border-t">
+              <div className="flex items-center gap-4 pt-4 border-t border-emerald-100">
                 <span className="text-gray-500 text-sm">Share:</span>
                 <div className="flex gap-2">
-                  <button className="p-2 rounded-full bg-gray-100 hover:bg-gray-200 transition-colors">
+                  <button className="p-2 rounded-full bg-emerald-50 hover:bg-emerald-100 transition-colors border border-emerald-100">
                     <Share2 className="w-4 h-4 text-gray-600" />
                   </button>
                 </div>
               </div>
 
               {/* Trust Badges */}
-              <div className="grid grid-cols-3 gap-4 pt-4 border-t">
+              <div className="grid grid-cols-3 gap-4 pt-4 border-t border-emerald-100">
                 <div className="flex flex-col items-center text-center">
                   <Truck className="w-8 h-8 text-emerald-500 mb-2" />
                   <span className="text-xs text-gray-600">Free Delivery</span>
@@ -484,9 +484,9 @@ export default function ProductDetailPage() {
         </div>
 
         {/* Product Details Tabs */}
-        <div className="bg-white rounded-2xl shadow-sm mt-8 p-6 lg:p-8">
+        <div className="bg-white rounded-2xl shadow-sm border border-emerald-100 mt-8 p-6 lg:p-8">
           <Tabs defaultValue="description" className="w-full">
-            <TabsList className="grid w-full grid-cols-3 mb-6">
+            <TabsList className="grid w-full grid-cols-3 mb-6 bg-emerald-50/70 border border-emerald-100">
               <TabsTrigger value="description">Description</TabsTrigger>
               <TabsTrigger value="nutrition">Nutrition Info</TabsTrigger>
               <TabsTrigger value="reviews">Reviews</TabsTrigger>
@@ -498,7 +498,7 @@ export default function ProductDetailPage() {
                 <p>{selectedProduct.description}</p>
                 
                 {selectedProduct.isOrganic && (
-                  <div className="mt-6 p-4 bg-emerald-50 rounded-lg">
+                  <div className="mt-6 p-4 bg-emerald-50 rounded-lg border border-emerald-100">
                     <h4 className="font-semibold text-emerald-800 flex items-center gap-2">
                       <Leaf className="w-5 h-5" />
                       100% Organic Product
@@ -512,7 +512,7 @@ export default function ProductDetailPage() {
                 )}
 
                 <div className="mt-6 grid md:grid-cols-2 gap-4">
-                  <div className="p-4 bg-gray-50 rounded-lg">
+                  <div className="p-4 bg-gray-50 rounded-lg border border-gray-100">
                     <h4 className="font-semibold text-gray-900">Product Details</h4>
                     <ul className="mt-2 space-y-2 text-sm">
                       <li><strong>SKU:</strong> {selectedProduct.sku || 'N/A'}</li>
@@ -525,7 +525,7 @@ export default function ProductDetailPage() {
                   </div>
                   
                   {selectedProduct.farmer && (
-                    <div className="p-4 bg-gray-50 rounded-lg">
+                    <div className="p-4 bg-gray-50 rounded-lg border border-gray-100">
                       <h4 className="font-semibold text-gray-900">Farmer Information</h4>
                       <ul className="mt-2 space-y-2 text-sm">
                         <li><strong>Name:</strong> {selectedProduct.farmer.name}</li>
@@ -604,6 +604,15 @@ export default function ProductDetailPage() {
               {relatedProducts.map((product) => (
                 <ProductCard key={product._id} product={product} />
               ))}
+            </div>
+            <div className="mt-6 text-center">
+              <Link
+                to="/products"
+                className="inline-flex items-center gap-2 rounded-lg border border-emerald-200 bg-white px-4 py-2 text-sm font-medium text-emerald-700 hover:bg-emerald-50 transition-colors"
+              >
+                Explore more products
+                <ChevronRight className="w-4 h-4" />
+              </Link>
             </div>
           </div>
         )}
