@@ -471,10 +471,60 @@ export default function ProductsPage() {
       </div>
 
       {/* Footer */}
-      <footer className="bg-gray-900 text-white py-12 mt-16">
+      <footer className="bg-gray-900 text-white pt-12 pb-6 mt-16">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center">
-            <p className="text-gray-400">© 2026 FreshMarket. All rights reserved.</p>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 pb-8 border-b border-gray-800">
+            <div>
+              <h3 className="text-lg font-semibold mb-3">FreshMarket</h3>
+              <p className="text-sm text-gray-400 leading-6">
+                Organic produce from trusted local farms, delivered fresh every day.
+              </p>
+            </div>
+
+            <div>
+              <h4 className="text-sm font-semibold tracking-wide uppercase text-emerald-300 mb-3">
+                Shop
+              </h4>
+              <ul className="space-y-2 text-sm text-gray-400">
+                <li><a href="/products?category=vegetables" className="hover:text-white">Vegetables</a></li>
+                <li><a href="/products?category=fruits" className="hover:text-white">Fruits</a></li>
+                <li><a href="/products?category=grains" className="hover:text-white">Grains</a></li>
+                <li><a href="/products?category=milk-dairy" className="hover:text-white">Milk & Dairy</a></li>
+              </ul>
+            </div>
+
+            <div>
+              <h4 className="text-sm font-semibold tracking-wide uppercase text-emerald-300 mb-3">
+                Customer Care
+              </h4>
+              <ul className="space-y-2 text-sm text-gray-400">
+                <li><a href="/products" className="hover:text-white">How to Order</a></li>
+                <li><a href="/products" className="hover:text-white">Delivery Policy</a></li>
+                <li><a href="/products" className="hover:text-white">Returns & Refunds</a></li>
+                <li><a href="/products" className="hover:text-white">FAQs</a></li>
+              </ul>
+            </div>
+
+            <div>
+              <h4 className="text-sm font-semibold tracking-wide uppercase text-emerald-300 mb-3">
+                Contact
+              </h4>
+              <ul className="space-y-2 text-sm text-gray-400">
+                <li>Email: support@freshmarket.vn</li>
+                <li>Phone: 1900 1234</li>
+                <li>Hours: 08:00 - 21:00</li>
+                <li>Address: Ho Chi Minh City, Vietnam</li>
+              </ul>
+            </div>
+          </div>
+
+          <div className="pt-6 flex flex-col sm:flex-row items-center justify-between gap-3 text-sm text-gray-500">
+            <p>© 2026 FreshMarket. All rights reserved.</p>
+            <div className="flex items-center gap-4">
+              <a href="/products" className="hover:text-gray-300">Privacy</a>
+              <a href="/products" className="hover:text-gray-300">Terms</a>
+              <a href="/products" className="hover:text-gray-300">Support</a>
+            </div>
           </div>
         </div>
       </footer>
