@@ -10,8 +10,52 @@ import { Transaction } from '../models/Transaction.model';
 import { AuthRequest } from '../middlewares/auth.middleware';
 import { AppError } from '../utils/AppError';
 import { createNotification } from '../models/Notification.model';
+import { UserRole } from '../constants/roles';
 
 export class OrderController {
+  private refundWalletPaymentIfNeeded = async (order: any): Promise<void> => {
+    if (!order) return;
+
+    const isWalletPayment = order.paymentMethod === 'wallet' && order.paymentStatus === 'paid';
+    const isRegularOrder = order.orderType === 'regular';
+
+    if (!isRegularOrder || !isWalletPayment) {
+      return;
+    }
+
+    // Prevent duplicate refunds if cancel endpoint is retried.
+    const existingRefund = await Transaction.findOne({
+      orderId: order._id,
+      type: 'refund',
+      status: 'success'
+    });
+
+    if (existingRefund) {
+      return;
+    }
+
+    const paymentTxn = await Transaction.findOne({
+      orderId: order._id,
+      type: 'payment',
+      status: 'success'
+    }).sort({ createdAt: -1 });
+
+    const refundAmount = paymentTxn?.amount ?? order.totalAmount;
+
+    await User.findByIdAndUpdate(order.userId, {
+      $inc: { walletBalance: refundAmount }
+    });
+
+    await Transaction.create({
+      userId: order.userId,
+      amount: refundAmount,
+      type: 'refund',
+      status: 'success',
+      orderId: order._id,
+      description: `Refund for cancelled order #${order._id}`
+    });
+  };
+
   /**
    * Create a new order
    * POST /api/orders
@@ -187,6 +231,11 @@ export class OrderController {
       if (status)        filter.status        = status;
       if (paymentStatus) filter.paymentStatus = paymentStatus;
       if (userId)        filter.userId        = userId;
+      // Shipper chỉ được xem đơn trả về (khách không nhận hàng)
+      if (req.user?.role === UserRole.SHIPPER) {
+        filter.status = 'returned';
+      }
+
       if (req.query.groupId && mongoose.Types.ObjectId.isValid(req.query.groupId as string)) {
         filter.groupId = new mongoose.Types.ObjectId(req.query.groupId as string);
       }
@@ -335,7 +384,8 @@ export class OrderController {
       const orderUserId = (order.userId as any)?._id?.toString() ?? order.userId.toString();
       const memberIds: string[] = ((order as any).memberIds ?? []).map((id: any) => id?.toString());
       const isGroupMember = memberIds.includes(req.user?.id ?? '');
-      if (req.user?.role !== 'admin' && req.user?.id !== orderUserId && !isGroupMember) {
+      const canViewNonOwnedOrder = [UserRole.ADMIN, UserRole.MANAGER, UserRole.SHIPPER].includes(req.user?.role as UserRole);
+      if (!canViewNonOwnedOrder && req.user?.id !== orderUserId && !isGroupMember) {
         throw new AppError('You do not have permission to view this order', 403);
       }
 
@@ -448,6 +498,8 @@ export class OrderController {
         { new: true, runValidators: true }
       ).populate('userId', 'name email phone')
        .populate('items.productId', 'name price thumbnail');
+
+      await this.refundWalletPaymentIfNeeded(order);
 
       // Restore stock
       if (updatedOrder && updatedOrder.items.length > 0) {
@@ -595,6 +647,8 @@ export class OrderController {
         .populate('userId', 'name email phone avatar')
         .populate('addressId')
         .populate('items.productId', 'name price thumbnail');
+
+      await this.refundWalletPaymentIfNeeded(order);
 
       // Restore stock
       if (updatedOrder && updatedOrder.items.length > 0) {
