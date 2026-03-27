@@ -29,21 +29,21 @@ const banners = [
     image: banner2,
     title: 'SẢN PHẨM HỮU CƠ',
     subtitle: 'Tươi ngon mỗi ngày',
-    buttons: []
+    buttons: [{ text: 'Mua ngay', link: '/products' }]
   },
   {
     id: 3,
     image: banner3,
     title: 'RAU XANH SẠCH',
     subtitle: 'An toàn cho sức khỏe',
-    buttons: []
+    buttons: [{ text: 'Xem rau củ', link: '/products?category=vegetables' }]
   },
   {
     id: 4,
     image: banner4,
-    title: '',
-    subtitle: '',
-    buttons: []
+    title: 'NÔNG SẢN ĐỊA PHƯƠNG',
+    subtitle: 'Ủng hộ nông dân Việt',
+    buttons: [{ text: 'Khám phá sản phẩm', link: '/products' }]
   }
 ];
 
@@ -112,7 +112,7 @@ export default function HomePage() {
   };
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-gradient-to-b from-emerald-50/40 via-white to-white">
       {/* Header */}
       <Header />
 
@@ -200,6 +200,20 @@ export default function HomePage() {
               Popular Products
             </h2>
             <div className="w-24 h-1 bg-gradient-to-r from-green-500 to-emerald-500 mx-auto rounded-full"></div>
+          </div>
+          <div className="flex flex-wrap justify-center gap-2 mb-8">
+            <Link to="/products?category=vegetables" className="px-4 py-2 rounded-full text-sm border border-emerald-200 bg-white text-emerald-700 hover:bg-emerald-50 transition-colors">
+              Vegetables
+            </Link>
+            <Link to="/products?category=fruits" className="px-4 py-2 rounded-full text-sm border border-emerald-200 bg-white text-emerald-700 hover:bg-emerald-50 transition-colors">
+              Fruits
+            </Link>
+            <Link to="/products?category=grains" className="px-4 py-2 rounded-full text-sm border border-emerald-200 bg-white text-emerald-700 hover:bg-emerald-50 transition-colors">
+              Grains
+            </Link>
+            <Link to="/products?category=milk-dairy" className="px-4 py-2 rounded-full text-sm border border-emerald-200 bg-white text-emerald-700 hover:bg-emerald-50 transition-colors">
+              Milk & Dairy
+            </Link>
           </div>
 
           {/* Horizontal Scrollable Products */}
@@ -295,6 +309,28 @@ export default function HomePage() {
             alt=""
             className="w-full opacity-0 pointer-events-none select-none"
           />
+          <div className="absolute inset-0 bg-gradient-to-r from-black/55 via-black/30 to-transparent z-[1]" />
+          <div className="absolute inset-0 z-[2] flex items-center">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full">
+              <div className="max-w-xl text-white">
+                <h3 className="text-2xl md:text-4xl font-bold mb-3 drop-shadow">
+                  {banners[currentSlide].title}
+                </h3>
+                <p className="text-white/85 mb-5">{banners[currentSlide].subtitle}</p>
+                <div className="flex flex-wrap gap-2">
+                  {banners[currentSlide].buttons.map((btn) => (
+                    <Link
+                      key={btn.text}
+                      to={btn.link}
+                      className="inline-flex items-center px-4 py-2 rounded-lg bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-medium transition-colors"
+                    >
+                      {btn.text}
+                    </Link>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
 
           <button
             onClick={prevSlide}
@@ -435,30 +471,30 @@ export default function HomePage() {
             <div>
               <h4 className="font-semibold mb-4">Shop</h4>
               <ul className="space-y-2 text-white/70">
-                <li><Link to="/" className="hover:text-white transition-colors">All Products</Link></li>
-                <li><Link to="/" className="hover:text-white transition-colors">Fruits</Link></li>
-                <li><Link to="/" className="hover:text-white transition-colors">Vegetables</Link></li>
-                <li><Link to="/" className="hover:text-white transition-colors">Bundles</Link></li>
+                <li><Link to="/products" className="hover:text-white transition-colors">All Products</Link></li>
+                <li><Link to="/products?category=fruits" className="hover:text-white transition-colors">Fruits</Link></li>
+                <li><Link to="/products?category=vegetables" className="hover:text-white transition-colors">Vegetables</Link></li>
+                <li><Link to="/products?category=grains" className="hover:text-white transition-colors">Grains</Link></li>
               </ul>
             </div>
 
             <div>
               <h4 className="font-semibold mb-4">Company</h4>
               <ul className="space-y-2 text-white/70">
-                <li><Link to="/" className="hover:text-white transition-colors">About Us</Link></li>
-                <li><Link to="/" className="hover:text-white transition-colors">Contact</Link></li>
-                <li><Link to="/" className="hover:text-white transition-colors">Careers</Link></li>
-                <li><Link to="/" className="hover:text-white transition-colors">Blog</Link></li>
+                <li><Link to="/products" className="hover:text-white transition-colors">About Us</Link></li>
+                <li><Link to="/products" className="hover:text-white transition-colors">Contact</Link></li>
+                <li><Link to="/products" className="hover:text-white transition-colors">Careers</Link></li>
+                <li><Link to="/products" className="hover:text-white transition-colors">Blog</Link></li>
               </ul>
             </div>
 
             <div>
               <h4 className="font-semibold mb-4">Support</h4>
               <ul className="space-y-2 text-white/70">
-                <li><Link to="/" className="hover:text-white transition-colors">Help Center</Link></li>
-                <li><Link to="/" className="hover:text-white transition-colors">Shipping Info</Link></li>
-                <li><Link to="/" className="hover:text-white transition-colors">Returns</Link></li>
-                <li><Link to="/" className="hover:text-white transition-colors">Privacy</Link></li>
+                <li><Link to="/products" className="hover:text-white transition-colors">Help Center</Link></li>
+                <li><Link to="/products" className="hover:text-white transition-colors">Shipping Info</Link></li>
+                <li><Link to="/products" className="hover:text-white transition-colors">Returns</Link></li>
+                <li><Link to="/products" className="hover:text-white transition-colors">Privacy</Link></li>
               </ul>
             </div>
           </div>
