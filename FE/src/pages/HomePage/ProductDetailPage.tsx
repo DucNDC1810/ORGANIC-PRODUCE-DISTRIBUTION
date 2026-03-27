@@ -190,6 +190,10 @@ export default function ProductDetailPage() {
     ? selectedProduct.images 
     : [selectedProduct.thumbnail || ''];
 
+  const formattedExpiryDate = selectedProduct.expiryDate
+    ? new Date(selectedProduct.expiryDate).toLocaleDateString('vi-VN')
+    : null;
+
   return (
     <div className="min-h-screen bg-gray-50">
       <Header />
@@ -357,6 +361,12 @@ export default function ProductDetailPage() {
                     <span className="font-medium">{selectedProduct.origin}</span>
                   </div>
                 )}
+                {formattedExpiryDate && (
+                  <div className="flex items-center gap-2 text-sm">
+                    <span className="text-gray-500">Expiry Date:</span>
+                    <span className="font-medium text-amber-700">{formattedExpiryDate}</span>
+                  </div>
+                )}
                 {selectedProduct.certifications && selectedProduct.certifications.length > 0 && (
                   <div className="flex items-center gap-2 text-sm">
                     <span className="text-gray-500">Certifications:</span>
@@ -518,6 +528,9 @@ export default function ProductDetailPage() {
                       <li><strong>SKU:</strong> {selectedProduct.sku || 'N/A'}</li>
                       <li><strong>Category:</strong> {selectedProduct.category}</li>
                       <li><strong>Unit:</strong> {selectedProduct.unit || 'unit'}</li>
+                      {formattedExpiryDate && (
+                        <li><strong>Expiry Date:</strong> {formattedExpiryDate}</li>
+                      )}
                       {selectedProduct.weight && (
                         <li><strong>Weight:</strong> {selectedProduct.weight}g</li>
                       )}
