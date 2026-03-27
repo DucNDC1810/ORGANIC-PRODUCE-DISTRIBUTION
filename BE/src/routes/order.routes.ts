@@ -47,7 +47,7 @@ router.post(
 router.get(
   '/pending-summary',
   authenticate as any,
-  checkRole(UserRole.ADMIN, UserRole.MANAGER) as any,
+  checkRole(UserRole.ADMIN, UserRole.MANAGER, UserRole.STAFF) as any,
   orderController.getPendingSummary as any
 );
 

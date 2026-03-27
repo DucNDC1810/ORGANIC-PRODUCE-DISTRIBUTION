@@ -341,8 +341,27 @@ export default function Header() {
                             </div>
                           </button>
                         )}
+                        {user?.role === 'staff' && (
+                          <button
+                            onClick={() => { setUserDropdownOpen(false); navigate('/staff'); }}
+                            className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors group"
+                          >
+                            <div className="w-8 h-8 rounded-lg bg-gray-100 flex items-center justify-center group-hover:bg-emerald-100 transition-colors">
+                              <LayoutDashboard className="w-4 h-4 text-gray-600 group-hover:text-emerald-600 transition-colors" />
+                            </div>
+                            <div className="flex-1 text-left">
+                              <p className="font-medium">Staff Dashboard</p>
+                              <p className="text-xs text-gray-500">Process returned orders</p>
+                            </div>
+                          </button>
+                        )}
                         <button
-                          onClick={() => { setUserDropdownOpen(false); navigate(user?.role === 'admin' ? '/admin' : '/profile'); }}
+                          onClick={() => {
+                            setUserDropdownOpen(false);
+                            if (user?.role === 'admin') navigate('/admin');
+                            else if (user?.role === 'staff') navigate('/staff');
+                            else navigate('/profile');
+                          }}
                           className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors group"
                         >
                           <div className="w-8 h-8 rounded-lg bg-gray-100 flex items-center justify-center group-hover:bg-blue-100 transition-colors">

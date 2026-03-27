@@ -669,7 +669,11 @@ export default function OrderConfirmation({ staffOnly = false }: { staffOnly?: b
   }, []);
 
   useEffect(() => { fetchOrders(); }, [fetchOrders]);
-  useEffect(() => { fetchPendingSummary(); }, [fetchPendingSummary]);
+  useEffect(() => {
+    if (!staffOnly) {
+      fetchPendingSummary();
+    }
+  }, [fetchPendingSummary, staffOnly]);
 
   // ── Actions ───────────────────────────────────────────────
 
