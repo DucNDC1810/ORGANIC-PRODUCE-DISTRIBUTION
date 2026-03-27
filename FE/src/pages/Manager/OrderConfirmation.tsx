@@ -173,6 +173,7 @@ interface OrderDetailModalProps {
   onProcessReturn: (id: string) => void;
   loading: boolean;
   subOrders?: Order[];
+  staffOnly?: boolean;
 }
 
 const OrderDetailModal = ({
@@ -184,6 +185,7 @@ const OrderDetailModal = ({
   onProcessReturn,
   loading,
   subOrders = [],
+  staffOnly = false,
 }: OrderDetailModalProps) => {
   if (!order) return null;
 
@@ -541,7 +543,7 @@ const OrderDetailModal = ({
           )}
         </div>
 
-        {isPending && (
+        {isPending && !staffOnly && (
           <DialogFooter className="gap-2 pt-2">
             <Button
               variant="outline"
@@ -596,7 +598,7 @@ const OrderDetailModal = ({
 
 const ITEMS_PER_PAGE = 10;
 
-export default function OrderConfirmation() {
+export default function OrderConfirmation({ staffOnly = false }: { staffOnly?: boolean }) {
   // Data state
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(false);
@@ -609,7 +611,7 @@ export default function OrderConfirmation() {
   const [currentPage, setCurrentPage] = useState(1);
   const [searchQuery, setSearchQuery] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [statusFilter, setStatusFilter] = useState<string>(staffOnly ? 'returned' : 'all');
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Dialog state
@@ -639,7 +641,7 @@ export default function OrderConfirmation() {
       const res = await orderAPI.getAllOrders({
         page: currentPage,
         limit: ITEMS_PER_PAGE,
-        status: statusFilter === 'all' ? undefined : statusFilter,
+        status: staffOnly ? 'returned' : (statusFilter === 'all' ? undefined : statusFilter),
         search: debouncedSearch.trim() || undefined,
       });
       // api interceptor already unwraps response.data → res IS the body
@@ -779,10 +781,12 @@ export default function OrderConfirmation() {
         <div>
           <h2 className="text-3xl font-bold text-foreground flex items-center gap-2">
             <ShoppingBag className="w-7 h-7 text-emerald-600" />
-            Order Confirmation
+            {staffOnly ? 'Returned Orders Processing' : 'Order Confirmation'}
           </h2>
           <p className="text-muted-foreground mt-1">
-            Review, confirm, or cancel incoming customer orders.
+            {staffOnly
+              ? 'Handle failed deliveries where customers refused to receive orders.'
+              : 'Review, confirm, or cancel incoming customer orders.'}
           </p>
         </div>
         <Button
@@ -807,24 +811,24 @@ export default function OrderConfirmation() {
         />
         <StatCard
           title="Pending Orders"
-          value={stats.pending}
+          value={staffOnly ? stats.returned : stats.pending}
           icon={Clock}
-          accent="border-l-amber-500"
-          sub={`${stats.pendingToday} new today`}
+          accent={staffOnly ? 'border-l-indigo-500' : 'border-l-amber-500'}
+          sub={staffOnly ? 'Need staff processing' : `${stats.pendingToday} new today`}
         />
         <StatCard
-          title="Confirmed"
-          value={stats.confirmed}
+          title={staffOnly ? 'Returned' : 'Confirmed'}
+          value={staffOnly ? stats.returned : stats.confirmed}
           icon={CheckCircle2}
-          accent="border-l-blue-500"
-          sub="Ready to process"
+          accent={staffOnly ? 'border-l-amber-500' : 'border-l-blue-500'}
+          sub={staffOnly ? 'Customer refused delivery' : 'Ready to process'}
         />
         <StatCard
-          title="Cancelled"
-          value={stats.cancelled}
+          title={staffOnly ? 'Processed (This page)' : 'Cancelled'}
+          value={staffOnly ? safeOrders.filter((o) => o.status === 'refunded').length : stats.cancelled}
           icon={XCircle}
           accent="border-l-red-500"
-          sub="On current page"
+          sub={staffOnly ? 'Already refunded' : 'On current page'}
         />
       </div>
 
@@ -850,30 +854,36 @@ export default function OrderConfirmation() {
             </div>
 
             {/* Status filter */}
-            <div className="w-full sm:w-52">
-              <Select
-                value={statusFilter}
-                onValueChange={(v) => {
-                  setStatusFilter(v);
-                  setCurrentPage(1);
-                }}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="All statuses" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Statuses</SelectItem>
-                  <SelectItem value="pending">Pending</SelectItem>
-                  <SelectItem value="confirmed">Confirmed</SelectItem>
-                  <SelectItem value="processing">Processing</SelectItem>
-                  <SelectItem value="shipped">Shipped</SelectItem>
-                  <SelectItem value="delivered">Delivered</SelectItem>
-                  <SelectItem value="cancelled">Cancelled</SelectItem>
-                  <SelectItem value="refunded">Refunded</SelectItem>
-                  <SelectItem value="returned">Returned</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+            {!staffOnly ? (
+              <div className="w-full sm:w-52">
+                <Select
+                  value={statusFilter}
+                  onValueChange={(v) => {
+                    setStatusFilter(v);
+                    setCurrentPage(1);
+                  }}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="All statuses" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Statuses</SelectItem>
+                    <SelectItem value="pending">Pending</SelectItem>
+                    <SelectItem value="confirmed">Confirmed</SelectItem>
+                    <SelectItem value="processing">Processing</SelectItem>
+                    <SelectItem value="shipped">Shipped</SelectItem>
+                    <SelectItem value="delivered">Delivered</SelectItem>
+                    <SelectItem value="cancelled">Cancelled</SelectItem>
+                    <SelectItem value="refunded">Refunded</SelectItem>
+                    <SelectItem value="returned">Returned</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            ) : (
+              <div className="inline-flex items-center rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-medium text-amber-700">
+                Showing only: Returned orders
+              </div>
+            )}
           </div>
         </CardContent>
       </Card>
@@ -1017,7 +1027,7 @@ export default function OrderConfirmation() {
                           </button>
 
                           {/* Quick-confirm (only for pending) */}
-                          {order.status === 'pending' && (
+                          {order.status === 'pending' && !staffOnly && (
                             <>
                               <button
                                 onClick={() => handleConfirm(order._id)}
@@ -1117,6 +1127,7 @@ export default function OrderConfirmation() {
         onProcessReturn={handleProcessReturnClick}
         loading={actionLoading}
         subOrders={groupSubOrders}
+        staffOnly={staffOnly}
       />
 
       {/* ── Cancel Alert Dialog ──────────────────── */}

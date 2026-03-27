@@ -15,6 +15,7 @@ import { toast } from 'sonner';
 const roleBadgeColors: Record<string, string> = {
   admin: 'bg-red-100 text-red-800',
   manager: 'bg-purple-100 text-purple-800',
+  staff: 'bg-indigo-100 text-indigo-800',
   customer: 'bg-blue-100 text-blue-800',
   user: 'bg-gray-100 text-gray-800',
   shipper: 'bg-orange-100 text-orange-800',
@@ -57,7 +58,7 @@ export default function CustomerManagement() {
     email: string;
     username: string;
     password: string;
-    role: 'admin' | 'manager' | 'customer' | 'user' | 'shipper' | 'farmer';
+    role: 'admin' | 'manager' | 'staff' | 'customer' | 'user' | 'shipper' | 'farmer';
     phone: string;
     address: string;
   }>({ 
@@ -414,6 +415,7 @@ export default function CustomerManagement() {
                   <SelectItem value="all">All Roles</SelectItem>
                   <SelectItem value="admin">Admin</SelectItem>
                   <SelectItem value="manager">Manager</SelectItem>
+                  <SelectItem value="staff">Staff</SelectItem>
                   <SelectItem value="customer">Customer</SelectItem>
                   <SelectItem value="shipper">Shipper</SelectItem>
                   <SelectItem value="farmer">Farmer</SelectItem>
@@ -832,7 +834,7 @@ export default function CustomerManagement() {
                     <Briefcase className="w-4 h-4 text-green-600" />
                     Role <span className="text-red-500">*</span>
                   </Label>
-                  <Select value={createForm.role} onValueChange={(value) => setCreateForm({ ...createForm, role: value as 'admin' | 'manager' | 'customer' | 'user' | 'shipper' | 'farmer' })}>
+                  <Select value={createForm.role} onValueChange={(value) => setCreateForm({ ...createForm, role: value as 'admin' | 'manager' | 'staff' | 'customer' | 'user' | 'shipper' | 'farmer' })}>
                     <SelectTrigger className="border-gray-300 focus:border-green-500 focus:ring-green-500">
                       <SelectValue placeholder="Select role" />
                     </SelectTrigger>
@@ -859,6 +861,12 @@ export default function CustomerManagement() {
                         <div className="flex items-center gap-2">
                           <div className="w-2 h-2 rounded-full bg-purple-500"></div>
                           Manager
+                        </div>
+                      </SelectItem>
+                      <SelectItem value="staff">
+                        <div className="flex items-center gap-2">
+                          <div className="w-2 h-2 rounded-full bg-indigo-500"></div>
+                          Staff
                         </div>
                       </SelectItem>
                       <SelectItem value="admin">
@@ -938,6 +946,7 @@ export default function CustomerManagement() {
               <SelectContent>
                 <SelectItem value="admin">Admin</SelectItem>
                 <SelectItem value="manager">Manager</SelectItem>
+                <SelectItem value="staff">Staff</SelectItem>
                 <SelectItem value="customer">Customer</SelectItem>
                 <SelectItem value="shipper">Shipper</SelectItem>
                 <SelectItem value="farmer">Farmer</SelectItem>

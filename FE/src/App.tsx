@@ -4,7 +4,7 @@ import { Toaster } from 'sonner';
 import { CartProvider } from './context/CartContext';
 import { AuthProvider } from './context/AuthContext';
 import { GroupProvider } from './context/GroupContext';
-import { ProtectedRoute, AdminRoute, ManagerRoute, ShipperRoute } from './components/ProtectedRoute';
+import { ProtectedRoute, AdminRoute, ManagerRoute, ShipperRoute, StaffRoute } from './components/ProtectedRoute';
 import MiniCart from './components/MiniCart';
 import ChatWidget from './components/ChatWidget';
 import GroupSessionBar from './components/GroupSessionBar';
@@ -29,6 +29,7 @@ const Profile              = lazy(() => import('./pages/Customer/Profile'));
 const AdminDashboard       = lazy(() => import('./pages/Admin/AdminDashboard'));
 const ManagerDashboard     = lazy(() => import('./pages/Manager/ManagerDashboard'));
 const ShipperDashboard     = lazy(() => import('./pages/Shipper/ShipperDashboard'));
+const StaffDashboard       = lazy(() => import('./pages/Staff/StaffDashboard'));
 const ProductsPage         = lazy(() => import('./pages/HomePage/ProductsPage'));
 const ProductDetailPage    = lazy(() => import('./pages/HomePage/ProductDetailPage'));
 const GroupOrderPage       = lazy(() => import('./pages/GroupOrder/GroupOrderPage'));
@@ -96,6 +97,7 @@ export default function App() {
               {/* Shipper-only routes */}
               <Route path="/shipper/*" element={<ShipperRoute><ShipperDashboard /></ShipperRoute>} />
               <Route path="/manager" element={<ManagerRoute><ManagerDashboard /></ManagerRoute>} />
+              <Route path="/staff" element={<StaffRoute><StaffDashboard /></StaffRoute>} />
             </Routes>
             </Suspense>
             <ChatWidget />

@@ -22,7 +22,7 @@ router.post(
 router.get(
   '/',
   authenticate as any,
-  checkRole(UserRole.ADMIN, UserRole.MANAGER) as any,
+  checkRole(UserRole.ADMIN, UserRole.MANAGER, UserRole.STAFF) as any,
   orderController.getAllOrders as any
 );
 
@@ -120,7 +120,7 @@ router.patch(
 router.patch(
   '/:id/process-return',
   authenticate as any,
-  checkRole(UserRole.ADMIN, UserRole.MANAGER) as any,
+  checkRole(UserRole.ADMIN, UserRole.MANAGER, UserRole.STAFF) as any,
   orderController.processReturnedOrder as any
 );
 
