@@ -1,4 +1,4 @@
-﻿import { lazy, Suspense } from 'react';
+import { lazy, Suspense } from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { Toaster } from 'sonner';
 import { CartProvider } from './context/CartContext';
@@ -24,6 +24,7 @@ const VerifyEmailPage      = lazy(() => import('./pages/HomePage/VerifyEmailPage
 const FarmStories          = lazy(() => import('./pages/HomePage/FarmStories'));
 const BlogsPage            = lazy(() => import('./pages/HomePage/BlogsPage'));
 const AboutUs              = lazy(() => import('./pages/HomePage/AboutUs'));
+const ContactUs            = lazy(() => import('./pages/HomePage/ContactUs'));
 const Profile              = lazy(() => import('./pages/Customer/Profile'));
 const AdminDashboard       = lazy(() => import('./pages/Admin/AdminDashboard'));
 const ManagerDashboard     = lazy(() => import('./pages/Manager/ManagerDashboard'));
@@ -60,6 +61,7 @@ export default function App() {
               <Route path="/blogs/green-living" element={<BlogsPage />} />
               <Route path="/blogs/news-offers" element={<FarmStories />} />
               <Route path="/about" element={<AboutUs />} />
+              <Route path="/contact" element={<ContactUs />} />
               <Route path="/products" element={<ProductsPage />} />
               <Route path="/products/:category" element={<ProductsPage />} />
               <Route path="/product/:id" element={<ProductDetailPage />} />
