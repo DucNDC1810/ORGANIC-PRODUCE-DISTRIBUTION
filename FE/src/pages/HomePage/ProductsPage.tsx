@@ -229,17 +229,24 @@ export default function ProductsPage() {
   const hasActiveFilters = searchTerm || (selectedCategory && selectedCategory !== 'all') || sortBy !== 'createdAt' || sortOrder !== 'desc';
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gradient-to-b from-emerald-50/60 via-white to-white">
       <Header />
 
       {/* Hero Section */}
-      <section className="bg-gradient-to-r from-emerald-600 to-green-500 py-12">
+      <section className="bg-gradient-to-r from-emerald-600 to-green-500 py-14">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center text-white">
             <h1 className="text-4xl md:text-5xl font-bold mb-4">Our Products</h1>
-            <p className="text-lg text-emerald-100 max-w-2xl mx-auto">
+            <p className="text-lg text-emerald-100 max-w-2xl mx-auto mb-6">
               Discover fresh organic products, carefully selected from local farms
             </p>
+            <div className="inline-flex items-center gap-2 rounded-full border border-white/30 bg-white/10 px-4 py-2 text-sm text-emerald-50">
+              <span>Fresh daily</span>
+              <span className="text-white/60">•</span>
+              <span>Safe sourcing</span>
+              <span className="text-white/60">•</span>
+              <span>Fast delivery</span>
+            </div>
           </div>
         </div>
       </section>
@@ -247,20 +254,37 @@ export default function ProductsPage() {
       {/* Main Content */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Search and Filter Bar */}
-        <div className="bg-white rounded-xl shadow-sm p-4 mb-8">
+        <div className="bg-white/95 backdrop-blur rounded-2xl shadow-sm border border-emerald-100 p-4 md:p-5 mb-8">
           <div className="flex flex-col lg:flex-row gap-4">
             {/* Search */}
-            <form onSubmit={handleSearch} className="flex-1">
-              <div className="relative">
+            <form onSubmit={handleSearch} className="flex-1 flex gap-2">
+              <div className="relative flex-1">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
                 <Input
                   type="text"
                   placeholder="Search products..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10 w-full"
+                  className="pl-10 pr-9 w-full border-emerald-100 focus-visible:ring-emerald-500"
                 />
+                {searchTerm && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSearchTerm('');
+                      setCurrentPage(1);
+                      updateUrlParams(undefined, '', undefined, undefined, 1);
+                    }}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                    aria-label="Clear search"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                )}
               </div>
+              <Button type="submit" className="bg-emerald-600 hover:bg-emerald-700">
+                Search
+              </Button>
             </form>
 
             {/* Filter Toggle for Mobile */}
@@ -325,6 +349,31 @@ export default function ProductsPage() {
               )}
             </div>
           </div>
+          {hasActiveFilters && (
+            <div className="mt-4 flex flex-wrap items-center gap-2 text-sm">
+              <span className="text-gray-500">Active filters:</span>
+              {searchTerm && (
+                <span className="inline-flex items-center rounded-full bg-emerald-50 px-3 py-1 text-emerald-700 border border-emerald-100">
+                  Search: {searchTerm}
+                </span>
+              )}
+              {selectedCategory !== 'all' && (
+                <span className="inline-flex items-center rounded-full bg-emerald-50 px-3 py-1 text-emerald-700 border border-emerald-100">
+                  Category: {categoryOptions.find((item) => item.value === selectedCategory)?.label || selectedCategory}
+                </span>
+              )}
+              {sortBy !== 'createdAt' && (
+                <span className="inline-flex items-center rounded-full bg-emerald-50 px-3 py-1 text-emerald-700 border border-emerald-100">
+                  Sort: {sortBy}
+                </span>
+              )}
+              {sortOrder !== 'desc' && (
+                <span className="inline-flex items-center rounded-full bg-emerald-50 px-3 py-1 text-emerald-700 border border-emerald-100">
+                  Order: Ascending
+                </span>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Results Info */}
@@ -339,6 +388,9 @@ export default function ProductsPage() {
               <>Loading...</>
             )}
           </p>
+          <div className="hidden md:block text-sm text-gray-500">
+            {sortBy === 'createdAt' ? 'Newest first' : `Sorted by ${sortBy}`} ({sortOrder})
+          </div>
         </div>
 
         {/* Products Grid */}
@@ -369,11 +421,12 @@ export default function ProductsPage() {
         {/* Pagination */}
         {pagination && pagination.totalPages > 1 && (
           <div className="flex justify-center mt-12">
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 bg-white border border-emerald-100 rounded-xl px-3 py-2 shadow-sm">
               <Button
                 variant="outline"
                 disabled={!pagination.hasPrev}
                 onClick={() => handlePageChange(currentPage - 1)}
+                className="border-emerald-100"
               >
                 Previous
               </Button>
@@ -396,7 +449,7 @@ export default function ProductsPage() {
                       <Button
                         variant={currentPage === page ? 'default' : 'outline'}
                         onClick={() => handlePageChange(page)}
-                        className={currentPage === page ? 'bg-emerald-600 hover:bg-emerald-700' : ''}
+                        className={currentPage === page ? 'bg-emerald-600 hover:bg-emerald-700' : 'border-emerald-100'}
                       >
                         {page}
                       </Button>
@@ -408,6 +461,7 @@ export default function ProductsPage() {
                 variant="outline"
                 disabled={!pagination.hasNext}
                 onClick={() => handlePageChange(currentPage + 1)}
+                className="border-emerald-100"
               >
                 Next
               </Button>
