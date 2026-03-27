@@ -6,6 +6,7 @@
 export enum UserRole {
   ADMIN = 'admin',           // Quản trị viên hệ thống - Full access
   MANAGER = 'manager',       // Quản lý - Quản lý sản phẩm, đơn hàng, người dùng
+  STAFF = 'staff',           // Nhân viên xử lý đơn lỗi/đơn bị từ chối nhận
   CUSTOMER = 'customer',     // Khách hàng - Mua hàng, xem đơn hàng
   USER = 'user',            // Người dùng cơ bản - Quyền hạn chế
   SHIPPER = 'shipper',      // Người giao hàng - Xem và cập nhật đơn hàng
@@ -122,6 +123,12 @@ export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     Permission.ANALYTICS_VIEW,
   ],
 
+  [UserRole.STAFF]: [
+    // Chỉ xử lý đơn hàng lỗi (đơn trả về)
+    Permission.ORDER_READ,
+    Permission.ORDER_UPDATE,
+  ],
+
   [UserRole.CUSTOMER]: [
     // Can only manage their own orders
     Permission.USER_READ,
@@ -165,6 +172,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
 export const ROLE_HIERARCHY: Record<UserRole, number> = {
   [UserRole.ADMIN]: 100,
   [UserRole.MANAGER]: 80,
+  [UserRole.STAFF]: 70,
   [UserRole.FARMER]: 60,
   [UserRole.SHIPPER]: 50,
   [UserRole.CUSTOMER]: 40,

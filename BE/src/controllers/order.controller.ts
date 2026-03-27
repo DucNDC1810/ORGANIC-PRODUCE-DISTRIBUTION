@@ -10,6 +10,7 @@ import { Transaction } from '../models/Transaction.model';
 import { AuthRequest } from '../middlewares/auth.middleware';
 import { AppError } from '../utils/AppError';
 import { createNotification } from '../models/Notification.model';
+import { UserRole } from '../constants/roles';
 
 export class OrderController {
   /**
@@ -187,6 +188,11 @@ export class OrderController {
       if (status)        filter.status        = status;
       if (paymentStatus) filter.paymentStatus = paymentStatus;
       if (userId)        filter.userId        = userId;
+      // Staff chỉ được xem đơn trả về (khách không nhận hàng)
+      if (req.user?.role === UserRole.STAFF) {
+        filter.status = 'returned';
+      }
+
       if (req.query.groupId && mongoose.Types.ObjectId.isValid(req.query.groupId as string)) {
         filter.groupId = new mongoose.Types.ObjectId(req.query.groupId as string);
       }
@@ -335,7 +341,8 @@ export class OrderController {
       const orderUserId = (order.userId as any)?._id?.toString() ?? order.userId.toString();
       const memberIds: string[] = ((order as any).memberIds ?? []).map((id: any) => id?.toString());
       const isGroupMember = memberIds.includes(req.user?.id ?? '');
-      if (req.user?.role !== 'admin' && req.user?.id !== orderUserId && !isGroupMember) {
+      const canViewNonOwnedOrder = [UserRole.ADMIN, UserRole.MANAGER, UserRole.STAFF].includes(req.user?.role as UserRole);
+      if (!canViewNonOwnedOrder && req.user?.id !== orderUserId && !isGroupMember) {
         throw new AppError('You do not have permission to view this order', 403);
       }
 

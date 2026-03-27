@@ -226,6 +226,7 @@ export const checkResourceOwnership = (
 export const roleLimits: Record<UserRole, { requests: number; window: number }> = {
   [UserRole.ADMIN]: { requests: 1000, window: 60000 },      // 1000 requests per minute
   [UserRole.MANAGER]: { requests: 500, window: 60000 },     // 500 requests per minute
+  [UserRole.STAFF]: { requests: 300, window: 60000 },       // 300 requests per minute
   [UserRole.FARMER]: { requests: 200, window: 60000 },      // 200 requests per minute
   [UserRole.SHIPPER]: { requests: 200, window: 60000 },     // 200 requests per minute
   [UserRole.CUSTOMER]: { requests: 100, window: 60000 },    // 100 requests per minute
